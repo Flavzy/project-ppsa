@@ -27,7 +27,35 @@ class UserFactory extends Factory
             'nama' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => 'staff',
+            'role' => 'karyawan',
         ];
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'role' => 'admin',
+        ]);
+    }
+
+    public function sales(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'role' => 'sales',
+        ]);
+    }
+
+    public function karyawan(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'role' => 'karyawan',
+        ]);
+    }
+
+    public function pimpinan(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'role' => 'pimpinan',
+        ]);
     }
 }

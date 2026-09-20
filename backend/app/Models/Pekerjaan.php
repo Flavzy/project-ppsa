@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pekerjaan extends Model
 {
+    use HasFactory;
+
     protected $table = 'pekerjaan';
 
     protected $primaryKey = 'id_pekerjaan';
@@ -22,9 +26,17 @@ class Pekerjaan extends Model
         'id_pic',
         'id_template',
         'judul',
+        'deskripsi',
         'deadline',
+        'prioritas',
+        'progress_persen',
         'status',
         'tgl_selesai',
+        'submitted_at',
+        'approved_at',
+        'approved_by',
+        'review_status',
+        'catatan_review',
     ];
 
     public function klien(): BelongsTo
@@ -47,6 +59,16 @@ class Pekerjaan extends Model
         return $this->hasMany(Reporting::class, 'id_pekerjaan', 'id_pekerjaan');
     }
 
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by', 'id_user');
+    }
+
+    public function performanceReview(): HasOne
+    {
+        return $this->hasOne(PerformanceReview::class, 'id_pekerjaan', 'id_pekerjaan');
+    }
+
     /**
      * @return array<string, string>
      */
@@ -55,6 +77,8 @@ class Pekerjaan extends Model
         return [
             'deadline' => 'date',
             'tgl_selesai' => 'date',
+            'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 }

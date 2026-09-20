@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePekerjaanRequest extends FormRequest
 {
@@ -22,9 +23,14 @@ class StorePekerjaanRequest extends FormRequest
             'id_pic' => ['required', 'integer', 'exists:users,id_user'],
             'id_template' => ['required', 'integer', 'exists:template_deadline,id_template'],
             'judul' => ['required', 'string', 'max:255'],
+            'deskripsi' => ['nullable', 'string'],
             'deadline' => ['required', 'date'],
+            'prioritas' => ['nullable', 'string', 'max:255'],
+            'progress_persen' => ['nullable', 'integer', 'min:0', 'max:100'],
             'status' => ['required', 'string', 'max:255'],
             'tgl_selesai' => ['nullable', 'date'],
+            'review_status' => ['nullable', 'string', Rule::in(['pending', 'submitted', 'approved', 'revision_needed'])],
+            'catatan_review' => ['nullable', 'string'],
         ];
     }
 }

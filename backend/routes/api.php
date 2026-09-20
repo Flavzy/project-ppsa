@@ -1,23 +1,133 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalonKlienController;
+use App\Http\Controllers\Api\ClientReportController;
+use App\Http\Controllers\Api\DashboardSummaryController;
 use App\Http\Controllers\Api\KlienController;
 use App\Http\Controllers\Api\KontrakController;
+use App\Http\Controllers\Api\LeadConversionController;
+use App\Http\Controllers\Api\LeadInteractionController;
 use App\Http\Controllers\Api\PekerjaanController;
+use App\Http\Controllers\Api\PekerjaanWorkflowController;
+use App\Http\Controllers\Api\PerformanceReviewController;
 use App\Http\Controllers\Api\ReportingController;
+use App\Http\Controllers\Api\ReportingWorkflowController;
 use App\Http\Controllers\Api\TemplateDeadlineController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('users', [UserController::class, 'index'])->name('users.index');
+Route::prefix('auth')->name('auth.')->group(function (): void {
+    Route::post('login', [AuthController::class, 'login'])->name('login');
 
-Route::apiResource('calon-klien', CalonKlienController::class)->parameters([
-    'calon-klien' => 'calonKlien',
-]);
-Route::apiResource('kontrak', KontrakController::class);
-Route::apiResource('klien', KlienController::class);
-Route::apiResource('template-deadline', TemplateDeadlineController::class)->parameters([
-    'template-deadline' => 'templateDeadline',
-]);
-Route::apiResource('pekerjaan', PekerjaanController::class);
-Route::apiResource('reporting', ReportingController::class);
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('me', [AuthController::class, 'me'])->name('me');
+        Route::post('logout', [AuthController::class, 'logout'])->name('logout');
+    });
+});
+
+Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('users', [UserController::class, 'index'])->name('users.index');
+    Route::get('dashboard-summary', DashboardSummaryController::class)->name('dashboard-summary');
+    Route::get('client-reports', [ClientReportController::class, 'index'])->name('client-reports.index');
+
+    // Calon Klien & Conversion
+    Route::post('calon-klien/{calonKlien}/convert', [LeadConversionController::class, 'store'])
+        ->middleware('role:admin,sales,pimpinan')
+        ->name('calon-klien.convert');
+    Route::delete('calon-klien/{calonKlien}', [CalonKlienController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')
+        ->name('calon-klien.destroy');
+    Route::apiResource('calon-klien', CalonKlienController::class)
+        ->except(['destroy'])
+        ->parameters(['calon-klien' => 'calonKlien'])
+        ->middleware('role:admin,sales,pimpinan');
+
+    // Lead Interactions
+    Route::delete('lead-interactions/{leadInteraction}', [LeadInteractionController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')
+        ->name('lead-interactions.destroy');
+    Route::apiResource('lead-interactions', LeadInteractionController::class)
+        ->except(['destroy'])
+        ->parameters(['lead-interactions' => 'leadInteraction'])
+        ->middleware('role:admin,sales,pimpinan');
+
+    // Kontrak
+    Route::delete('kontrak/{kontrak}', [KontrakController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')
+        ->name('kontrak.destroy');
+    Route::apiResource('kontrak', KontrakController::class)
+        ->except(['destroy'])
+        ->middleware('role:admin,sales,pimpinan');
+
+    // Klien
+    Route::delete('klien/{klien}', [KlienController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')
+        ->name('klien.destroy');
+    Route::apiResource('klien', KlienController::class)
+        ->except(['destroy'])
+        ->middleware('role:admin,sales,pimpinan');
+
+    // Template Deadline: index & show for all authenticated; store, update, destroy for admin,pimpinan
+    Route::get('template-deadline', [TemplateDeadlineController::class, 'index'])->name('template-deadline.index');
+    Route::get('template-deadline/{templateDeadline}', [TemplateDeadlineController::class, 'show'])->name('template-deadline.show');
+    Route::post('template-deadline', [TemplateDeadlineController::class, 'store'])
+        ->middleware('role:admin,pimpinan')->name('template-deadline.store');
+    Route::match(['put', 'patch'], 'template-deadline/{templateDeadline}', [TemplateDeadlineController::class, 'update'])
+        ->middleware('role:admin,pimpinan')->name('template-deadline.update');
+    Route::delete('template-deadline/{templateDeadline}', [TemplateDeadlineController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')->name('template-deadline.destroy');
+
+    // Pekerjaan Workflow
+    Route::post('pekerjaan/{pekerjaan}/submit', [PekerjaanWorkflowController::class, 'submit'])
+        ->middleware('role:admin,karyawan,pimpinan')
+        ->name('pekerjaan.submit');
+    Route::post('pekerjaan/{pekerjaan}/approve', [PekerjaanWorkflowController::class, 'approve'])
+        ->middleware('role:admin,pimpinan')
+        ->name('pekerjaan.approve');
+    Route::post('pekerjaan/{pekerjaan}/reject', [PekerjaanWorkflowController::class, 'reject'])
+        ->middleware('role:admin,pimpinan')
+        ->name('pekerjaan.reject');
+
+    // Pekerjaan:
+    // store, destroy restricted to admin,pimpinan
+    // index, show, update accessible to admin,karyawan,pimpinan
+    Route::post('pekerjaan', [PekerjaanController::class, 'store'])
+        ->middleware('role:admin,pimpinan')->name('pekerjaan.store');
+    Route::delete('pekerjaan/{pekerjaan}', [PekerjaanController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')->name('pekerjaan.destroy');
+    Route::get('pekerjaan', [PekerjaanController::class, 'index'])
+        ->middleware('role:admin,karyawan,pimpinan')->name('pekerjaan.index');
+    Route::get('pekerjaan/{pekerjaan}', [PekerjaanController::class, 'show'])
+        ->middleware('role:admin,karyawan,pimpinan')->name('pekerjaan.show');
+    Route::match(['put', 'patch'], 'pekerjaan/{pekerjaan}', [PekerjaanController::class, 'update'])
+        ->middleware('role:admin,karyawan,pimpinan')->name('pekerjaan.update');
+
+    // Reporting Workflow
+    Route::post('reporting/{reporting}/publish-client', [ReportingWorkflowController::class, 'publishClient'])
+        ->middleware('role:admin,pimpinan')
+        ->name('reporting.publish-client');
+
+    // Reporting:
+    // destroy restricted to admin,pimpinan
+    // index, store, show, update for admin,karyawan,pimpinan
+    Route::delete('reporting/{reporting}', [ReportingController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')->name('reporting.destroy');
+    Route::apiResource('reporting', ReportingController::class)
+        ->except(['destroy'])
+        ->middleware('role:admin,karyawan,pimpinan');
+
+    // Performance Reviews:
+    // store, update, destroy restricted to admin,pimpinan
+    // index, show accessible to admin,karyawan,pimpinan
+    Route::post('performance-reviews', [PerformanceReviewController::class, 'store'])
+        ->middleware('role:admin,pimpinan')->name('performance-reviews.store');
+    Route::match(['put', 'patch'], 'performance-reviews/{performanceReview}', [PerformanceReviewController::class, 'update'])
+        ->middleware('role:admin,pimpinan')->name('performance-reviews.update');
+    Route::delete('performance-reviews/{performanceReview}', [PerformanceReviewController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')->name('performance-reviews.destroy');
+    Route::get('performance-reviews', [PerformanceReviewController::class, 'index'])
+        ->middleware('role:admin,karyawan,pimpinan')->name('performance-reviews.index');
+    Route::get('performance-reviews/{performanceReview}', [PerformanceReviewController::class, 'show'])
+        ->middleware('role:admin,karyawan,pimpinan')->name('performance-reviews.show');
+});

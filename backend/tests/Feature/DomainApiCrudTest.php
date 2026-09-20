@@ -9,6 +9,7 @@ use App\Models\Pekerjaan;
 use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class DomainApiCrudTest extends TestCase
@@ -17,9 +18,10 @@ class DomainApiCrudTest extends TestCase
 
     public function test_users_index_returns_ordered_users(): void
     {
-        User::factory()->create(['nama' => 'Budi', 'email' => 'budi@example.com']);
-        User::factory()->create(['nama' => 'Andi', 'email' => 'andi@example.com']);
+        $budi = User::factory()->create(['nama' => 'Budi', 'email' => 'budi@example.com']);
+        $andi = User::factory()->create(['nama' => 'Andi', 'email' => 'andi@example.com']);
 
+        Sanctum::actingAs($budi);
         $response = $this->getJson('/api/users');
 
         $response->assertOk()
@@ -29,7 +31,8 @@ class DomainApiCrudTest extends TestCase
 
     public function test_calon_klien_crud_flow(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
 
         $createResponse = $this->postJson('/api/calon-klien', [
             'id_user' => $user->id_user,
@@ -59,6 +62,7 @@ class DomainApiCrudTest extends TestCase
 
     public function test_calon_klien_validation_rejects_missing_fields(): void
     {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
         $response = $this->postJson('/api/calon-klien', []);
 
         $response->assertUnprocessable()
@@ -67,12 +71,8 @@ class DomainApiCrudTest extends TestCase
 
     public function test_kontrak_crud_flow(): void
     {
-        $calonKlien = CalonKlien::create([
-            'id_user' => User::factory()->create()->id_user,
-            'nama_perusahaan' => 'PT Alpha',
-            'kontak' => '0811',
-            'status_prospek' => 'prospek',
-        ]);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $calonKlien = CalonKlien::factory()->create();
 
         $createResponse = $this->postJson('/api/kontrak', [
             'id_calon_klien' => $calonKlien->id_calon_klien,
@@ -95,12 +95,8 @@ class DomainApiCrudTest extends TestCase
 
     public function test_kontrak_validation_rejects_invalid_dates(): void
     {
-        $calonKlien = CalonKlien::create([
-            'id_user' => User::factory()->create()->id_user,
-            'nama_perusahaan' => 'PT Beta',
-            'kontak' => '0812',
-            'status_prospek' => 'prospek',
-        ]);
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $calonKlien = CalonKlien::factory()->create();
 
         $response = $this->postJson('/api/kontrak', [
             'id_calon_klien' => $calonKlien->id_calon_klien,
@@ -115,7 +111,8 @@ class DomainApiCrudTest extends TestCase
 
     public function test_klien_crud_flow(): void
     {
-        $kontrak = $this->createKontrak('KTR-010');
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $kontrak = Kontrak::factory()->create();
 
         $createResponse = $this->postJson('/api/klien', [
             'id_kontrak' => $kontrak->id_kontrak,
@@ -135,6 +132,7 @@ class DomainApiCrudTest extends TestCase
 
     public function test_template_deadline_crud_flow(): void
     {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
         $createResponse = $this->postJson('/api/template-deadline', [
             'nama_template' => 'Template A',
             'keterangan' => 'Keterangan A',
@@ -150,9 +148,10 @@ class DomainApiCrudTest extends TestCase
 
     public function test_pekerjaan_crud_flow(): void
     {
-        $klien = $this->createKlien('KTR-020');
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $klien = Klien::factory()->create();
         $pic = User::factory()->create();
-        $template = TemplateDeadline::create(['nama_template' => 'T1']);
+        $template = TemplateDeadline::factory()->create();
 
         $createResponse = $this->postJson('/api/pekerjaan', [
             'id_klien' => $klien->id_klien,
@@ -173,7 +172,8 @@ class DomainApiCrudTest extends TestCase
 
     public function test_reporting_crud_flow(): void
     {
-        $pekerjaan = $this->createPekerjaan('KTR-030');
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $pekerjaan = Pekerjaan::factory()->create();
 
         $createResponse = $this->postJson('/api/reporting', [
             'id_pekerjaan' => $pekerjaan->id_pekerjaan,
@@ -188,52 +188,5 @@ class DomainApiCrudTest extends TestCase
         $this->getJson("/api/reporting/{$id}")->assertOk();
         $this->putJson("/api/reporting/{$id}", ['catatan' => 'Catatan revisi'])->assertOk();
         $this->deleteJson("/api/reporting/{$id}")->assertNoContent();
-    }
-
-    private function createKontrak(string $noKontrak): Kontrak
-    {
-        $calonKlien = CalonKlien::create([
-            'id_user' => User::factory()->create()->id_user,
-            'nama_perusahaan' => 'PT '.$noKontrak,
-            'kontak' => '0819',
-            'status_prospek' => 'prospek',
-        ]);
-
-        return Kontrak::create([
-            'id_calon_klien' => $calonKlien->id_calon_klien,
-            'no_kontrak' => $noKontrak,
-            'tgl_mulai' => '2026-09-01',
-            'tgl_selesai' => '2026-09-30',
-            'status' => 'aktif',
-        ]);
-    }
-
-    private function createKlien(string $noKontrak): Klien
-    {
-        $kontrak = $this->createKontrak($noKontrak);
-
-        return Klien::create([
-            'id_kontrak' => $kontrak->id_kontrak,
-            'nama_perusahaan' => 'PT Klien '.$noKontrak,
-            'alamat' => 'Alamat '.$noKontrak,
-            'kontak' => '0819',
-            'layanan' => 'Layanan '.$noKontrak,
-        ]);
-    }
-
-    private function createPekerjaan(string $noKontrak): Pekerjaan
-    {
-        $klien = $this->createKlien($noKontrak);
-        $pic = User::factory()->create();
-        $template = TemplateDeadline::create(['nama_template' => 'Template '.$noKontrak]);
-
-        return Pekerjaan::create([
-            'id_klien' => $klien->id_klien,
-            'id_pic' => $pic->id_user,
-            'id_template' => $template->id_template,
-            'judul' => 'Judul '.$noKontrak,
-            'deadline' => '2026-09-25',
-            'status' => 'baru',
-        ]);
     }
 }

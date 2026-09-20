@@ -10,13 +10,16 @@ use App\Models\Kontrak;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
 
 class KontrakController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
+        Gate::authorize('viewAny', Kontrak::class);
+
         $kontrak = Kontrak::query()
-            ->with(['calonKlien', 'klien'])
+            ->with(['calonKlien', 'klien', 'reviewer'])
             ->orderByDesc('id_kontrak')
             ->get();
 
@@ -25,8 +28,11 @@ class KontrakController extends Controller
 
     public function store(StoreKontrakRequest $request): JsonResponse
     {
-        $kontrak = Kontrak::create($request->validated())
-            ->load(['calonKlien', 'klien']);
+        Gate::authorize('create', Kontrak::class);
+
+        $data = $this->preparePayload($request);
+        $kontrak = Kontrak::create($data)
+            ->load(['calonKlien', 'klien', 'reviewer']);
 
         return (new KontrakResource($kontrak))
             ->response()
@@ -35,20 +41,48 @@ class KontrakController extends Controller
 
     public function show(Kontrak $kontrak): KontrakResource
     {
-        return new KontrakResource($kontrak->load(['calonKlien', 'klien']));
+        Gate::authorize('view', $kontrak);
+
+        return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer']));
     }
 
     public function update(UpdateKontrakRequest $request, Kontrak $kontrak): KontrakResource
     {
-        $kontrak->update($request->validated());
+        Gate::authorize('update', $kontrak);
 
-        return new KontrakResource($kontrak->load(['calonKlien', 'klien']));
+        $kontrak->update($this->preparePayload($request));
+
+        return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer']));
     }
 
     public function destroy(Kontrak $kontrak): Response
     {
+        Gate::authorize('delete', $kontrak);
+
         $kontrak->delete();
 
         return response()->noContent();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function preparePayload(StoreKontrakRequest|UpdateKontrakRequest $request): array
+    {
+        $data = $request->validated();
+
+        foreach (['dokumen_draft', 'dokumen_final'] as $field) {
+            if ($request->hasFile($field)) {
+                $data[$field] = $request->file($field)->store('kontrak');
+            } else {
+                unset($data[$field]);
+            }
+        }
+
+        if (isset($data['reviewed_by'])) {
+            $data['reviewed_at'] = now();
+        }
+
+        return $data;
     }
 }

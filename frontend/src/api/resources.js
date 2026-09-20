@@ -23,3 +23,41 @@ export function deleteResource(endpoint, id) {
     method: 'DELETE',
   })
 }
+
+export function convertLead(idCalonKlien, payload) {
+  return apiRequest(`calon-klien/${idCalonKlien}/convert`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function submitPekerjaan(idPekerjaan, payload = { progress_persen: 100 }) {
+  return apiRequest(`pekerjaan/${idPekerjaan}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function approvePekerjaan(idPekerjaan, payload = {}) {
+  return apiRequest(`pekerjaan/${idPekerjaan}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function rejectPekerjaan(idPekerjaan, payload = {}) {
+  return apiRequest(`pekerjaan/${idPekerjaan}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function publishReportingClient(idReporting) {
+  return apiRequest(`reporting/${idReporting}/publish-client`, {
+    method: 'POST',
+  })
+}
+
+export function getDashboardSummary() {
+  return apiRequest('dashboard-summary')
+}

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateReportingRequest extends FormRequest
 {
@@ -19,8 +20,13 @@ class UpdateReportingRequest extends FormRequest
     {
         return [
             'id_pekerjaan' => ['sometimes', 'required', 'integer', 'exists:pekerjaan,id_pekerjaan'],
+            'id_user' => ['nullable', 'integer', 'exists:users,id_user'],
             'tgl_lapor' => ['sometimes', 'required', 'date'],
-            'dokumen_bukti' => ['nullable', 'string', 'max:255'],
+            'progress_persen' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'tipe_laporan' => ['sometimes', 'required', 'string', Rule::in(['internal', 'client'])],
+            'status_laporan' => ['sometimes', 'required', 'string', Rule::in(['draft', 'submitted', 'approved', 'sent'])],
+            'is_visible_to_client' => ['nullable', 'boolean'],
+            'dokumen_bukti' => ['nullable'],
             'catatan' => ['nullable', 'string'],
         ];
     }
