@@ -868,3 +868,113 @@ tbody tr:hover {
   justify-content: flex-end;
   margin-top: 12px;
 }
+
+/* Responsive Mobile Styles for Phone & Tablet Screens */
+@media (max-width: 900px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    max-height: none;
+    box-shadow: 0 4px 14px rgba(154, 52, 18, 0.15);
+    padding: 20px 16px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .sidebar-header {
+    margin-bottom: 4px;
+  }
+
+  .user-profile-card {
+    margin: 12px 0;
+    padding: 10px 12px;
+  }
+
+  .resource-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .nav-heading {
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+
+  .resource-nav button {
+    flex: 1 1 calc(50% - 6px);
+    text-align: center;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .resource-panel {
+    padding: 20px 16px 40px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-card {
+    width: 96% !important;
+    max-width: 96% !important;
+    padding: 20px 16px !important;
+  }
+}
+
+/* Print Styles for Legal Contract Document */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .no-print,
+  .app-shell-sidebar,
+  .app-shell-topbar,
+  .resource-panel > *:not(.modal-backdrop),
+  .modal-header,
+  .modal-actions {
+    display: none !important;
+  }
+
+  .modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .printable-contract {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    font-size: 12pt !important;
+  }
+}
+

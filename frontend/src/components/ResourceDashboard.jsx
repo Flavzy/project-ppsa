@@ -10,9 +10,14 @@ import {
   updateResource,
 } from '../api/resources'
 import { useAuth } from '../auth/useAuth'
+import ConfirmModal from './ConfirmModal'
 import ConvertLeadModal from './ConvertLeadModal'
+import DetailLegalitasModal from './DetailLegalitasModal'
+import DraftKontrakModal from './DraftKontrakModal'
+import PromptModal from './PromptModal'
 import ResourceForm from './ResourceForm'
 import ResourceTable from './ResourceTable'
+import ToastNotification from './ToastNotification'
 
 function ResourceDashboard({ config, resourceConfigs, supportResources }) {
   const { user } = useAuth()
@@ -25,6 +30,36 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
   const [successMessage, setSuccessMessage] = useState('')
   const [validationErrors, setValidationErrors] = useState({})
   const [convertingLead, setConvertingLead] = useState(null)
+  const [viewingLegalitas, setViewingLegalitas] = useState(null)
+  const [viewingContract, setViewingContract] = useState(null)
+
+  // Custom modal dialogs to replace browser confirm/prompt
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmText: 'Konfirmasi',
+    type: 'warning',
+    action: null,
+    loading: false,
+  })
+
+  const [promptDialog, setPromptDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    defaultValue: '',
+    placeholder: '',
+    confirmText: 'Simpan',
+    action: null,
+    loading: false,
+  })
+
+  const [toast, setToast] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  })
 
   const canCreate = config.canCreate ? config.canCreate.includes(user?.role) : true
   const canEdit = config.canEdit ? config.canEdit.includes(user?.role) : true
@@ -58,6 +93,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
       setOptions(Object.fromEntries(optionEntries))
     } catch (requestError) {
       setError(requestError.message)
+      setToast({ open: true, message: requestError.message, severity: 'error' })
     } finally {
       setLoading(false)
     }
@@ -85,6 +121,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
       } catch (requestError) {
         if (!ignore) {
           setError(requestError.message)
+          setToast({ open: true, message: requestError.message, severity: 'error' })
         }
       } finally {
         if (!ignore) {
@@ -107,6 +144,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     setValidationErrors({})
 
     try {
+      let successMsg = ''
       if (editingRecord) {
         await updateResource(
           config.endpoint,
@@ -114,128 +152,240 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
           editingRecord[config.primaryKey],
           payload,
         )
-        setSuccessMessage(`Data ${config.label} berhasil diperbarui.`)
+        successMsg = `Data ${config.label} berhasil diperbarui.`
       } else {
         await createResource(config.endpoint, payload)
-        setSuccessMessage(`Data ${config.label} berhasil ditambahkan.`)
+        successMsg = `Data ${config.label} berhasil ditambahkan.`
       }
 
+      setSuccessMessage(successMsg)
+      setToast({ open: true, message: successMsg, severity: 'success' })
       setEditingRecord(null)
       await reload()
     } catch (requestError) {
       setError(requestError.message)
+      setToast({ open: true, message: requestError.message, severity: 'error' })
       setValidationErrors(requestError.errors || {})
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleDelete(record) {
+  function handleDelete(record) {
     const label = record[config.displayField] || `#${record[config.primaryKey]}`
 
-    if (!confirm(`Hapus ${config.label} ${label}?`)) {
-      return
-    }
+    setConfirmDialog({
+      open: true,
+      title: `Hapus ${config.label}`,
+      message: `Apakah Anda yakin ingin menghapus data ${config.label} "${label}"? Tindakan ini tidak dapat dibatalkan.`,
+      confirmText: 'Ya, Hapus',
+      type: 'danger',
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
 
-    setError('')
-    setSuccessMessage('')
-
-    try {
-      await deleteResource(config.endpoint, record[config.primaryKey])
-      setSuccessMessage(`Data ${config.label} berhasil dihapus.`)
-      await reload()
-    } catch (requestError) {
-      setError(requestError.message)
-    }
+        try {
+          await deleteResource(config.endpoint, record[config.primaryKey])
+          const msg = `Data ${config.label} berhasil dihapus.`
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'info' })
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
+          await reload()
+        } catch (requestError) {
+          setError(requestError.message)
+          setToast({ open: true, message: requestError.message, severity: 'error' })
+          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
   }
 
-  async function handleSubmitTask(record) {
-    if (!confirm(`Kirim pekerjaan "${record.judul}" untuk ditinjau oleh pimpinan?`)) {
-      return
-    }
+  function handleSubmitTask(record) {
+    setConfirmDialog({
+      open: true,
+      title: 'Pengajuan Tugas Selesai',
+      message: `Kirim pekerjaan "${record.judul}" untuk ditinjau dan divalidasi oleh pimpinan?`,
+      confirmText: 'Kirim Pekerjaan',
+      type: 'info',
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
 
-    setError('')
-    setSuccessMessage('')
-
-    try {
-      await submitPekerjaan(record.id_pekerjaan, { progress_persen: 100 })
-      setSuccessMessage(`Pekerjaan "${record.judul}" berhasil disubmit untuk direview.`)
-      await reload()
-    } catch (err) {
-      setError(err.message || 'Gagal mengirim pekerjaan.')
-    }
+        try {
+          await submitPekerjaan(record.id_pekerjaan, { progress_persen: 100 })
+          const msg = `Pekerjaan "${record.judul}" berhasil diajukan untuk direview.`
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'success' })
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
+          await reload()
+        } catch (err) {
+          setError(err.message || 'Gagal mengirim pekerjaan.')
+          setToast({ open: true, message: err.message || 'Gagal mengirim pekerjaan.', severity: 'error' })
+          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
   }
 
-  async function handleApproveTask(record) {
-    const note = prompt('Catatan persetujuan (opsional):', 'Pekerjaan telah diverifikasi dan disetujui.')
-    if (note === null) return
+  function handleApproveTask(record) {
+    setPromptDialog({
+      open: true,
+      title: 'Setujui Pekerjaan',
+      message: `Berikan catatan persetujuan untuk pekerjaan "${record.judul}":`,
+      defaultValue: 'Pekerjaan telah diverifikasi dan disetujui.',
+      placeholder: 'Tuliskan catatan persetujuan...',
+      confirmText: 'Setujui Pekerjaan',
+      action: async (note) => {
+        setPromptDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
 
-    setError('')
-    setSuccessMessage('')
-
-    try {
-      await approvePekerjaan(record.id_pekerjaan, { catatan_review: note })
-      setSuccessMessage(`Pekerjaan "${record.judul}" berhasil disetujui (Status: Selesai).`)
-      await reload()
-    } catch (err) {
-      setError(err.message || 'Gagal menyetujui pekerjaan.')
-    }
+        try {
+          await approvePekerjaan(record.id_pekerjaan, { catatan_review: note })
+          const msg = `Pekerjaan "${record.judul}" berhasil disetujui (Status: Selesai).`
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'success' })
+          setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
+          await reload()
+        } catch (err) {
+          setError(err.message || 'Gagal menyetujui pekerjaan.')
+          setToast({ open: true, message: err.message || 'Gagal menyetujui pekerjaan.', severity: 'error' })
+          setPromptDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
   }
 
-  async function handleRejectTask(record) {
-    const note = prompt('Catatan revisi untuk karyawan:', 'Harap perbaiki dan lengkapi bukti dokumen.')
-    if (!note) return
+  function handleRejectTask(record) {
+    setPromptDialog({
+      open: true,
+      title: 'Minta Revisi Pekerjaan',
+      message: `Tuliskan catatan perbaikan untuk karyawan atas pekerjaan "${record.judul}":`,
+      defaultValue: 'Harap perbaiki dan lengkapi bukti dokumen.',
+      placeholder: 'Tuliskan instruksi perbaikan...',
+      confirmText: 'Kirim Permintaan Revisi',
+      action: async (note) => {
+        setPromptDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
 
-    setError('')
-    setSuccessMessage('')
-
-    try {
-      await rejectPekerjaan(record.id_pekerjaan, { catatan_review: note })
-      setSuccessMessage(`Pekerjaan "${record.judul}" dikembalikan untuk revisi.`)
-      await reload()
-    } catch (err) {
-      setError(err.message || 'Gagal meminta revisi pekerjaan.')
-    }
+        try {
+          await rejectPekerjaan(record.id_pekerjaan, { catatan_review: note })
+          const msg = `Pekerjaan "${record.judul}" dikembalikan kepada karyawan untuk revisi.`
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'warning' })
+          setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
+          await reload()
+        } catch (err) {
+          setError(err.message || 'Gagal meminta revisi pekerjaan.')
+          setToast({ open: true, message: err.message || 'Gagal meminta revisi pekerjaan.', severity: 'error' })
+          setPromptDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
   }
 
-  async function handlePublishReport(record) {
-    if (!confirm(`Publikasikan laporan ID #${record.id_reporting} ke klien?`)) {
-      return
-    }
+  function handlePublishReport(record) {
+    setConfirmDialog({
+      open: true,
+      title: 'Publikasikan Laporan Klien',
+      message: `Publikasikan laporan ID #${record.id_reporting} ke klien? Klien akan dapat melihat laporan ini secara langsung.`,
+      confirmText: 'Ya, Publikasikan',
+      type: 'info',
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
 
-    setError('')
-    setSuccessMessage('')
+        try {
+          await publishReportingClient(record.id_reporting)
+          const msg = `Laporan ID #${record.id_reporting} berhasil dipublikasikan ke klien.`
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'success' })
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
+          await reload()
+        } catch (err) {
+          setError(err.message || 'Gagal mempublikasikan laporan.')
+          setToast({ open: true, message: err.message || 'Gagal mempublikasikan laporan.', severity: 'error' })
+          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
+  }
 
+  async function handleSignContract(contract) {
+    const today = new Date().toISOString().split('T')[0]
     try {
-      await publishReportingClient(record.id_reporting)
-      setSuccessMessage(`Laporan ID #${record.id_reporting} berhasil dipublikasikan ke klien.`)
+      await updateResource('kontrak', 'id_kontrak', contract.id_kontrak, {
+        status: 'aktif',
+        ditandatangani_pada: today,
+      })
+      const msg = `Kontrak ${contract.no_kontrak} berhasil ditandatangani dan berstatus Aktif!`
+      setSuccessMessage(msg)
+      setToast({ open: true, message: msg, severity: 'success' })
+      setViewingContract((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'aktif',
+              ditandatangani_pada: today,
+              kontrak: prev.kontrak
+                ? { ...prev.kontrak, status: 'aktif', ditandatangani_pada: today }
+                : undefined,
+            }
+          : null,
+      )
       await reload()
     } catch (err) {
-      setError(err.message || 'Gagal mempublikasikan laporan.')
+      setError(err.message || 'Gagal menandatangani kontrak.')
+      setToast({ open: true, message: err.message || 'Gagal menandatangani kontrak.', severity: 'error' })
+      throw err
     }
   }
 
   return (
-    <section className="resource-panel">
-      <div className="panel-copy">
-        <p className="eyebrow">Modul Operasional</p>
-        <h1>{config.label}</h1>
-        <p>Kelola dan pantau data {config.label.toLowerCase()}.</p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+            Modul Operasional
+          </span>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-1">
+            {config.label}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Kelola dan pantau data {config.label.toLowerCase()} secara komprehensif.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={reload}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-xs self-start sm:self-auto cursor-pointer disabled:opacity-50"
+        >
+          <svg className={`size-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh Data
+        </button>
       </div>
 
       {error && (
-        <div className="alert alert-danger" role="alert">
+        <div className="p-4 rounded-2xl border border-error-200 bg-error-50 text-error-700 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400 text-sm font-medium">
           {error}
         </div>
       )}
 
       {successMessage && (
-        <div className="alert alert-success" role="alert">
+        <div className="p-4 rounded-2xl border border-success-200 bg-success-50 text-success-700 dark:border-success-800 dark:bg-success-500/10 dark:text-success-400 text-sm font-medium">
           {successMessage}
         </div>
       )}
 
       <ResourceForm
+        key={editingRecord ? editingRecord[config.primaryKey] : 'new'}
         config={config}
         record={editingRecord}
         options={options}
@@ -258,6 +408,8 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
         onEdit={setEditingRecord}
         onDelete={handleDelete}
         onConvert={setConvertingLead}
+        onViewLegalitas={setViewingLegalitas}
+        onViewContract={setViewingContract}
         onSubmitTask={handleSubmitTask}
         onApproveTask={handleApproveTask}
         onRejectTask={handleRejectTask}
@@ -270,11 +422,61 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
           onClose={() => setConvertingLead(null)}
           onSuccess={(msg) => {
             setSuccessMessage(msg)
+            setToast({ open: true, message: msg, severity: 'success' })
             reload()
           }}
         />
       )}
-    </section>
+
+      {viewingLegalitas && (
+        <DetailLegalitasModal
+          record={viewingLegalitas}
+          onClose={() => setViewingLegalitas(null)}
+        />
+      )}
+
+      {viewingContract && (
+        <DraftKontrakModal
+          lead={config.key === 'calonKlien' ? viewingContract : viewingContract.calon_klien}
+          contract={config.key === 'kontrak' ? viewingContract : viewingContract.kontrak}
+          onClose={() => setViewingContract(null)}
+          onSign={handleSignContract}
+        />
+      )}
+
+      {/* Modern Confirmation Modal */}
+      <ConfirmModal
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        type={confirmDialog.type}
+        loading={confirmDialog.loading}
+        onConfirm={confirmDialog.action}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      />
+
+      {/* Modern Prompt Modal */}
+      <PromptModal
+        open={promptDialog.open}
+        title={promptDialog.title}
+        message={promptDialog.message}
+        defaultValue={promptDialog.defaultValue}
+        placeholder={promptDialog.placeholder}
+        confirmText={promptDialog.confirmText}
+        loading={promptDialog.loading}
+        onConfirm={(val) => promptDialog.action && promptDialog.action(val)}
+        onClose={() => setPromptDialog((prev) => ({ ...prev, open: false }))}
+      />
+
+      {/* Floating In-App Toast Notification */}
+      <ToastNotification
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+      />
+    </div>
   )
 }
 

@@ -11,20 +11,27 @@ export const resourceConfigs = [
     canDelete: ['admin', 'pimpinan'],
     columns: [
       { key: 'id_calon_klien', label: 'ID' },
-      { key: 'nama_perusahaan', label: 'Perusahaan' },
-      { key: 'kontak', label: 'Kontak' },
+      { key: 'nama_klien', label: 'Nama Klien' },
+      { key: 'nama_perusahaan', label: 'Nama Perusahaan' },
+      { key: 'nama_direktur', label: 'Nama Direktur' },
+      { key: 'kontak_person', label: 'Kontak Person' },
       { key: 'status_prospek', label: 'Status' },
-      { key: 'tgl_followup', label: 'Follow Up' },
+      { key: 'legalitas_status', label: 'Legalitas' },
     ],
     fields: [
-      { name: 'id_user', label: 'Sales PIC', type: 'select', optionsResource: 'users', optionValue: 'id_user', optionLabel: 'nama', required: true },
-      { name: 'nama_perusahaan', label: 'Nama Perusahaan', type: 'text', required: true },
-      { name: 'kontak', label: 'Kontak', type: 'text', required: true },
+      // 1. Data Klien & Perusahaan
+      { name: 'nama_klien', label: '1. Nama Klien', type: 'text', required: true, section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'nama_perusahaan', label: '2. Nama Perusahaan', type: 'text', required: true, section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'alamat_perusahaan', label: '3. Alamat Perusahaan', type: 'textarea', rows: 2, required: false, section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'nama_direktur', label: '4. Nama Direktur', type: 'text', required: false, section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'kontak_person', label: '5. Kontak Person', type: 'text', required: true, placeholder: 'No. HP / WhatsApp / Telepon', section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'id_user', label: 'Sales PIC', type: 'select', optionsResource: 'users', optionValue: 'id_user', optionLabel: 'nama', required: true, section: 'Informasi Profil Klien & Perusahaan' },
       {
         name: 'status_prospek',
         label: 'Status Prospek',
         type: 'select',
         required: true,
+        section: 'Informasi Profil Klien & Perusahaan',
         options: [
           { value: 'prospek', label: 'Prospek' },
           { value: 'proposal', label: 'Proposal' },
@@ -33,7 +40,25 @@ export const resourceConfigs = [
           { value: 'lost', label: 'Lost' },
         ],
       },
-      { name: 'tgl_followup', label: 'Tanggal Follow Up', type: 'date' },
+      { name: 'tgl_followup', label: 'Tanggal Follow Up', type: 'date', section: 'Informasi Profil Klien & Perusahaan' },
+
+      // 2. Legalitas Perusahaan (Nomor & Dokumen Pendukung)
+      { name: 'nomor_nib', label: '1. NIB (Nomor Induk Berusaha)', type: 'text', placeholder: 'Masukkan nomor NIB', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_nib', label: 'Upload Dokumen NIB', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+
+      { name: 'nomor_npwp', label: '2. NPWP Perusahaan', type: 'text', placeholder: 'Masukkan nomor NPWP', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_npwp', label: 'Upload Dokumen NPWP', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+
+      { name: 'nomor_akta_pendirian', label: '3. Akta Pendirian', type: 'text', placeholder: 'Masukkan nomor Akta Pendirian', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_akta_pendirian', label: 'Upload Dokumen Akta Pendirian', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+
+      { name: 'nomor_sk_kemenkumham', label: '4. SK Kemenkumham', type: 'text', placeholder: 'Masukkan nomor SK Kemenkumham', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_sk_kemenkumham', label: 'Upload Dokumen SK Kemenkumham', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+
+      { name: 'nomor_izin_usaha', label: '5. Izin Usaha', type: 'text', placeholder: 'Masukkan nomor Izin Usaha', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_izin_usaha', label: 'Upload Dokumen Izin Usaha', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+
+      { name: 'file_dokumen_pendukung', label: 'Upload Dokumen Pendukung Lainnya', type: 'file', accept: '.pdf,image/*,.zip,.rar', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
     ],
   },
   {
@@ -209,11 +234,42 @@ export const resourceConfigs = [
       { name: 'catatan', label: 'Catatan Evaluasi', type: 'textarea' },
     ],
   },
-]
-
-export const supportResources = [
   {
     key: 'users',
+    label: 'Manajemen Akun Sales & User',
     endpoint: 'users',
+    primaryKey: 'id_user',
+    displayField: 'nama',
+    allowedRoles: ['admin'],
+    canCreate: ['admin'],
+    canEdit: ['admin'],
+    canDelete: ['admin'],
+    columns: [
+      { key: 'id_user', label: 'ID' },
+      { key: 'nama', label: 'Nama Pengguna' },
+      { key: 'email', label: 'Email' },
+      { key: 'role', label: 'Role / Peran' },
+    ],
+    fields: [
+      { name: 'nama', label: 'Nama Lengkap', type: 'text', required: true, placeholder: 'Nama Sales / Staff (contoh: Ahmad Sales)' },
+      { name: 'email', label: 'Alamat Email Login', type: 'email', required: true, placeholder: 'sales@example.com' },
+      { name: 'password', label: 'Password Login', type: 'password', required: true, placeholder: 'Minimal 6 karakter' },
+      {
+        name: 'role',
+        label: 'Peran Akun (Role)',
+        type: 'select',
+        required: true,
+        defaultValue: 'sales',
+        options: [
+          { value: 'sales', label: 'Sales & Marketing (Pengelola Calon Klien)' },
+          { value: 'karyawan', label: 'Karyawan / Tim Teknis' },
+          { value: 'pimpinan', label: 'Pimpinan / Manajer' },
+          { value: 'admin', label: 'Administrator Utama' },
+        ],
+      },
+    ],
   },
 ]
+
+export const supportResources = []
+

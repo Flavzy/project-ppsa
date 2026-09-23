@@ -5,13 +5,23 @@ export function listResource(endpoint) {
 }
 
 export function createResource(endpoint, payload) {
+  const isFormData = payload instanceof FormData
   return apiRequest(endpoint, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: isFormData ? payload : JSON.stringify(payload),
   })
 }
 
 export function updateResource(endpoint, primaryKey, id, payload) {
+  const isFormData = payload instanceof FormData
+  if (isFormData) {
+    payload.append('_method', 'PUT')
+    return apiRequest(`${endpoint}/${id}`, {
+      method: 'POST',
+      body: payload,
+    }).then((record) => ({ ...record, [primaryKey]: record[primaryKey] ?? id }))
+  }
+
   return apiRequest(`${endpoint}/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),

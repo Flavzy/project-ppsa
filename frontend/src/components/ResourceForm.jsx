@@ -1,6 +1,14 @@
 function getInitialValue(field, record, currentUser, config) {
+  if (field.type === 'password' || field.name === 'password') {
+    return ''
+  }
+
   if (record?.[field.name] !== undefined && record?.[field.name] !== null) {
     return record[field.name]
+  }
+
+  if (!record && field.defaultValue !== undefined) {
+    return field.defaultValue
   }
 
   // Pre-fill user id for creator roles
@@ -16,17 +24,26 @@ function getInitialValue(field, record, currentUser, config) {
   return ''
 }
 
-function ResourceForm({ config, record, options, saving, errors, onCancel, onSubmit, currentUser, canCreate = true, canEdit = true }) {
+function ResourceForm({
+  config,
+  record,
+  options,
+  saving,
+  errors,
+  onCancel,
+  onSubmit,
+  currentUser,
+  canCreate = true,
+  canEdit = true,
+}) {
   // If editing but cannot edit, or adding but cannot create, don't show the form
   if (record && !canEdit) {
     return null
   }
   if (!record && !canCreate) {
     return (
-      <div className="resource-form-readonly-notice">
-        <p className="text-muted">
-          Peran Anda ({currentUser?.role || 'Pengguna'}) memiliki akses hanya-baca untuk {config.label}. Pembuatan data baru dikelola oleh administrator/pimpinan.
-        </p>
+      <div className="rounded-2xl border border-gray-200 bg-gray-50/50 p-4 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-800/40 dark:text-gray-400">
+        Peran Anda ({currentUser?.role || 'Pengguna'}) memiliki akses hanya-baca untuk {config.label}. Pembuatan data baru dikelola oleh administrator/pimpinan.
       </div>
     )
   }
@@ -34,111 +51,246 @@ function ResourceForm({ config, record, options, saving, errors, onCancel, onSub
   function handleSubmit(event) {
     event.preventDefault()
 
-    const formData = new FormData(event.currentTarget)
-    const payload = {}
+    const hasFileField = config.fields.some((f) => f.type === 'file')
 
-    config.fields.forEach((field) => {
-      // If field is disabled, get default/record value
-      const isFieldDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
-      if (isFieldDisabled) {
-        return
-      }
+    if (hasFileField) {
+      const formData = new FormData()
 
-      const value = formData.get(field.name)
-      payload[field.name] = value === '' ? null : value
-    })
+      config.fields.forEach((field) => {
+        const isFieldDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
+        if (isFieldDisabled) {
+          return
+        }
 
-    onSubmit(payload)
+        if (field.type === 'file') {
+          const inputEl = event.currentTarget.querySelector(`[name="${field.name}"]`)
+          if (inputEl && inputEl.files && inputEl.files[0]) {
+            formData.append(field.name, inputEl.files[0])
+          }
+        } else {
+          const inputEl = event.currentTarget.querySelector(`[name="${field.name}"]`)
+          if (inputEl) {
+            const val = inputEl.value
+            formData.append(field.name, val)
+          }
+        }
+      })
+
+      onSubmit(formData)
+    } else {
+      const formElData = new FormData(event.currentTarget)
+      const payload = {}
+
+      config.fields.forEach((field) => {
+        const isFieldDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
+        if (isFieldDisabled) {
+          return
+        }
+
+        const value = formElData.get(field.name)
+        payload[field.name] = value === '' ? null : value
+      })
+
+      onSubmit(payload)
+    }
   }
 
+  // Group fields by section if section is specified
+  const sections = []
+  config.fields.forEach((field) => {
+    const sectionName = field.section || 'Informasi Utama'
+    let group = sections.find((s) => s.title === sectionName)
+    if (!group) {
+      group = { title: sectionName, fields: [] }
+      sections.push(group)
+    }
+    group.fields.push(field)
+  })
+
   return (
-    <form className="resource-form" onSubmit={handleSubmit}>
-      <div className="form-header">
+    <div className="rounded-3xl border border-gray-200 bg-white p-6 md:p-8 shadow-xs dark:border-gray-800 dark:bg-gray-900 transition-all mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 mb-5 border-b border-gray-100 dark:border-gray-800 gap-3">
         <div>
-          <p className="eyebrow">Form</p>
-          <h2>{record ? `Edit ${config.label}` : `Tambah ${config.label}`}</h2>
+          <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+            Form Formulir
+          </span>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mt-0.5">
+            {record ? `Edit Data ${config.label}` : `Tambah ${config.label} Baru`}
+          </h2>
         </div>
         {record && (
-          <button type="button" className="ghost-button" onClick={onCancel}>
-            Batal edit
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors self-start sm:self-auto cursor-pointer"
+          >
+            Batal Ubah
           </button>
         )}
       </div>
 
-      <div className="form-grid">
-        {config.fields.map((field) => {
-          const fieldError = errors?.[field.name]?.[0]
-          const isPicDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
-          const initialVal = getInitialValue(field, record, currentUser, config)
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {sections.map((section, sIndex) => (
+          <div key={section.title} className="space-y-4">
+            {sections.length > 1 && (
+              <div className="pt-2 pb-1 border-b border-gray-100 dark:border-gray-800">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  {sIndex + 1}. {section.title}
+                </h3>
+              </div>
+            )}
 
-          return (
-            <label key={field.name} className="field">
-              <span>
-                {field.label}
-                {isPicDisabled && <em className="field-note"> (Terkunci untuk Karyawan)</em>}
-              </span>
-              {field.type === 'textarea' ? (
-                <textarea
-                  name={field.name}
-                  defaultValue={initialVal ?? ''}
-                  required={field.required}
-                  rows="3"
-                  disabled={isPicDisabled}
-                />
-              ) : field.type === 'select' ? (
-                <select
-                  name={field.name}
-                  defaultValue={initialVal ?? ''}
-                  required={field.required && !isPicDisabled}
-                  disabled={isPicDisabled}
-                >
-                  <option value="">Pilih {field.label}</option>
-                  {(() => {
-                    const selectOptions = field.options || options[field.optionsResource] || []
-                    const valKey = field.optionValue || 'value'
-                    const lblKey = field.optionLabel || 'label'
-                    const hasCurrent = selectOptions.some((opt) => {
-                      const v = typeof opt === 'object' ? opt[valKey] : opt
-                      return String(v) === String(initialVal)
-                    })
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {section.fields.map((field) => {
+                const fieldError = errors?.[field.name]?.[0]
+                const isPicDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
+                const initialVal = getInitialValue(field, record, currentUser, config)
+                const existingFileUrl = record?.[`${field.name}_url`]
+                const isFullWidth = field.type === 'textarea' || field.fullWidth
 
-                    return (
-                      <>
-                        {initialVal && !hasCurrent && (
-                          <option value={initialVal}>{initialVal}</option>
-                        )}
-                        {selectOptions.map((opt) => {
-                          const optVal = typeof opt === 'object' ? opt[valKey] : opt
-                          const optLabel = typeof opt === 'object' ? (opt[lblKey] || opt[valKey] || opt) : opt
+                return (
+                  <div
+                    key={field.name}
+                    className={isFullWidth ? 'md:col-span-2' : ''}
+                  >
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                      {field.label}
+                      {field.required && <span className="text-error-500 ml-1">*</span>}
+                      {isPicDisabled && (
+                        <span className="text-xs font-normal text-gray-400 lowercase ml-1">
+                          (terkunci untuk pic)
+                        </span>
+                      )}
+                    </label>
+
+                    {field.type === 'textarea' ? (
+                      <textarea
+                        name={field.name}
+                        defaultValue={initialVal ?? ''}
+                        required={field.required}
+                        rows={field.rows || 3}
+                        disabled={isPicDisabled}
+                        placeholder={field.placeholder || ''}
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                      />
+                    ) : field.type === 'select' ? (
+                      <select
+                        name={field.name}
+                        defaultValue={initialVal ?? ''}
+                        required={field.required && !isPicDisabled}
+                        disabled={isPicDisabled}
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                      >
+                        <option value="">Pilih {field.label}</option>
+                        {(() => {
+                          const selectOptions = field.options || options[field.optionsResource] || []
+                          const valKey = field.optionValue || 'value'
+                          const lblKey = field.optionLabel || 'label'
+                          const hasCurrent = selectOptions.some((opt) => {
+                            const v = typeof opt === 'object' ? opt[valKey] : opt
+                            return String(v) === String(initialVal)
+                          })
+
                           return (
-                            <option key={optVal} value={optVal}>
-                              {optLabel}
-                            </option>
+                            <>
+                              {initialVal && !hasCurrent && (
+                                <option value={initialVal}>{initialVal}</option>
+                              )}
+                              {selectOptions.map((opt) => {
+                                const optVal = typeof opt === 'object' ? opt[valKey] : opt
+                                const optLabel = typeof opt === 'object' ? (opt[lblKey] || opt[valKey] || opt) : opt
+                                return (
+                                  <option key={optVal} value={optVal}>
+                                    {optLabel}
+                                  </option>
+                                )
+                              })}
+                            </>
                           )
-                        })}
-                      </>
-                    )
-                  })()}
-                </select>
-              ) : (
-                <input
-                  name={field.name}
-                  type={field.type}
-                  defaultValue={initialVal ?? ''}
-                  required={field.required}
-                  disabled={isPicDisabled}
-                />
-              )}
-              {fieldError && <small className="field-error">{fieldError}</small>}
-            </label>
-          )
-        })}
-      </div>
+                        })()}
+                      </select>
+                    ) : field.type === 'file' ? (
+                      <div className="space-y-1.5">
+                        <input
+                          name={field.name}
+                          type="file"
+                          accept={field.accept}
+                          disabled={isPicDisabled}
+                          className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-500/15 dark:file:text-brand-400 cursor-pointer"
+                        />
+                        {existingFileUrl && (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <span>Berkas terunggah:</span>
+                            <a
+                              href={existingFileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                            >
+                              Lihat Dokumen
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <input
+                        name={field.name}
+                        type={field.type}
+                        defaultValue={initialVal ?? ''}
+                        required={record && (field.name === 'password' || field.type === 'password') ? false : field.required}
+                        disabled={isPicDisabled}
+                        placeholder={
+                          record && (field.name === 'password' || field.type === 'password')
+                            ? 'Kosongkan jika tidak ingin mengubah password'
+                            : (field.placeholder || '')
+                        }
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                      />
+                    )}
+                    {fieldError && (
+                      <p className="mt-1 text-xs text-error-600 dark:text-error-400 font-medium">
+                        {fieldError}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
 
-      <button type="submit" className="primary-button" disabled={saving}>
-        {saving ? 'Menyimpan...' : record ? 'Simpan perubahan' : 'Tambah data'}
-      </button>
-    </form>
+        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+          {record && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              Batal
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 font-semibold text-sm text-white shadow-theme-xs shadow-brand-500/20 transition-all cursor-pointer disabled:opacity-50"
+          >
+            {saving ? (
+              <>
+                <svg className="size-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>Menyimpan...</span>
+              </>
+            ) : record ? (
+              'Simpan Perubahan'
+            ) : (
+              'Tambah Data'
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
   )
 }
 

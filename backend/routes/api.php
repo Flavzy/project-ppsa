@@ -28,6 +28,11 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('users', [UserController::class, 'index'])->name('users.index');
+    Route::post('users', [UserController::class, 'store'])->middleware('role:admin')->name('users.store');
+    Route::get('users/{user}', [UserController::class, 'show'])->middleware('role:admin')->name('users.show');
+    Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update'])->middleware('role:admin')->name('users.update');
+    Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('role:admin')->name('users.destroy');
+
     Route::get('dashboard-summary', DashboardSummaryController::class)->name('dashboard-summary');
     Route::get('client-reports', [ClientReportController::class, 'index'])->name('client-reports.index');
 

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { convertLead } from '../api/resources'
 
 export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
-  const [noKontrak, setNoKontrak] = useState(() => `KTR-${lead.id_calon_klien}-${Date.now().toString().slice(-4)}`)
+  const [noKontrak, setNoKontrak] = useState(() => `KTR-${lead?.id_calon_klien}-${Date.now().toString().slice(-4)}`)
   const [jenisDokumen, setJenisDokumen] = useState('kontrak')
   const [tglMulai, setTglMulai] = useState(() => new Date().toISOString().split('T')[0])
   const [tglSelesai, setTglSelesai] = useState(() => {
@@ -10,12 +10,30 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
     nextMonth.setDate(nextMonth.getDate() + 30)
     return nextMonth.toISOString().split('T')[0]
   })
-  const [alamat, setAlamat] = useState('Gedung Bisnis Center, Jakarta')
+  const [alamat, setAlamat] = useState(lead?.alamat_perusahaan || 'Gedung Bisnis Center, Jakarta')
   const [layanan, setLayanan] = useState('Implementasi & Konsultansi Sistem')
-  const [nilaiProyek, setNilaiProyek] = useState(() => lead.nilai_estimasi || '')
+  const [nilaiProyek, setNilaiProyek] = useState(() => lead?.nilai_estimasi || '')
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !submitting) onClose?.()
+    }
+    if (lead) {
+      document.body.style.overflow = 'hidden'
+      window.addEventListener('keydown', handleKeyDown)
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [lead, submitting, onClose])
+
+  if (!lead) return null
 
   async function handleConvert(e) {
     e.preventDefault()
@@ -43,119 +61,175 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal-card">
-        <div className="modal-header">
-          <h3>Konversi Lead ke Kontrak & Klien</h3>
-          <p className="modal-subtitle">
-            Mengonversi prospek deal <strong>{lead.nama_perusahaan}</strong> menjadi klien dan kontrak resmi.
-          </p>
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 h-full w-full bg-gray-900/50 backdrop-blur-[6px] transition-opacity"
+        onClick={submitting ? undefined : onClose}
+      />
+
+      {/* Modal Dialog */}
+      <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-gray-100 dark:border-gray-800 dark:bg-gray-900 transition-all z-10 animate-fade-in max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-success-600 dark:text-success-400">
+              Konversi Prospek Deal
+            </span>
+            <h3 className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+              Konversi Lead ke Kontrak & Klien
+            </h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Perusahaan: <strong className="text-gray-700 dark:text-gray-200">{lead.nama_perusahaan}</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         {error && (
-          <div className="alert" role="alert">
+          <div className="mt-4 p-3 rounded-xl bg-error-50 dark:bg-error-500/10 border border-error-200 dark:border-error-800 text-xs text-error-700 dark:text-error-400">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleConvert} className="modal-form">
-          <label className="field">
-            <span>Nomor Kontrak</span>
+        {/* Form Body */}
+        <form onSubmit={handleConvert} className="overflow-y-auto flex-1 my-4 space-y-4 pr-1">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+              Nomor Kontrak <span className="text-error-500">*</span>
+            </label>
             <input
               type="text"
               value={noKontrak}
               onChange={(e) => setNoKontrak(e.target.value)}
               required
               disabled={submitting}
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="field">
-            <span>Jenis Dokumen</span>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+              Jenis Dokumen <span className="text-error-500">*</span>
+            </label>
             <select
               value={jenisDokumen}
               onChange={(e) => setJenisDokumen(e.target.value)}
               required
               disabled={submitting}
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             >
               <option value="kontrak">Kontrak</option>
               <option value="spk">SPK (Surat Perintah Kerja)</option>
               <option value="adendum">Adendum</option>
             </select>
-          </label>
+          </div>
 
-          <div className="form-row">
-            <label className="field">
-              <span>Tanggal Mulai</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                Tanggal Mulai <span className="text-error-500">*</span>
+              </label>
               <input
                 type="date"
                 value={tglMulai}
                 onChange={(e) => setTglMulai(e.target.value)}
                 required
                 disabled={submitting}
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
               />
-            </label>
-
-            <label className="field">
-              <span>Tanggal Selesai</span>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+                Tanggal Selesai <span className="text-error-500">*</span>
+              </label>
               <input
                 type="date"
                 value={tglSelesai}
                 onChange={(e) => setTglSelesai(e.target.value)}
                 required
                 disabled={submitting}
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
               />
-            </label>
+            </div>
           </div>
 
-          <label className="field">
-            <span>Alamat Klien</span>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+              Alamat Kantor Klien <span className="text-error-500">*</span>
+            </label>
             <textarea
               value={alamat}
               onChange={(e) => setAlamat(e.target.value)}
               required
               rows={2}
               disabled={submitting}
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="field">
-            <span>Layanan</span>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+              Ruang Lingkup Layanan <span className="text-error-500">*</span>
+            </label>
             <input
               type="text"
               value={layanan}
               onChange={(e) => setLayanan(e.target.value)}
               required
               disabled={submitting}
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="field">
-            <span>Nilai Proyek (Rp)</span>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+              Nilai Proyek (Rp)
+            </label>
             <input
               type="number"
               value={nilaiProyek}
               onChange={(e) => setNilaiProyek(e.target.value)}
-              placeholder="50000000"
+              placeholder="Contoh: 50000000"
               disabled={submitting}
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             />
-          </label>
+          </div>
 
-          <div className="form-actions">
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
             <button
               type="button"
-              className="ghost-button"
               onClick={onClose}
               disabled={submitting}
+              className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="primary-button"
               disabled={submitting}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 font-semibold text-sm text-white shadow-theme-xs shadow-brand-500/20 transition-all cursor-pointer disabled:opacity-50"
             >
-              {submitting ? 'Mengonversi...' : 'Konversi Sekarang'}
+              {submitting ? (
+                <>
+                  <svg className="size-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Mengonversi...</span>
+                </>
+              ) : (
+                'Konversi Sekarang'
+              )}
             </button>
           </div>
         </form>
