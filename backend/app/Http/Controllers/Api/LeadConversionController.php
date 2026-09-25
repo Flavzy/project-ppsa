@@ -25,34 +25,50 @@ class LeadConversionController extends Controller
             ]);
         }
 
-        if ($calonKlien->kontrak()->exists()) {
+        $existingKontrak = $calonKlien->kontrak()->first();
+        if ($existingKontrak && $existingKontrak->status !== 'draft') {
             throw ValidationException::withMessages([
-                'id_calon_klien' => ['Calon klien ini sudah memiliki kontrak.'],
+                'id_calon_klien' => ['Calon klien ini sudah memiliki kontrak aktif.'],
             ]);
         }
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($calonKlien, $validated): void {
-            $kontrak = Kontrak::create([
-                'id_calon_klien' => $calonKlien->id_calon_klien,
-                'no_kontrak' => $validated['no_kontrak'],
-                'jenis_dokumen' => $validated['jenis_dokumen'],
-                'no_spk' => $validated['no_spk'] ?? null,
-                'nilai_proyek' => $validated['nilai_proyek'] ?? $calonKlien->nilai_estimasi,
-                'lingkup_kerja' => $validated['lingkup_kerja'] ?? $calonKlien->pain_points,
-                'tgl_mulai' => $validated['tgl_mulai'],
-                'tgl_selesai' => $validated['tgl_selesai'],
-                'status' => 'draft',
-            ]);
+        DB::transaction(function () use ($calonKlien, $validated, $existingKontrak): void {
+            if ($existingKontrak) {
+                $existingKontrak->update([
+                    'no_kontrak' => $validated['no_kontrak'],
+                    'jenis_dokumen' => $validated['jenis_dokumen'],
+                    'no_spk' => $validated['no_spk'] ?? null,
+                    'nilai_proyek' => $validated['nilai_proyek'] ?? $calonKlien->nilai_estimasi,
+                    'lingkup_kerja' => $validated['lingkup_kerja'] ?? $calonKlien->pain_points,
+                    'tgl_mulai' => $validated['tgl_mulai'],
+                    'tgl_selesai' => $validated['tgl_selesai'],
+                ]);
+                $kontrak = $existingKontrak;
+            } else {
+                $kontrak = Kontrak::create([
+                    'id_calon_klien' => $calonKlien->id_calon_klien,
+                    'no_kontrak' => $validated['no_kontrak'],
+                    'jenis_dokumen' => $validated['jenis_dokumen'],
+                    'no_spk' => $validated['no_spk'] ?? null,
+                    'nilai_proyek' => $validated['nilai_proyek'] ?? $calonKlien->nilai_estimasi,
+                    'lingkup_kerja' => $validated['lingkup_kerja'] ?? $calonKlien->pain_points,
+                    'tgl_mulai' => $validated['tgl_mulai'],
+                    'tgl_selesai' => $validated['tgl_selesai'],
+                    'status' => 'draft',
+                ]);
+            }
 
-            Klien::create([
-                'id_kontrak' => $kontrak->id_kontrak,
-                'nama_perusahaan' => $calonKlien->nama_perusahaan,
-                'alamat' => $validated['alamat'],
-                'kontak' => $calonKlien->kontak,
-                'layanan' => $validated['layanan'],
-            ]);
+            Klien::updateOrCreate(
+                ['id_kontrak' => $kontrak->id_kontrak],
+                [
+                    'nama_perusahaan' => $calonKlien->nama_perusahaan,
+                    'alamat' => $validated['alamat'],
+                    'kontak' => $calonKlien->kontak,
+                    'layanan' => $validated['layanan'],
+                ]
+            );
         });
 
         return (new CalonKlienResource($calonKlien->refresh()->load(['user', 'kontrak.klien', 'interactions'])))

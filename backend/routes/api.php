@@ -13,7 +13,6 @@ use App\Http\Controllers\Api\PekerjaanWorkflowController;
 use App\Http\Controllers\Api\PerformanceReviewController;
 use App\Http\Controllers\Api\ReportingController;
 use App\Http\Controllers\Api\ReportingWorkflowController;
-use App\Http\Controllers\Api\TemplateDeadlineController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,17 +27,17 @@ Route::prefix('auth')->name('auth.')->group(function (): void {
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('users', [UserController::class, 'index'])->name('users.index');
-    Route::post('users', [UserController::class, 'store'])->middleware('role:admin')->name('users.store');
-    Route::get('users/{user}', [UserController::class, 'show'])->middleware('role:admin')->name('users.show');
-    Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update'])->middleware('role:admin')->name('users.update');
-    Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('role:admin')->name('users.destroy');
+    Route::post('users', [UserController::class, 'store'])->middleware('role:admin,pimpinan')->name('users.store');
+    Route::get('users/{user}', [UserController::class, 'show'])->middleware('role:admin,pimpinan')->name('users.show');
+    Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update'])->middleware('role:admin,pimpinan')->name('users.update');
+    Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('role:admin,pimpinan')->name('users.destroy');
 
     Route::get('dashboard-summary', DashboardSummaryController::class)->name('dashboard-summary');
     Route::get('client-reports', [ClientReportController::class, 'index'])->name('client-reports.index');
 
     // Calon Klien & Conversion
     Route::post('calon-klien/{calonKlien}/convert', [LeadConversionController::class, 'store'])
-        ->middleware('role:admin,sales,pimpinan')
+        ->middleware('role:admin,pimpinan,operator,sales')
         ->name('calon-klien.convert');
     Route::delete('calon-klien/{calonKlien}', [CalonKlienController::class, 'destroy'])
         ->middleware('role:admin,pimpinan')
@@ -46,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('calon-klien', CalonKlienController::class)
         ->except(['destroy'])
         ->parameters(['calon-klien' => 'calonKlien'])
-        ->middleware('role:admin,sales,pimpinan');
+        ->middleware('role:admin,pimpinan,operator,sales');
 
     // Lead Interactions
     Route::delete('lead-interactions/{leadInteraction}', [LeadInteractionController::class, 'destroy'])
@@ -55,7 +54,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('lead-interactions', LeadInteractionController::class)
         ->except(['destroy'])
         ->parameters(['lead-interactions' => 'leadInteraction'])
-        ->middleware('role:admin,sales,pimpinan');
+        ->middleware('role:admin,pimpinan,operator,sales');
 
     // Kontrak
     Route::delete('kontrak/{kontrak}', [KontrakController::class, 'destroy'])
@@ -63,7 +62,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->name('kontrak.destroy');
     Route::apiResource('kontrak', KontrakController::class)
         ->except(['destroy'])
-        ->middleware('role:admin,sales,pimpinan');
+        ->middleware('role:admin,pimpinan,operator,sales');
 
     // Klien
     Route::delete('klien/{klien}', [KlienController::class, 'destroy'])
@@ -71,17 +70,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->name('klien.destroy');
     Route::apiResource('klien', KlienController::class)
         ->except(['destroy'])
-        ->middleware('role:admin,sales,pimpinan');
-
-    // Template Deadline: index & show for all authenticated; store, update, destroy for admin,pimpinan
-    Route::get('template-deadline', [TemplateDeadlineController::class, 'index'])->name('template-deadline.index');
-    Route::get('template-deadline/{templateDeadline}', [TemplateDeadlineController::class, 'show'])->name('template-deadline.show');
-    Route::post('template-deadline', [TemplateDeadlineController::class, 'store'])
-        ->middleware('role:admin,pimpinan')->name('template-deadline.store');
-    Route::match(['put', 'patch'], 'template-deadline/{templateDeadline}', [TemplateDeadlineController::class, 'update'])
-        ->middleware('role:admin,pimpinan')->name('template-deadline.update');
-    Route::delete('template-deadline/{templateDeadline}', [TemplateDeadlineController::class, 'destroy'])
-        ->middleware('role:admin,pimpinan')->name('template-deadline.destroy');
+        ->middleware('role:admin,pimpinan,operator,sales');
 
     // Pekerjaan Workflow
     Route::post('pekerjaan/{pekerjaan}/submit', [PekerjaanWorkflowController::class, 'submit'])
@@ -95,18 +84,19 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->name('pekerjaan.reject');
 
     // Pekerjaan:
-    // store, destroy restricted to admin,pimpinan
-    // index, show, update accessible to admin,karyawan,pimpinan
+    // store accessible to admin,pimpinan,operator (to assign client PIC)
+    // destroy restricted to admin,pimpinan
+    // index, show, update accessible to admin,pimpinan,karyawan,operator
     Route::post('pekerjaan', [PekerjaanController::class, 'store'])
-        ->middleware('role:admin,pimpinan')->name('pekerjaan.store');
+        ->middleware('role:admin,pimpinan,operator')->name('pekerjaan.store');
     Route::delete('pekerjaan/{pekerjaan}', [PekerjaanController::class, 'destroy'])
         ->middleware('role:admin,pimpinan')->name('pekerjaan.destroy');
     Route::get('pekerjaan', [PekerjaanController::class, 'index'])
-        ->middleware('role:admin,karyawan,pimpinan')->name('pekerjaan.index');
+        ->middleware('role:admin,pimpinan,karyawan,operator')->name('pekerjaan.index');
     Route::get('pekerjaan/{pekerjaan}', [PekerjaanController::class, 'show'])
-        ->middleware('role:admin,karyawan,pimpinan')->name('pekerjaan.show');
+        ->middleware('role:admin,pimpinan,karyawan,operator')->name('pekerjaan.show');
     Route::match(['put', 'patch'], 'pekerjaan/{pekerjaan}', [PekerjaanController::class, 'update'])
-        ->middleware('role:admin,karyawan,pimpinan')->name('pekerjaan.update');
+        ->middleware('role:admin,pimpinan,karyawan,operator')->name('pekerjaan.update');
 
     // Reporting Workflow
     Route::post('reporting/{reporting}/publish-client', [ReportingWorkflowController::class, 'publishClient'])

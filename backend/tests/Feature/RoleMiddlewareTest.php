@@ -84,6 +84,40 @@ class RoleMiddlewareTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_operator_role_can_access_lead_conversion(): void
+    {
+        $operator = User::factory()->create(['role' => 'operator']);
+        $lead = CalonKlien::factory()->deal()->create(['id_user' => $operator->id_user]);
+
+        Sanctum::actingAs($operator);
+        $response = $this->postJson("/api/calon-klien/{$lead->id_calon_klien}/convert", [
+            'no_kontrak' => 'KTR-AUTH-OPERATOR',
+            'jenis_dokumen' => 'spk',
+            'tgl_mulai' => '2026-09-15',
+            'tgl_selesai' => '2026-10-15',
+            'alamat' => 'Jl. Operator',
+            'layanan' => 'Operator Service',
+        ]);
+
+        $response->assertOk();
+    }
+
+    public function test_pimpinan_can_create_user(): void
+    {
+        $pimpinan = User::factory()->create(['role' => 'pimpinan']);
+
+        Sanctum::actingAs($pimpinan);
+        $response = $this->postJson('/api/users', [
+            'nama' => 'Staff Baru',
+            'email' => 'staffbaru@example.com',
+            'password' => 'password123',
+            'role' => 'karyawan',
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('users', ['email' => 'staffbaru@example.com']);
+    }
+
     public function test_pimpinan_can_approve_pekerjaan(): void
     {
         $pimpinan = User::factory()->create(['role' => 'pimpinan']);
@@ -110,5 +144,30 @@ class RoleMiddlewareTest extends TestCase
         ]);
 
         $response->assertForbidden();
+    }
+
+    public function test_operator_can_create_pekerjaan_and_assign_pic(): void
+    {
+        $operator = User::factory()->create(['role' => 'operator']);
+        $karyawan = User::factory()->create(['role' => 'karyawan']);
+        $klien = \App\Models\Klien::factory()->create();
+        $template = \App\Models\TemplateDeadline::factory()->create();
+
+        Sanctum::actingAs($operator);
+        $response = $this->postJson('/api/pekerjaan', [
+            'id_klien' => $klien->id_klien,
+            'id_pic' => $karyawan->id_user,
+            'id_template' => $template->id_template,
+            'judul' => 'Pembuatan Landing Page Klien',
+            'deadline' => '2026-10-30',
+            'status' => 'baru',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.id_pic', $karyawan->id_user);
+        $this->assertDatabaseHas('pekerjaan', [
+            'judul' => 'Pembuatan Landing Page Klien',
+            'id_pic' => $karyawan->id_user,
+        ]);
     }
 }

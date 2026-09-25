@@ -23,7 +23,6 @@ class RouteProtectionTest extends TestCase
         $this->getJson('/api/pekerjaan')->assertUnauthorized();
         $this->getJson('/api/kontrak')->assertUnauthorized();
         $this->getJson('/api/klien')->assertUnauthorized();
-        $this->getJson('/api/template-deadline')->assertUnauthorized();
         $this->getJson('/api/reporting')->assertUnauthorized();
         $this->getJson('/api/performance-reviews')->assertUnauthorized();
     }

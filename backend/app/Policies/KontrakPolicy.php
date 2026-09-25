@@ -9,22 +9,22 @@ class KontrakPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function view(User $user, Kontrak $kontrak): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function update(User $user, Kontrak $kontrak): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function delete(User $user, Kontrak $kontrak): bool

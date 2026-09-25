@@ -121,7 +121,6 @@ class EndToEndIntegrationTest extends TestCase
         // Karyawan can access operational routes
         $this->withToken($token)->getJson('/api/pekerjaan')->assertOk();
         $this->withToken($token)->getJson('/api/reporting')->assertOk();
-        $this->withToken($token)->getJson('/api/template-deadline')->assertOk();
 
         // Karyawan cannot access CRM routes (403 Forbidden)
         $this->withToken($token)->getJson('/api/calon-klien')->assertForbidden();

@@ -1,4 +1,5 @@
 import Badge from './ui/Badge'
+import LoadingSpinner from './common/LoadingSpinner'
 
 function renderCellValue(column, record) {
   const value = record[column.key]
@@ -26,6 +27,31 @@ function renderCellValue(column, record) {
     return <span className="text-gray-400">-</span>
   }
 
+  // Render Klien (Klien Penyewa Jasa)
+  if (column.key === 'id_klien') {
+    const clientName = record.klien?.nama_perusahaan
+    return (
+      <div className="flex flex-col">
+        <span className="font-semibold text-gray-900 dark:text-gray-100">
+          {clientName || `Klien #${value}`}
+        </span>
+        {clientName && (
+          <span className="text-xs text-gray-400">ID: {value}</span>
+        )}
+      </div>
+    )
+  }
+
+  // Render PIC (Penanggung Jawab Karyawan)
+  if (column.key === 'id_pic') {
+    const picName = record.pic?.nama
+    return (
+      <Badge size="sm" color="info">
+        <span className="mr-1">👤</span> {picName || `Karyawan #${value}`}
+      </Badge>
+    )
+  }
+
   // Render stylized status badges
   if (['status', 'status_prospek', 'review_status', 'prioritas'].includes(column.key)) {
     if (column.key === 'status_prospek' && value === 'deal') {
@@ -44,11 +70,13 @@ function renderCellValue(column, record) {
       deal: 'success',
       lost: 'error',
       // Work status
+      baru: 'info',
       draft: 'light',
       in_progress: 'primary',
       review: 'warning',
       submitted: 'warning',
       revision: 'error',
+      revision_needed: 'error',
       approved: 'success',
       completed: 'success',
       // Priority
@@ -62,9 +90,28 @@ function renderCellValue(column, record) {
       batal: 'error',
     }
 
+    const statusLabels = {
+      baru: 'Baru',
+      in_progress: 'Dalam Pengerjaan',
+      submitted: 'Diajukan',
+      revision_needed: 'Perlu Revisi',
+      completed: 'Selesai',
+      draft: 'Draft',
+      review: 'Ditinjau',
+      revision: 'Revisi',
+      approved: 'Disetujui',
+      aktif: 'Aktif',
+      nonaktif: 'Nonaktif',
+      batal: 'Batal',
+      selesai: 'Selesai',
+      rendah: 'Rendah',
+      sedang: 'Sedang',
+      tinggi: 'Tinggi',
+    }
+
     return (
       <Badge size="sm" color={badgeColors[value] || 'light'}>
-        {value}
+        {statusLabels[value] || value}
       </Badge>
     )
   }
@@ -72,10 +119,11 @@ function renderCellValue(column, record) {
   // Render role badges
   if (column.key === 'role') {
     const roleLabels = {
-      admin: { label: 'Administrator', color: 'primary' },
-      sales: { label: 'Sales / BD', color: 'success' },
-      karyawan: { label: 'Karyawan / PIC', color: 'warning' },
-      pimpinan: { label: 'Pimpinan', color: 'info' },
+      admin: { label: 'Admin Utama', color: 'primary' },
+      pimpinan: { label: 'Pimpinan (Admin Utama)', color: 'primary' },
+      operator: { label: 'Operator', color: 'success' },
+      sales: { label: 'Operator', color: 'success' },
+      karyawan: { label: 'Karyawan', color: 'warning' },
     }
     const roleInfo = roleLabels[value] || { label: value, color: 'light' }
     return (
@@ -112,16 +160,12 @@ function ResourceTable({
 }) {
   if (loading) {
     return (
-      <div className="rounded-3xl border border-gray-200 bg-white p-12 text-center shadow-xs dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex flex-col items-center justify-center gap-3">
-          <svg className="size-8 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-            Memuat data {config.label}...
-          </p>
-        </div>
+      <div className="rounded-3xl border border-gray-200 bg-white p-10 text-center shadow-xs dark:border-gray-800 dark:bg-gray-900">
+        <LoadingSpinner
+          size="md"
+          text={`Memuat data ${config.label}...`}
+          subtitle="Menyinkronkan data dengan server..."
+        />
       </div>
     )
   }
@@ -163,7 +207,7 @@ function ResourceTable({
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {records.map((record) => {
               const isDealLead = config.key === 'calonKlien' && record.status_prospek === 'deal'
-              const canConvertLead = isDealLead && !record.kontrak && ['admin', 'sales', 'pimpinan'].includes(user?.role)
+              const canConvertLead = isDealLead && !record.kontrak && ['admin', 'pimpinan', 'operator', 'sales'].includes(user?.role)
               const isCalonKlien = config.key === 'calonKlien'
               const isKontrak = config.key === 'kontrak'
 

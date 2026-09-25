@@ -5,6 +5,7 @@ import ConfirmModal from './ConfirmModal'
 import DashboardView from './DashboardView'
 import ResourceDashboard from './ResourceDashboard'
 import Badge from './ui/Badge'
+import LoadingSpinner from './common/LoadingSpinner'
 
 // SVG Icons strictly sized with size-5 (20px) and shrink-0
 function NavIcon({ type, className = '' }) {
@@ -23,12 +24,6 @@ function NavIcon({ type, className = '' }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       )
-    case 'leadInteractions':
-      return (
-        <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      )
     case 'kontrak':
       return (
         <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -39,12 +34,6 @@ function NavIcon({ type, className = '' }) {
       return (
         <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      )
-    case 'templateDeadline':
-      return (
-        <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       )
     case 'pekerjaan':
@@ -108,31 +97,36 @@ export default function ProtectedShell() {
 
   async function handleConfirmLogout() {
     setLoggingOut(true)
+    setShowLogoutModal(false)
     try {
-      await logout()
-    } finally {
+      await Promise.all([
+        logout(),
+        new Promise((resolve) => setTimeout(resolve, 800)),
+      ])
+    } catch {
       setLoggingOut(false)
-      setShowLogoutModal(false)
     }
   }
 
   const roleBadgeColor = {
     admin: 'primary',
-    pimpinan: 'warning',
+    pimpinan: 'primary',
+    operator: 'success',
     sales: 'success',
     karyawan: 'info',
   }[user?.role] || 'light'
 
   const roleLabel = {
-    admin: 'Administrator',
-    pimpinan: 'Pimpinan Eksekutif',
-    sales: 'Sales & Marketing',
-    karyawan: 'Karyawan PIC',
+    admin: 'Pimpinan (Admin Utama)',
+    pimpinan: 'Pimpinan (Admin Utama)',
+    operator: 'Operator',
+    sales: 'Operator',
+    karyawan: 'Karyawan',
   }[user?.role] || user?.role
 
   // Group resources for clean TailAdmin sidebar sections
-  const crmResources = allowedResources.filter((r) => ['calonKlien', 'leadInteractions', 'kontrak'].includes(r.key))
-  const operationsResources = allowedResources.filter((r) => ['klien', 'templateDeadline', 'pekerjaan'].includes(r.key))
+  const crmResources = allowedResources.filter((r) => ['calonKlien', 'kontrak'].includes(r.key))
+  const operationsResources = allowedResources.filter((r) => ['klien', 'pekerjaan'].includes(r.key))
   const reportingResources = allowedResources.filter((r) => ['reporting', 'performanceReviews'].includes(r.key))
   const adminResources = allowedResources.filter((r) => ['users'].includes(r.key))
 
@@ -156,16 +150,17 @@ export default function ProtectedShell() {
           {/* Logo & Brand Header */}
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 px-5 dark:border-gray-800">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white font-black text-sm tracking-wider shadow-theme-xs">
-                PPSA
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50/80 p-1.5 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20 shadow-theme-xs">
+                <img
+                  src="/images/logo/loading-logo.png"
+                  alt="Logo"
+                  className="size-7 object-contain drop-shadow-xs"
+                />
               </div>
               <div className="min-w-0">
-                <h2 className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
-                  SIM-KK Portal
+                <h2 className="text-base font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
+                  SIM-KK
                 </h2>
-                <span className="text-[10px] font-semibold text-brand-500 tracking-wider uppercase">
-                  TailAdmin Edition
-                </span>
               </div>
             </div>
 
@@ -388,7 +383,7 @@ export default function ProtectedShell() {
             {/* Breadcrumb / Title Indicator */}
             <div>
               <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-                SIM-KK PPSA
+                SIM-KK
               </span>
               <h1 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
                 {currentActiveKey === 'dashboard'
@@ -452,6 +447,11 @@ export default function ProtectedShell() {
         onConfirm={handleConfirmLogout}
         onClose={() => setShowLogoutModal(false)}
       />
+
+      {/* Fullscreen Pure White Loading saat Logout (Hanya Logo di Tengah) */}
+      {loggingOut && (
+        <LoadingSpinner size="screen" text="" />
+      )}
     </div>
   )
 }

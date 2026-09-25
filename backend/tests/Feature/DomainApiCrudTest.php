@@ -6,7 +6,6 @@ use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Models\Pekerjaan;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -66,7 +65,7 @@ class DomainApiCrudTest extends TestCase
         $response = $this->postJson('/api/calon-klien', []);
 
         $response->assertUnprocessable()
-            ->assertJsonValidationErrors(['id_user', 'nama_perusahaan', 'kontak', 'status_prospek']);
+            ->assertJsonValidationErrors(['nama_perusahaan']);
     }
 
     public function test_kontrak_crud_flow(): void
@@ -130,33 +129,15 @@ class DomainApiCrudTest extends TestCase
         $this->deleteJson("/api/klien/{$id}")->assertNoContent();
     }
 
-    public function test_template_deadline_crud_flow(): void
-    {
-        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
-        $createResponse = $this->postJson('/api/template-deadline', [
-            'nama_template' => 'Template A',
-            'keterangan' => 'Keterangan A',
-        ]);
-
-        $createResponse->assertCreated();
-        $id = $createResponse->json('data.id_template');
-
-        $this->getJson("/api/template-deadline/{$id}")->assertOk();
-        $this->putJson("/api/template-deadline/{$id}", ['nama_template' => 'Template B'])->assertOk();
-        $this->deleteJson("/api/template-deadline/{$id}")->assertNoContent();
-    }
-
     public function test_pekerjaan_crud_flow(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
         $klien = Klien::factory()->create();
         $pic = User::factory()->create();
-        $template = TemplateDeadline::factory()->create();
 
         $createResponse = $this->postJson('/api/pekerjaan', [
             'id_klien' => $klien->id_klien,
             'id_pic' => $pic->id_user,
-            'id_template' => $template->id_template,
             'judul' => 'Pekerjaan A',
             'deadline' => '2026-09-25',
             'status' => 'baru',

@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:8000/api'
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000/api'
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '')
 const TOKEN_KEY = 'simkk_token'
 
@@ -18,6 +18,14 @@ export function setToken(token) {
 
 export function removeToken() {
   localStorage.removeItem(TOKEN_KEY)
+}
+
+// In-memory cache for fast GET responses & in-flight deduplication
+const requestCache = new Map()
+const CACHE_TTL_MS = 20000 // 20 seconds TTL
+
+export function invalidateApiCache() {
+  requestCache.clear()
 }
 
 async function parseResponse(response, isLoginRequest) {
@@ -59,7 +67,31 @@ async function parseResponse(response, isLoginRequest) {
 
 export async function apiRequest(path, options = {}) {
   const cleanPath = path.replace(/^\//, '')
+  const method = (options.method || 'GET').toUpperCase()
   const isLoginRequest = cleanPath.includes('auth/login')
+
+  // Cache key based on path + auth token
+  const token = getToken()
+  const cacheKey = `${method}:${cleanPath}:${token || 'anon'}`
+
+  // For GET requests, check cache and in-flight deduplication
+  if (method === 'GET' && !options.skipCache) {
+    const cached = requestCache.get(cacheKey)
+    if (cached) {
+      const now = Date.now()
+      if (cached.data !== undefined && now - cached.timestamp < CACHE_TTL_MS) {
+        return cached.data
+      }
+      if (cached.promise) {
+        return cached.promise
+      }
+    }
+  }
+
+  // Any mutation (POST, PUT, PATCH, DELETE) invalidates cached GET queries
+  if (method !== 'GET') {
+    requestCache.clear()
+  }
 
   const headers = {
     Accept: 'application/json',
@@ -70,17 +102,44 @@ export async function apiRequest(path, options = {}) {
     headers['Content-Type'] = 'application/json'
   }
 
-  const token = getToken()
   if (token && !options.skipAuth) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE_URL}/${cleanPath}`, {
-    ...options,
-    headers,
-  })
+  const executeFetch = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/${cleanPath}`, {
+        ...options,
+        headers,
+      })
+      const result = await parseResponse(response, isLoginRequest)
 
-  return parseResponse(response, isLoginRequest)
+      if (method === 'GET' && !options.skipCache) {
+        requestCache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: result,
+        })
+      }
+
+      return result
+    } catch (err) {
+      if (method === 'GET') {
+        requestCache.delete(cacheKey)
+      }
+      throw err
+    }
+  }
+
+  if (method === 'GET' && !options.skipCache) {
+    const promise = executeFetch()
+    requestCache.set(cacheKey, {
+      timestamp: Date.now(),
+      promise,
+    })
+    return promise
+  }
+
+  return executeFetch()
 }
 
 export function loginApi(email, password) {
@@ -91,11 +150,12 @@ export function loginApi(email, password) {
   })
 }
 
-export function getMeApi() {
-  return apiRequest('auth/me')
+export function getMeApi(options = {}) {
+  return apiRequest('auth/me', options)
 }
 
 export function logoutApi() {
+  requestCache.clear()
   return apiRequest('auth/logout', {
     method: 'POST',
   })

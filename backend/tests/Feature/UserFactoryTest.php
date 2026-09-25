@@ -41,6 +41,13 @@ class UserFactoryTest extends TestCase
         $this->assertSame('karyawan', $karyawan->role);
     }
 
+    public function test_factory_operator_state(): void
+    {
+        $operator = User::factory()->operator()->create();
+
+        $this->assertSame('operator', $operator->role);
+    }
+
     public function test_factory_pimpinan_state(): void
     {
         $pimpinan = User::factory()->pimpinan()->create();

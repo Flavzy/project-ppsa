@@ -21,7 +21,7 @@ class StorePekerjaanRequest extends FormRequest
         return [
             'id_klien' => ['required', 'integer', 'exists:klien,id_klien'],
             'id_pic' => ['required', 'integer', 'exists:users,id_user'],
-            'id_template' => ['required', 'integer', 'exists:template_deadline,id_template'],
+            'id_template' => ['nullable', 'integer'],
             'judul' => ['required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string'],
             'deadline' => ['required', 'date'],

@@ -21,7 +21,7 @@ class UpdatePekerjaanRequest extends FormRequest
         return [
             'id_klien' => ['sometimes', 'required', 'integer', 'exists:klien,id_klien'],
             'id_pic' => ['sometimes', 'required', 'integer', 'exists:users,id_user'],
-            'id_template' => ['sometimes', 'required', 'integer', 'exists:template_deadline,id_template'],
+            'id_template' => ['nullable', 'integer'],
             'judul' => ['sometimes', 'required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string'],
             'deadline' => ['sometimes', 'required', 'date'],

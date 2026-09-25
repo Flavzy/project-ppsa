@@ -44,8 +44,8 @@ class DashboardSummaryController extends Controller
             ]);
         }
 
-        // Sales role: CRM leads and contract metrics
-        if ($user->role === 'sales') {
+        // Operator / Sales role: CRM leads and contract metrics
+        if (in_array($user->role, ['operator', 'sales'], true)) {
             $leadByStatus = CalonKlien::query()
                 ->selectRaw('status_prospek as status, count(*) as total')
                 ->groupBy('status_prospek')

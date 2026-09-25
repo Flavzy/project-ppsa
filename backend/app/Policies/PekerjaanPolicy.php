@@ -9,12 +9,12 @@ class PekerjaanPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan', 'karyawan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales', 'karyawan'], true);
     }
 
     public function view(User $user, Pekerjaan $pekerjaan): bool
     {
-        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
+        if (in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true)) {
             return true;
         }
 
@@ -27,12 +27,12 @@ class PekerjaanPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function update(User $user, Pekerjaan $pekerjaan): bool
     {
-        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
+        if (in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true)) {
             return true;
         }
 

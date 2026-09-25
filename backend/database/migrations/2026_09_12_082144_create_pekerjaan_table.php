@@ -13,7 +13,7 @@ return new class extends Migration
 
             $table->unsignedBigInteger('id_klien');
             $table->unsignedBigInteger('id_pic');
-            $table->unsignedBigInteger('id_template');
+            $table->unsignedBigInteger('id_template')->nullable();
 
             $table->string('judul');
             $table->date('deadline');
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreign('id_template')
                   ->references('id_template')
                   ->on('template_deadline')
-                  ->onDelete('cascade');
+                  ->nullOnDelete();
         });
     }
 

@@ -9,17 +9,17 @@ class LeadInteractionPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function view(User $user, LeadInteraction $leadInteraction): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function update(User $user, LeadInteraction $leadInteraction): bool
@@ -28,7 +28,7 @@ class LeadInteractionPolicy
             return true;
         }
 
-        if ($user->role === 'sales') {
+        if (in_array($user->role, ['operator', 'sales'], true)) {
             return (int) $leadInteraction->id_user === (int) $user->id_user
                 || ((int) $leadInteraction->calonKlien?->id_user === (int) $user->id_user);
         }

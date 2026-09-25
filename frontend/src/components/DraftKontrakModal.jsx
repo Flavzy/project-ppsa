@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import LoadingSpinner from './common/LoadingSpinner'
 
 export default function DraftKontrakModal({ lead, contract, onClose, onSign }) {
   const [signingLoading, setSigningLoading] = useState(false)
@@ -332,7 +333,17 @@ export default function DraftKontrakModal({ lead, contract, onClose, onSign }) {
                 disabled={signingLoading}
                 className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-success-600 hover:bg-success-700 text-sm font-semibold text-white shadow-theme-xs shadow-success-600/20 transition-all cursor-pointer disabled:opacity-50"
               >
-                <span>✍️</span> {signingLoading ? 'Memproses...' : 'Tandatangani Kontrak'}
+                {signingLoading ? (
+                  <>
+                    <LoadingSpinner size="xs" text="" />
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✍️</span>
+                    <span>Tandatangani Kontrak</span>
+                  </>
+                )}
               </button>
             )}
 

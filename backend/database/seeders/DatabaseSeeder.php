@@ -9,7 +9,6 @@ use App\Models\LeadInteraction;
 use App\Models\Pekerjaan;
 use App\Models\PerformanceReview;
 use App\Models\Reporting;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -24,21 +23,28 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // ── Users ──
-        $admin = User::factory()->create([
-            'nama' => 'Admin Utama',
-            'email' => 'admin@example.com',
-            'role' => 'admin',
-        ]);
-
         $pimpinan = User::factory()->create([
             'nama' => 'Budi Santoso',
             'email' => 'pimpinan@example.com',
             'role' => 'pimpinan',
         ]);
 
+        $admin = User::factory()->create([
+            'nama' => 'Admin Utama',
+            'email' => 'admin@example.com',
+            'role' => 'pimpinan',
+        ]);
+
+        $operator = User::factory()->create([
+            'nama' => 'Rudi Hartono',
+            'email' => 'operator@example.com',
+            'role' => 'operator',
+        ]);
+        $sales = $operator;
+
         $karyawan1 = User::factory()->create([
             'nama' => 'Andi Pratama',
-            'email' => 'andi@example.com',
+            'email' => 'karyawan@example.com',
             'role' => 'karyawan',
         ]);
 
@@ -46,28 +52,6 @@ class DatabaseSeeder extends Seeder
             'nama' => 'Siti Nurhaliza',
             'email' => 'siti@example.com',
             'role' => 'karyawan',
-        ]);
-
-        $sales = User::factory()->create([
-            'nama' => 'Rudi Hartono',
-            'email' => 'sales@example.com',
-            'role' => 'sales',
-        ]);
-
-        // ── Template Deadline ──
-        $templateStandar = TemplateDeadline::factory()->create([
-            'nama_template' => 'Standar',
-            'keterangan' => 'Template deadline standar (30 hari)',
-        ]);
-
-        $templateUrgent = TemplateDeadline::factory()->create([
-            'nama_template' => 'Urgent',
-            'keterangan' => 'Template deadline urgent (14 hari)',
-        ]);
-
-        $templateCustom = TemplateDeadline::factory()->create([
-            'nama_template' => 'Custom',
-            'keterangan' => 'Template deadline fleksibel',
         ]);
 
         // ── Calon Klien (Leads) ──
@@ -167,7 +151,6 @@ class DatabaseSeeder extends Seeder
         $taskCompleted1 = Pekerjaan::factory()->completed()->create([
             'id_klien' => $klien1->id_klien,
             'id_pic' => $karyawan1->id_user,
-            'id_template' => $templateStandar->id_template,
             'judul' => 'Audit Website Klien',
             'deadline' => '2026-09-15',
             'tgl_selesai' => '2026-09-14',
@@ -177,7 +160,6 @@ class DatabaseSeeder extends Seeder
         $taskCompleted2 = Pekerjaan::factory()->completed()->create([
             'id_klien' => $klien3->id_klien,
             'id_pic' => $karyawan2->id_user,
-            'id_template' => $templateStandar->id_template,
             'judul' => 'Laporan Konsultansi Final',
             'deadline' => '2026-08-30',
             'tgl_selesai' => '2026-08-28',
@@ -187,7 +169,6 @@ class DatabaseSeeder extends Seeder
         Pekerjaan::factory()->inProgress()->create([
             'id_klien' => $klien1->id_klien,
             'id_pic' => $karyawan1->id_user,
-            'id_template' => $templateUrgent->id_template,
             'judul' => 'Kampanye Google Ads',
             'deadline' => '2026-10-01',
         ]);
@@ -195,7 +176,6 @@ class DatabaseSeeder extends Seeder
         Pekerjaan::factory()->inProgress()->create([
             'id_klien' => $klien2->id_klien,
             'id_pic' => $karyawan2->id_user,
-            'id_template' => $templateStandar->id_template,
             'judul' => 'Setup Server Monitoring',
             'deadline' => '2026-10-15',
         ]);
@@ -203,7 +183,6 @@ class DatabaseSeeder extends Seeder
         Pekerjaan::factory()->submitted()->create([
             'id_klien' => $klien1->id_klien,
             'id_pic' => $karyawan2->id_user,
-            'id_template' => $templateCustom->id_template,
             'judul' => 'Desain Landing Page',
             'deadline' => '2026-09-20',
         ]);
@@ -211,7 +190,6 @@ class DatabaseSeeder extends Seeder
         Pekerjaan::factory()->overdue()->create([
             'id_klien' => $klien2->id_klien,
             'id_pic' => $karyawan1->id_user,
-            'id_template' => $templateStandar->id_template,
             'judul' => 'Migrasi Database Legacy',
             'deadline' => '2026-09-01',
         ]);
@@ -219,7 +197,6 @@ class DatabaseSeeder extends Seeder
         Pekerjaan::factory()->create([
             'id_klien' => $klien1->id_klien,
             'id_pic' => $karyawan1->id_user,
-            'id_template' => $templateUrgent->id_template,
             'judul' => 'SEO Optimization',
             'status' => 'baru',
             'progress_persen' => 0,
@@ -229,7 +206,6 @@ class DatabaseSeeder extends Seeder
         Pekerjaan::factory()->create([
             'id_klien' => $klien2->id_klien,
             'id_pic' => $karyawan2->id_user,
-            'id_template' => $templateCustom->id_template,
             'judul' => 'Instalasi Firewall',
             'status' => 'revision_needed',
             'review_status' => 'revision_needed',

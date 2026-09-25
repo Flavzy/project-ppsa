@@ -19,7 +19,7 @@ class PekerjaanController extends Controller
         Gate::authorize('viewAny', Pekerjaan::class);
 
         $query = Pekerjaan::query()
-            ->with(['klien', 'pic', 'templateDeadline', 'approver', 'performanceReview']);
+            ->with(['klien', 'pic', 'approver', 'performanceReview']);
 
         if (request()->user()->role === 'karyawan') {
             $query->where('id_pic', request()->user()->id_user);
@@ -35,7 +35,7 @@ class PekerjaanController extends Controller
         Gate::authorize('create', Pekerjaan::class);
 
         $pekerjaan = Pekerjaan::create($request->validated())
-            ->load(['klien', 'pic', 'templateDeadline']);
+            ->load(['klien', 'pic']);
 
         return (new PekerjaanResource($pekerjaan))
             ->response()
@@ -46,7 +46,7 @@ class PekerjaanController extends Controller
     {
         Gate::authorize('view', $pekerjaan);
 
-        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'templateDeadline']));
+        return new PekerjaanResource($pekerjaan->load(['klien', 'pic']));
     }
 
     public function update(UpdatePekerjaanRequest $request, Pekerjaan $pekerjaan): PekerjaanResource
@@ -65,7 +65,7 @@ class PekerjaanController extends Controller
 
         $pekerjaan->update($data);
 
-        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'templateDeadline']));
+        return new PekerjaanResource($pekerjaan->load(['klien', 'pic']));
     }
 
     public function destroy(Pekerjaan $pekerjaan): Response

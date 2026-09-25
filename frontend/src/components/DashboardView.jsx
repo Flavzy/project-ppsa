@@ -3,13 +3,17 @@ import { getDashboardSummary } from '../api/resources'
 import { useAuth } from '../auth/useAuth'
 import Badge from './ui/Badge'
 import GridShape from './common/GridShape'
+import LoadingSpinner from './common/LoadingSpinner'
 
 // Status labels & Tailwind color maps
 const WORK_STATUS_CONFIG = {
+  baru: { label: 'Baru', color: 'bg-blue-light-500', badgeColor: 'info' },
   draft: { label: 'Draft', color: 'bg-gray-400', badgeColor: 'light' },
   in_progress: { label: 'Dalam Pengerjaan', color: 'bg-brand-500', badgeColor: 'primary' },
+  submitted: { label: 'Diajukan', color: 'bg-warning-500', badgeColor: 'warning' },
   review: { label: 'Menunggu Review', color: 'bg-warning-500', badgeColor: 'warning' },
   revision: { label: 'Perlu Revisi', color: 'bg-error-500', badgeColor: 'error' },
+  revision_needed: { label: 'Perlu Revisi', color: 'bg-error-500', badgeColor: 'error' },
   approved: { label: 'Disetujui', color: 'bg-success-500', badgeColor: 'success' },
   completed: { label: 'Selesai', color: 'bg-success-600', badgeColor: 'success' },
 }
@@ -30,10 +34,11 @@ const CONTRACT_STATUS_CONFIG = {
 }
 
 const ROLE_BADGE_CONFIG = {
-  admin: { label: 'Administrator Utama', color: 'primary' },
-  pimpinan: { label: 'Pimpinan / Eksekutif', color: 'warning' },
-  sales: { label: 'Sales & Business Development', color: 'success' },
-  karyawan: { label: 'Karyawan / PIC Operasional', color: 'info' },
+  admin: { label: 'Pimpinan (Admin Utama)', color: 'primary' },
+  pimpinan: { label: 'Pimpinan (Admin Utama)', color: 'primary' },
+  operator: { label: 'Operator', color: 'success' },
+  sales: { label: 'Operator', color: 'success' },
+  karyawan: { label: 'Karyawan', color: 'info' },
 }
 
 // Subcomponent: TailAdmin Metric Stat Card - Crisp and proportional
@@ -107,12 +112,10 @@ function WelcomeBannerWidget({ user }) {
           <p className="mt-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
             {user?.role === 'karyawan' &&
               'Pantau progres tugas harian Anda, kelola batas waktu pengerjaan, dan pantau catatan ulasan kinerja Anda secara real-time.'}
-            {user?.role === 'sales' &&
-              'Kelola saluran prospek calon klien, pantau status negosiasi, dan dorong konversi kontrak kerja sama baru.'}
-            {user?.role === 'pimpinan' &&
-              'Akses ikhtisar performa eksekutif, tinjau progres operasional proyek, dan pantau metrik kinerja perusahaan.'}
-            {user?.role === 'admin' &&
-              'Kelola seluruh alur kerja operasional, administrasi data klien, pemantauan tugas tim, dan evaluasi kinerja karyawan.'}
+            {['operator', 'sales'].includes(user?.role) &&
+              'Kelola saluran prospek calon klien, tentukan penanggung jawab (PIC) untuk klien penyewa jasa, dan pantau kelola pekerjaan.'}
+            {['pimpinan', 'admin'].includes(user?.role) &&
+              'Akses ikhtisar performa eksekutif, kelola administrasi pengguna, tinjau progres operasional proyek, dan pantau metrik kinerja perusahaan.'}
           </p>
         </div>
 
@@ -720,20 +723,7 @@ export default function DashboardView() {
   }, [])
 
   if (loading) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8 animate-pulse space-y-6">
-        <div className="h-44 rounded-3xl bg-gray-200 dark:bg-gray-800" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="h-32 rounded-2xl bg-gray-200 dark:bg-gray-800" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="h-64 rounded-2xl bg-gray-200 dark:bg-gray-800" />
-          <div className="h-64 rounded-2xl bg-gray-200 dark:bg-gray-800" />
-        </div>
-      </div>
-    )
+    return <LoadingSpinner size="screen" text="" />
   }
 
   if (error) {
@@ -758,7 +748,7 @@ export default function DashboardView() {
       <WelcomeBannerWidget user={user} />
 
       {/* 2. Role-Based Dashboard View */}
-      {user?.role === 'admin' && (
+      {['admin', 'pimpinan'].includes(user?.role) && (
         <AdminDashboardView
           totals={totals}
           workByStatus={workByStatus}
@@ -768,16 +758,7 @@ export default function DashboardView() {
         />
       )}
 
-      {user?.role === 'pimpinan' && (
-        <PimpinanDashboardView
-          totals={totals}
-          workByStatus={workByStatus}
-          leadByStatus={leadByStatus}
-          employeeScores={employeeScores}
-        />
-      )}
-
-      {user?.role === 'sales' && (
+      {['operator', 'sales'].includes(user?.role) && (
         <SalesDashboardView
           totals={totals}
           leadByStatus={leadByStatus}

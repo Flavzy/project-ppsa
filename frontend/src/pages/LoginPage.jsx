@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/useAuth'
 import GridShape from '../components/common/GridShape'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -19,9 +20,13 @@ export default function LoginPage() {
     setSubmitting(true)
 
     try {
-      await login(email, password)
+      await Promise.all([
+        login(email, password),
+        new Promise((resolve) => setTimeout(resolve, 750)),
+      ])
       setPassword('')
     } catch (requestError) {
+      setSubmitting(false)
       if (requestError.status === 401) {
         setError('Kredensial tidak valid. Silakan periksa email dan kata sandi Anda.')
       } else if (requestError.status === 422) {
@@ -31,8 +36,6 @@ export default function LoginPage() {
         setError(requestError.message || 'Terjadi kesalahan saat masuk. Silakan coba lagi.')
       }
       setPassword('')
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -48,7 +51,7 @@ export default function LoginPage() {
             className="w-full max-w-[160px] h-auto mb-3 drop-shadow-md"
           />
           <span className="inline-block text-[11px] font-bold tracking-widest text-brand-400 uppercase mb-1">
-            SIM-KK / PPSA PLATFORM
+            SIM-KK PLATFORM
           </span>
           <h2 className="text-lg font-bold text-white leading-snug max-w-sm">
             Sistem Informasi Manajemen Klien & Kinerja Karyawan
@@ -61,11 +64,13 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-md">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-500 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20">
-                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                  <path d="M19 2H9c-1.1 0-2 .9-2 2v2H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H5V8h14v12zm-4-9h-2V9h2v2zm0 4h-2v-2h2v2zm-4-4h-2V9h2v2zm0 4h-2v-2h2v2z" />
-                </svg>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50/80 p-2 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20 shadow-theme-xs">
+                <img
+                  src="/images/logo/loading-logo.png"
+                  alt="Logo"
+                  className="size-8 object-contain drop-shadow-xs"
+                />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
@@ -166,9 +171,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-brand-600 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden disabled:opacity-60 cursor-pointer"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-brand-600 focus:ring-2 focus:ring-brand-500/20 focus:outline-hidden disabled:opacity-60 cursor-pointer"
             >
-              {submitting ? 'Memproses...' : 'Masuk ke Sistem'}
+              {submitting ? (
+                <>
+                  <LoadingSpinner size="xs" text="" />
+                  <span>Memproses Masuk...</span>
+                </>
+              ) : (
+                'Masuk ke Sistem'
+              )}
             </button>
           </form>
 
@@ -181,37 +193,25 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail('admin@example.com')
-                  setPassword('password123')
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 cursor-pointer"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-brand-500"></span>
-                Admin
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
                   setEmail('pimpinan@example.com')
                   setPassword('password123')
                 }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700 transition hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3.5 py-1.5 text-xs font-semibold text-purple-700 transition hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 cursor-pointer shadow-xs"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-purple-500"></span>
-                Pimpinan
+                <span className="h-2 w-2 rounded-full bg-purple-500"></span>
+                Pimpinan (Admin Utama)
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  setEmail('sales@example.com')
+                  setEmail('operator@example.com')
                   setPassword('password123')
                 }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3 py-1 text-xs font-semibold text-success-700 transition hover:bg-success-100 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3.5 py-1.5 text-xs font-semibold text-success-700 transition hover:bg-success-100 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300 cursor-pointer shadow-xs"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-success-500"></span>
-                Sales PIC
+                <span className="h-2 w-2 rounded-full bg-success-500"></span>
+                Operator
               </button>
 
               <button
@@ -220,17 +220,17 @@ export default function LoginPage() {
                   setEmail('karyawan@example.com')
                   setPassword('password123')
                 }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3.5 py-1.5 text-xs font-semibold text-orange-700 transition hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 cursor-pointer shadow-xs"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-orange-500"></span>
-                Karyawan PIC
+                <span className="h-2 w-2 rounded-full bg-orange-500"></span>
+                Karyawan
               </button>
             </div>
           </div>
 
           {/* Footer Copyright */}
           <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500">
-            &copy; {new Date().getFullYear()} SIM-KK &bull; PPSA Project. Powered by TailAdmin UI.
+            &copy; {new Date().getFullYear()} SIM-KK. Powered by TailAdmin UI.
           </div>
         </div>
       </div>
@@ -247,7 +247,7 @@ export default function LoginPage() {
           />
 
           <span className="inline-block text-xs font-bold tracking-widest text-brand-400 uppercase mb-2">
-            SIM-KK / PPSA PLATFORM
+            SIM-KK PLATFORM
           </span>
 
           <h2 className="text-2xl xl:text-3xl font-extrabold text-white leading-tight mb-4">
@@ -259,6 +259,11 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Fullscreen Pure White Loading saat Login (Hanya Logo di Tengah) */}
+      {submitting && (
+        <LoadingSpinner size="screen" text="" />
+      )}
     </div>
   )
 }

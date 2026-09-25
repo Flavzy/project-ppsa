@@ -33,7 +33,6 @@ class PekerjaanResource extends JsonResource
             'catatan_review' => $this->catatan_review,
             'klien' => new KlienResource($this->whenLoaded('klien')),
             'pic' => new UserResource($this->whenLoaded('pic')),
-            'template_deadline' => new TemplateDeadlineResource($this->whenLoaded('templateDeadline')),
             'approver' => new UserResource($this->whenLoaded('approver')),
             'performance_review' => new PerformanceReviewResource($this->whenLoaded('performanceReview')),
         ];

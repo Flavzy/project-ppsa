@@ -35,7 +35,7 @@ class LeadInteractionController extends Controller
         $validated = $request->validated();
         $calonKlien = CalonKlien::findOrFail($validated['id_calon_klien']);
 
-        if ($request->user()->role === 'sales') {
+        if (in_array($request->user()->role, ['operator', 'sales'], true)) {
             if ((int) $calonKlien->id_user !== (int) $request->user()->id_user) {
                 abort(403, 'Akses tidak diizinkan untuk calon klien ini.');
             }
@@ -62,7 +62,7 @@ class LeadInteractionController extends Controller
         Gate::authorize('update', $leadInteraction);
 
         $validated = $request->validated();
-        if ($request->user()->role === 'sales') {
+        if (in_array($request->user()->role, ['operator', 'sales'], true)) {
             unset($validated['id_user'], $validated['id_calon_klien']);
         }
 

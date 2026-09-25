@@ -23,7 +23,7 @@ class PekerjaanWorkflowController extends Controller
             'submitted_at' => now(),
         ]);
 
-        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'templateDeadline', 'approver', 'performanceReview']));
+        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'approver', 'performanceReview']));
     }
 
     public function approve(ReviewPekerjaanRequest $request, Pekerjaan $pekerjaan): PekerjaanResource
@@ -43,7 +43,7 @@ class PekerjaanWorkflowController extends Controller
             'catatan_review' => $validated['catatan_review'] ?? null,
         ]);
 
-        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'templateDeadline', 'approver', 'performanceReview']));
+        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'approver', 'performanceReview']));
     }
 
     public function reject(ReviewPekerjaanRequest $request, Pekerjaan $pekerjaan): PekerjaanResource
@@ -59,6 +59,6 @@ class PekerjaanWorkflowController extends Controller
             'catatan_review' => $validated['catatan_review'] ?? null,
         ]);
 
-        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'templateDeadline', 'approver', 'performanceReview']));
+        return new PekerjaanResource($pekerjaan->load(['klien', 'pic', 'approver', 'performanceReview']));
     }
 }

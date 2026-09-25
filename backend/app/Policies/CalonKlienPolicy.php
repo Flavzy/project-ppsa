@@ -9,17 +9,17 @@ class CalonKlienPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function view(User $user, CalonKlien $calonKlien): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'sales', 'pimpinan'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
     }
 
     public function update(User $user, CalonKlien $calonKlien): bool
@@ -28,7 +28,7 @@ class CalonKlienPolicy
             return true;
         }
 
-        if ($user->role === 'sales') {
+        if (in_array($user->role, ['operator', 'sales'], true)) {
             return (int) $calonKlien->id_user === (int) $user->id_user;
         }
 
@@ -46,7 +46,7 @@ class CalonKlienPolicy
             return true;
         }
 
-        if ($user->role === 'sales') {
+        if (in_array($user->role, ['operator', 'sales'], true)) {
             return (int) $calonKlien->id_user === (int) $user->id_user;
         }
 

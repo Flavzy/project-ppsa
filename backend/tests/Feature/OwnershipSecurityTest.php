@@ -9,7 +9,6 @@ use App\Models\LeadInteraction;
 use App\Models\Pekerjaan;
 use App\Models\PerformanceReview;
 use App\Models\Reporting;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -436,53 +435,7 @@ class OwnershipSecurityTest extends TestCase
     }
 
     // ==========================================
-    // 5. Template Deadline Route Protections
-    // ==========================================
-
-    public function test_karyawan_and_sales_can_read_templates(): void
-    {
-        $karyawan = User::factory()->create(['role' => 'karyawan']);
-        $sales = User::factory()->create(['role' => 'sales']);
-        $template = TemplateDeadline::factory()->create();
-
-        Sanctum::actingAs($karyawan);
-        $this->getJson('/api/template-deadline')->assertOk();
-        $this->getJson("/api/template-deadline/{$template->id_template}")->assertOk();
-
-        Sanctum::actingAs($sales);
-        $this->getJson('/api/template-deadline')->assertOk();
-        $this->getJson("/api/template-deadline/{$template->id_template}")->assertOk();
-    }
-
-    public function test_karyawan_and_sales_cannot_modify_templates(): void
-    {
-        $karyawan = User::factory()->create(['role' => 'karyawan']);
-        $sales = User::factory()->create(['role' => 'sales']);
-        $template = TemplateDeadline::factory()->create();
-
-        Sanctum::actingAs($karyawan);
-        $this->postJson('/api/template-deadline', [
-            'nama_template' => 'Template Ilegal',
-        ])->assertForbidden();
-        $this->putJson("/api/template-deadline/{$template->id_template}", [
-            'nama_template' => 'Modifikasi Ilegal',
-        ])->assertForbidden();
-        $this->deleteJson("/api/template-deadline/{$template->id_template}")
-            ->assertForbidden();
-
-        Sanctum::actingAs($sales);
-        $this->postJson('/api/template-deadline', [
-            'nama_template' => 'Template Ilegal 2',
-        ])->assertForbidden();
-        $this->putJson("/api/template-deadline/{$template->id_template}", [
-            'nama_template' => 'Modifikasi Ilegal 2',
-        ])->assertForbidden();
-        $this->deleteJson("/api/template-deadline/{$template->id_template}")
-            ->assertForbidden();
-    }
-
-    // ==========================================
-    // 6. Reporting Granular Protection & IDOR
+    // 5. Reporting Granular Protection & IDOR
     // ==========================================
 
     public function test_karyawan_can_only_view_own_reports_in_index(): void

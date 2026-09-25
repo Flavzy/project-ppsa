@@ -87,7 +87,7 @@ class CalonKlienController extends Controller
         Gate::authorize('update', $calonKlien);
 
         $data = $request->validated();
-        if ($request->user()->role === 'sales') {
+        if (in_array($request->user()->role, ['operator', 'sales'], true)) {
             unset($data['id_user']);
         }
 

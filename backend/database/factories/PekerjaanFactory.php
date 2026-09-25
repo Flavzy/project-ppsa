@@ -21,7 +21,7 @@ class PekerjaanFactory extends Factory
         return [
             'id_klien' => Klien::factory(),
             'id_pic' => User::factory(),
-            'id_template' => TemplateDeadline::factory(),
+            'id_template' => null,
             'judul' => fake()->sentence(3),
             'deskripsi' => fake()->optional()->paragraph(),
             'deadline' => fake()->dateTimeBetween('now', '+3 months')->format('Y-m-d'),
