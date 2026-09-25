@@ -170,4 +170,61 @@ class RoleMiddlewareTest extends TestCase
             'id_pic' => $karyawan->id_user,
         ]);
     }
+
+    public function test_pekerjaan_creation_rejects_past_dates_and_non_karyawan_pic(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pimpinan = User::factory()->create(['role' => 'pimpinan']);
+        $karyawan = User::factory()->create(['role' => 'karyawan']);
+        $klien = \App\Models\Klien::factory()->create();
+
+        Sanctum::actingAs($admin);
+
+        // 1. Non-karyawan (e.g. pimpinan) as PIC must be rejected
+        $resNonKaryawan = $this->postJson('/api/pekerjaan', [
+            'id_klien' => $klien->id_klien,
+            'id_pic' => $pimpinan->id_user,
+            'judul' => 'Tugas Test Non Karyawan',
+            'tgl_penugasan' => now()->toDateString(),
+            'deadline' => now()->addDays(5)->toDateString(),
+            'status' => 'baru',
+        ]);
+        $resNonKaryawan->assertUnprocessable()
+            ->assertJsonValidationErrors(['id_pic']);
+
+        // 2. Past tgl_penugasan must be rejected
+        $resPastTgl = $this->postJson('/api/pekerjaan', [
+            'id_klien' => $klien->id_klien,
+            'id_pic' => $karyawan->id_user,
+            'judul' => 'Tugas Test Past Date',
+            'tgl_penugasan' => now()->subDay()->toDateString(),
+            'deadline' => now()->addDays(5)->toDateString(),
+            'status' => 'baru',
+        ]);
+        $resPastTgl->assertUnprocessable()
+            ->assertJsonValidationErrors(['tgl_penugasan']);
+
+        // 3. Deadline before tgl_penugasan must be rejected
+        $resPastDeadline = $this->postJson('/api/pekerjaan', [
+            'id_klien' => $klien->id_klien,
+            'id_pic' => $karyawan->id_user,
+            'judul' => 'Tugas Test Past Deadline',
+            'tgl_penugasan' => now()->addDays(3)->toDateString(),
+            'deadline' => now()->addDays(1)->toDateString(),
+            'status' => 'baru',
+        ]);
+        $resPastDeadline->assertUnprocessable()
+            ->assertJsonValidationErrors(['deadline']);
+
+        // 4. Valid realtime creation succeeds
+        $resValid = $this->postJson('/api/pekerjaan', [
+            'id_klien' => $klien->id_klien,
+            'id_pic' => $karyawan->id_user,
+            'judul' => 'Tugas Valid Realtime',
+            'tgl_penugasan' => now()->toDateString(),
+            'deadline' => now()->addDays(7)->toDateString(),
+            'status' => 'baru',
+        ]);
+        $resValid->assertCreated();
+    }
 }

@@ -131,7 +131,7 @@ export default function ProtectedShell() {
   const adminResources = allowedResources.filter((r) => ['users'].includes(r.key))
 
   return (
-    <div className="min-h-screen flex bg-gray-50/75 dark:bg-gray-950 font-outfit text-gray-800 dark:text-gray-200">
+    <div className="h-screen flex overflow-hidden bg-gray-50/75 dark:bg-gray-950 font-outfit text-gray-800 dark:text-gray-200">
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div
@@ -140,9 +140,9 @@ export default function ProtectedShell() {
         />
       )}
 
-      {/* TailAdmin Sleek Sidebar - Balanced w-64 size */}
+      {/* TailAdmin Sleek Sidebar - Fixed stationary w-64 size */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col justify-between border-r border-gray-200/80 bg-white transition-transform duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 shrink-0 flex-col justify-between border-r border-gray-200/80 bg-white transition-transform duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:static lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -364,9 +364,9 @@ export default function ProtectedShell() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        {/* TailAdmin Sticky Top Header */}
-        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-gray-200/80 bg-white/95 px-4 sm:px-6 backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95">
+      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+        {/* TailAdmin Fixed Top Header */}
+        <header className="shrink-0 z-30 flex h-16 w-full items-center justify-between border-b border-gray-200/80 bg-white/95 px-4 sm:px-6 backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95">
           <div className="flex items-center gap-3">
             {/* Hamburger button for Mobile */}
             <button

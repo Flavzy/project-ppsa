@@ -34,7 +34,15 @@ class PekerjaanController extends Controller
     {
         Gate::authorize('create', Pekerjaan::class);
 
-        $pekerjaan = Pekerjaan::create($request->validated())
+        $data = $request->validated();
+        if (empty($data['tgl_penugasan'])) {
+            $data['tgl_penugasan'] = now()->toDateString();
+        }
+        if (($data['status'] ?? '') === 'completed' && empty($data['tgl_selesai'])) {
+            $data['tgl_selesai'] = now()->toDateString();
+        }
+
+        $pekerjaan = Pekerjaan::create($data)
             ->load(['klien', 'pic']);
 
         return (new PekerjaanResource($pekerjaan))
@@ -61,6 +69,10 @@ class PekerjaanController extends Controller
             }
             $allowed = ['progress_persen', 'deskripsi', 'catatan_review'];
             $data = array_intersect_key($data, array_flip($allowed));
+        }
+
+        if (($data['status'] ?? '') === 'completed' && empty($data['tgl_selesai']) && empty($pekerjaan->tgl_selesai)) {
+            $data['tgl_selesai'] = now()->toDateString();
         }
 
         $pekerjaan->update($data);

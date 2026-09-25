@@ -21,6 +21,7 @@ class PekerjaanResource extends JsonResource
             'id_template' => $this->id_template,
             'judul' => $this->judul,
             'deskripsi' => $this->deskripsi,
+            'tgl_penugasan' => $this->tgl_penugasan?->toDateString(),
             'deadline' => $this->deadline?->toDateString(),
             'prioritas' => $this->prioritas,
             'progress_persen' => $this->progress_persen,

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import LoadingSpinner from './common/LoadingSpinner'
 
 function getInitialValue(field, record, currentUser, config) {
@@ -10,7 +11,7 @@ function getInitialValue(field, record, currentUser, config) {
   }
 
   if (!record && field.defaultValue !== undefined) {
-    return field.defaultValue
+    return typeof field.defaultValue === 'function' ? field.defaultValue() : field.defaultValue
   }
 
   // Pre-fill user id for creator roles
@@ -38,6 +39,11 @@ function ResourceForm({
   canCreate = true,
   canEdit = true,
 }) {
+  const todayStr = new Date().toISOString().split('T')[0]
+  const [tglPenugasanVal, setTglPenugasanVal] = useState(
+    record?.tgl_penugasan || todayStr
+  )
+
   // If editing but cannot edit, or adding but cannot create, don't show the form
   if (record && !canEdit) {
     return null
@@ -185,7 +191,14 @@ function ResourceForm({
                       >
                         <option value="">Pilih {field.label}</option>
                         {(() => {
-                          const selectOptions = field.options || options[field.optionsResource] || []
+                          let selectOptions = field.options || options[field.optionsResource] || []
+                          if (field.optionsFilter && typeof field.optionsFilter === 'function') {
+                            selectOptions = selectOptions.filter(field.optionsFilter)
+                          }
+                          if (config.key === 'pekerjaan' && field.name === 'id_pic') {
+                            selectOptions = selectOptions.filter((opt) => opt.role === 'karyawan')
+                          }
+
                           const valKey = field.optionValue || 'value'
                           const lblKey = field.optionLabel || 'label'
                           const hasCurrent = selectOptions.some((opt) => {
@@ -234,21 +247,34 @@ function ResourceForm({
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <input
-                        name={field.name}
-                        type={field.type}
-                        defaultValue={initialVal ?? ''}
-                        required={record && (field.name === 'password' || field.type === 'password') ? false : field.required}
-                        disabled={isPicDisabled}
-                        placeholder={
-                          record && (field.name === 'password' || field.type === 'password')
-                            ? 'Kosongkan jika tidak ingin mengubah password'
-                            : (field.placeholder || '')
-                        }
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
-                      />
-                    )}
+                    ) : (() => {
+                      const isTglPenugasan = config.key === 'pekerjaan' && field.name === 'tgl_penugasan'
+                      const isDeadline = config.key === 'pekerjaan' && field.name === 'deadline'
+                      let minDateAttr = undefined
+                      if (isTglPenugasan && !record) {
+                        minDateAttr = todayStr
+                      } else if (isDeadline) {
+                        minDateAttr = tglPenugasanVal || todayStr
+                      }
+
+                      return (
+                        <input
+                          name={field.name}
+                          type={field.type}
+                          defaultValue={initialVal ?? ''}
+                          min={minDateAttr}
+                          onChange={isTglPenugasan ? (e) => setTglPenugasanVal(e.target.value) : undefined}
+                          required={record && (field.name === 'password' || field.type === 'password') ? false : field.required}
+                          disabled={isPicDisabled}
+                          placeholder={
+                            record && (field.name === 'password' || field.type === 'password')
+                              ? 'Kosongkan jika tidak ingin mengubah password'
+                              : (field.placeholder || '')
+                          }
+                          className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                        />
+                      )
+                    })()}
                     {fieldError && (
                       <p className="mt-1 text-xs text-error-600 dark:text-error-400 font-medium">
                         {fieldError}

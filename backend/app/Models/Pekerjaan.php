@@ -27,6 +27,7 @@ class Pekerjaan extends Model
         'id_template',
         'judul',
         'deskripsi',
+        'tgl_penugasan',
         'deadline',
         'prioritas',
         'progress_persen',
@@ -75,6 +76,7 @@ class Pekerjaan extends Model
     protected function casts(): array
     {
         return [
+            'tgl_penugasan' => 'date',
             'deadline' => 'date',
             'tgl_selesai' => 'date',
             'submitted_at' => 'datetime',
