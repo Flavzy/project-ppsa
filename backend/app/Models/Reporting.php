@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Reporting extends Model
 {
@@ -40,6 +41,19 @@ class Reporting extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_user', 'id_user');
+    }
+
+    public function getDokumenBuktiUrlAttribute(): ?string
+    {
+        if (!$this->dokumen_bukti) {
+            return null;
+        }
+
+        if (str_starts_with($this->dokumen_bukti, 'http://') || str_starts_with($this->dokumen_bukti, 'https://')) {
+            return $this->dokumen_bukti;
+        }
+
+        return Storage::disk('public')->url($this->dokumen_bukti);
     }
 
     /**

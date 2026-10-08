@@ -25,6 +25,7 @@ class ReportingResource extends JsonResource
             'is_visible_to_client' => $this->is_visible_to_client,
             'published_at' => $this->published_at?->toDateTimeString(),
             'dokumen_bukti' => $this->dokumen_bukti,
+            'dokumen_bukti_url' => $this->dokumen_bukti_url,
             'catatan' => $this->catatan,
             'pekerjaan' => new PekerjaanResource($this->whenLoaded('pekerjaan')),
             'user' => new UserResource($this->whenLoaded('user')),

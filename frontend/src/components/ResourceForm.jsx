@@ -27,6 +27,25 @@ function getInitialValue(field, record, currentUser, config) {
   return ''
 }
 
+function isFieldLockedForUser(field, record, config, currentUser) {
+  if (config?.key === 'pekerjaan') {
+    // 1. Saat penugasan baru (Operator): status selalu otomatis 'baru'
+    if (!record && field.name === 'status') {
+      return true
+    }
+    // 2. Saat edit pekerjaan:
+    // Karyawan: PIC, tgl_penugasan, deadline, id_klien terkunci. Status DIIZINKAN (diubah oleh karyawan).
+    if (record && currentUser?.role === 'karyawan') {
+      return ['id_pic', 'tgl_penugasan', 'deadline', 'id_klien'].includes(field.name)
+    }
+    // Pimpinan & Operator: Status TERKUNCI (hanya karyawan / tombol persetujuan pimpinan)
+    if (record && currentUser?.role !== 'karyawan') {
+      return field.name === 'status'
+    }
+  }
+  return false
+}
+
 function ResourceForm({
   config,
   record,
@@ -65,8 +84,10 @@ function ResourceForm({
       const formData = new FormData()
 
       config.fields.forEach((field) => {
-        const isFieldDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
-        if (isFieldDisabled) {
+        if (isFieldLockedForUser(field, record, config, currentUser)) {
+          if (!record && config?.key === 'pekerjaan' && field.name === 'status') {
+            formData.append(field.name, 'baru')
+          }
           return
         }
 
@@ -90,8 +111,10 @@ function ResourceForm({
       const payload = {}
 
       config.fields.forEach((field) => {
-        const isFieldDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
-        if (isFieldDisabled) {
+        if (isFieldLockedForUser(field, record, config, currentUser)) {
+          if (!record && config?.key === 'pekerjaan' && field.name === 'status') {
+            payload[field.name] = 'baru'
+          }
           return
         }
 
@@ -151,7 +174,7 @@ function ResourceForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {section.fields.map((field) => {
                 const fieldError = errors?.[field.name]?.[0]
-                const isPicDisabled = record && config.key === 'pekerjaan' && field.name === 'id_pic' && currentUser?.role === 'karyawan'
+                const isFieldDisabled = isFieldLockedForUser(field, record, config, currentUser)
                 const initialVal = getInitialValue(field, record, currentUser, config)
                 const existingFileUrl = record?.[`${field.name}_url`]
                 const isFullWidth = field.type === 'textarea' || field.fullWidth
@@ -163,10 +186,21 @@ function ResourceForm({
                   >
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
                       {field.label}
-                      {field.required && <span className="text-error-500 ml-1">*</span>}
-                      {isPicDisabled && (
-                        <span className="text-xs font-normal text-gray-400 lowercase ml-1">
-                          (terkunci untuk pic)
+                      {field.required && !isFieldDisabled && <span className="text-error-500 ml-1">*</span>}
+                      {isFieldDisabled && (
+                        <span className="text-xs font-normal text-amber-600 dark:text-amber-400 lowercase ml-1">
+                          {field.name === 'tgl_penugasan' || field.name === 'deadline'
+                            ? '(hanya wewenang operator)'
+                            : field.name === 'status' && !record
+                            ? '(otomatis baru saat penugasan)'
+                            : field.name === 'status' && currentUser?.role !== 'karyawan'
+                            ? '(hanya wewenang karyawan / tombol persetujuan pimpinan)'
+                            : '(terkunci)'}
+                        </span>
+                      )}
+                      {!isFieldDisabled && config?.key === 'pekerjaan' && field.name === 'status' && currentUser?.role === 'karyawan' && (
+                        <span className="text-xs font-normal text-brand-600 dark:text-brand-400 lowercase ml-1">
+                          (wewenang karyawan)
                         </span>
                       )}
                     </label>
@@ -175,19 +209,19 @@ function ResourceForm({
                       <textarea
                         name={field.name}
                         defaultValue={initialVal ?? ''}
-                        required={field.required}
+                        required={field.required && !isFieldDisabled}
                         rows={field.rows || 3}
-                        disabled={isPicDisabled}
+                        disabled={isFieldDisabled}
                         placeholder={field.placeholder || ''}
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       />
                     ) : field.type === 'select' ? (
                       <select
                         name={field.name}
                         defaultValue={initialVal ?? ''}
-                        required={field.required && !isPicDisabled}
-                        disabled={isPicDisabled}
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                        required={field.required && !isFieldDisabled}
+                        disabled={isFieldDisabled}
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <option value="">Pilih {field.label}</option>
                         {(() => {
@@ -197,6 +231,20 @@ function ResourceForm({
                           }
                           if (config.key === 'pekerjaan' && field.name === 'id_pic') {
                             selectOptions = selectOptions.filter((opt) => opt.role === 'karyawan')
+                          }
+                          if (config.key === 'pekerjaan' && field.name === 'status') {
+                            selectOptions = selectOptions.filter((opt) => {
+                              const v = typeof opt === 'object' ? opt.value : opt
+                              return !['completed', 'revision_needed'].includes(v)
+                            })
+                          }
+
+                          const statusLabelFallback = {
+                            baru: 'Baru (Menunggu Dikerjakan)',
+                            in_progress: 'Dalam Pengerjaan',
+                            submitted: 'Diajukan untuk Ditinjau',
+                            revision_needed: 'Perlu Revisi (Status Saat Ini)',
+                            completed: 'Selesai (Status Saat Ini)',
                           }
 
                           const valKey = field.optionValue || 'value'
@@ -209,7 +257,9 @@ function ResourceForm({
                           return (
                             <>
                               {initialVal && !hasCurrent && (
-                                <option value={initialVal}>{initialVal}</option>
+                                <option value={initialVal}>
+                                  {statusLabelFallback[initialVal] || initialVal}
+                                </option>
                               )}
                               {selectOptions.map((opt) => {
                                 const optVal = typeof opt === 'object' ? opt[valKey] : opt
@@ -230,8 +280,8 @@ function ResourceForm({
                           name={field.name}
                           type="file"
                           accept={field.accept}
-                          disabled={isPicDisabled}
-                          className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-500/15 dark:file:text-brand-400 cursor-pointer"
+                          disabled={isFieldDisabled}
+                          className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-500/15 dark:file:text-brand-400 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                         />
                         {existingFileUrl && (
                           <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -264,14 +314,14 @@ function ResourceForm({
                           defaultValue={initialVal ?? ''}
                           min={minDateAttr}
                           onChange={isTglPenugasan ? (e) => setTglPenugasanVal(e.target.value) : undefined}
-                          required={record && (field.name === 'password' || field.type === 'password') ? false : field.required}
-                          disabled={isPicDisabled}
+                          required={record && (field.name === 'password' || field.type === 'password') ? false : (field.required && !isFieldDisabled)}
+                          disabled={isFieldDisabled}
                           placeholder={
                             record && (field.name === 'password' || field.type === 'password')
                               ? 'Kosongkan jika tidak ingin mengubah password'
                               : (field.placeholder || '')
                           }
-                          className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:opacity-60"
+                          className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                         />
                       )
                     })()}

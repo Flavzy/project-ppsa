@@ -70,7 +70,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->name('klien.destroy');
     Route::apiResource('klien', KlienController::class)
         ->except(['destroy'])
-        ->middleware('role:admin,pimpinan,operator,sales');
+        ->middleware('role:admin,pimpinan,operator,sales,karyawan');
 
     // Pekerjaan Workflow
     Route::post('pekerjaan/{pekerjaan}/submit', [PekerjaanWorkflowController::class, 'submit'])

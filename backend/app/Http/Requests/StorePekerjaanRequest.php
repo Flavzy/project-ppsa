@@ -34,7 +34,7 @@ class StorePekerjaanRequest extends FormRequest
             'deadline' => ['required', 'date', 'after_or_equal:today', 'after_or_equal:' . $tglPenugasan],
             'prioritas' => ['nullable', 'string', 'max:255'],
             'progress_persen' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'status' => ['required', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'max:255'],
             'tgl_selesai' => ['nullable', 'date'],
             'review_status' => ['nullable', 'string', Rule::in(['pending', 'submitted', 'approved', 'revision_needed'])],
             'catatan_review' => ['nullable', 'string'],

@@ -18,13 +18,28 @@ class DashboardSummaryController extends Controller
     {
         $user = $request->user();
 
-        // Karyawan role: personal task metrics and personal performance score only
+        // Karyawan role: personal task metrics, personal performance score, and task list
         if ($user->role === 'karyawan') {
             $workByStatus = Pekerjaan::query()
                 ->where('id_pic', $user->id_user)
                 ->selectRaw('status, count(*) as total')
                 ->groupBy('status')
                 ->pluck('total', 'status');
+
+            $recentTasks = Pekerjaan::query()
+                ->with('klien')
+                ->where('id_pic', $user->id_user)
+                ->orderByDesc('id_pekerjaan')
+                ->get()
+                ->map(fn (Pekerjaan $p): array => [
+                    'id_pekerjaan' => $p->id_pekerjaan,
+                    'judul' => $p->judul,
+                    'klien' => $p->klien?->nama_perusahaan ?? '-',
+                    'tgl_penugasan' => $p->tgl_penugasan?->toDateString() ?? '-',
+                    'deadline' => $p->deadline?->toDateString() ?? '-',
+                    'status' => $p->status,
+                    'progress_persen' => $p->progress_persen,
+                ]);
 
             return response()->json([
                 'data' => [
@@ -40,6 +55,7 @@ class DashboardSummaryController extends Controller
                         'average_performance_score' => round((float) PerformanceReview::where('id_user', $user->id_user)->avg('final_score'), 2),
                     ],
                     'work_by_status' => $workByStatus,
+                    'recent_tasks' => $recentTasks,
                 ],
             ]);
         }

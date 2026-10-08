@@ -97,7 +97,7 @@ class ReportingController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('dokumen_bukti')) {
-            $data['dokumen_bukti'] = $request->file('dokumen_bukti')->store('reporting');
+            $data['dokumen_bukti'] = $request->file('dokumen_bukti')->store('reporting', 'public');
         }
 
         return $data;

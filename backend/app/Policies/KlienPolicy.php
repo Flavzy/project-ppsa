@@ -9,12 +9,12 @@ class KlienPolicy
 {
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales', 'karyawan'], true);
     }
 
     public function view(User $user, Klien $klien): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
+        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales', 'karyawan'], true);
     }
 
     public function create(User $user): bool

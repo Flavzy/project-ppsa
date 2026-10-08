@@ -587,7 +587,7 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus }) {
 }
 
 // Subcomponent: Karyawan Dashboard View
-function KaryawanDashboardView({ totals, workByStatus }) {
+function KaryawanDashboardView({ totals, workByStatus, recentTasks = [] }) {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -641,7 +641,7 @@ function KaryawanDashboardView({ totals, workByStatus }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
         <div className="md:col-span-7">
           <StatusBreakdownCard
             title="Distribusi Status Tugas Saya"
@@ -670,7 +670,7 @@ function KaryawanDashboardView({ totals, workByStatus }) {
                 </h3>
               </div>
               <p className="mt-4 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                Pastikan Anda memperbarui status tugas secara berkala pada modul <strong>Pekerjaan</strong>. Kirimkan laporan atau ajukan persetujuan sebelum batas deadline untuk menjaga indeks evaluasi kerja pimpinan tetap prima.
+                Pastikan Anda memperbarui status tugas secara berkala pada modul <strong>Pekerjaan Saya</strong>. Kirimkan laporan atau ajukan persetujuan sebelum batas deadline untuk menjaga indeks evaluasi kerja pimpinan tetap prima.
               </p>
             </div>
 
@@ -683,6 +683,80 @@ function KaryawanDashboardView({ totals, workByStatus }) {
               </Badge>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Daftar Tugas Terkini Langsung di Dasbor */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15">
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                Daftar Tugas Saya
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Pekerjaan yang ditugaskan kepada Anda oleh Operator / Pimpinan
+              </p>
+            </div>
+          </div>
+          <Badge size="sm" color="info">
+            {recentTasks.length} Tugas Terdaftar
+          </Badge>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800 text-sm">
+            <thead>
+              <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="py-3 px-3">Judul Pekerjaan</th>
+                <th className="py-3 px-3">Klien</th>
+                <th className="py-3 px-3">Tgl Penugasan</th>
+                <th className="py-3 px-3">Batas Waktu</th>
+                <th className="py-3 px-3 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {recentTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-gray-400">
+                    Belum ada tugas yang ditugaskan kepada Anda saat ini.
+                  </td>
+                </tr>
+              ) : (
+                recentTasks.map((task) => {
+                  const statusInfo = WORK_STATUS_CONFIG[task.status] || { label: task.status, badgeColor: 'light' }
+                  return (
+                    <tr key={task.id_pekerjaan} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
+                      <td className="py-3.5 px-3">
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {task.judul}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300">
+                        {task.klien}
+                      </td>
+                      <td className="py-3.5 px-3 text-gray-500 dark:text-gray-400 text-xs">
+                        {task.tgl_penugasan}
+                      </td>
+                      <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300 font-mono text-xs">
+                        {task.deadline}
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        <Badge size="sm" color={statusInfo.badgeColor}>
+                          {statusInfo.label}
+                        </Badge>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </>
@@ -770,6 +844,7 @@ export default function DashboardView() {
         <KaryawanDashboardView
           totals={totals}
           workByStatus={workByStatus}
+          recentTasks={summary?.recent_tasks || []}
         />
       )}
     </div>

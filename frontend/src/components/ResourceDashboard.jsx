@@ -76,50 +76,56 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     return relationKeys
       .map((key) => allResources.find((resource) => resource.key === key))
       .filter(Boolean)
-  }, [config.fields, resourceConfigs, supportResources])
+      .filter((resource) => !resource.allowedRoles || resource.allowedRoles.includes(user?.role))
+  }, [config.fields, resourceConfigs, supportResources, user?.role])
+
+  const loadOptionsSafely = useCallback(async () => {
+    const entries = await Promise.all(
+      optionConfigs.map(async (optionConfig) => {
+        try {
+          const res = await listResource(optionConfig.endpoint)
+          return [optionConfig.key, res]
+        } catch {
+          return [optionConfig.key, []]
+        }
+      }),
+    )
+    return Object.fromEntries(entries)
+  }, [optionConfigs])
 
   const reload = useCallback(async () => {
     invalidateApiCache()
     setLoading(true)
+    setError('')
     try {
-      const [resourceRecords, optionEntries] = await Promise.all([
+      const [resourceRecords, optionMap] = await Promise.all([
         listResource(config.endpoint),
-        Promise.all(
-          optionConfigs.map(async (optionConfig) => [
-            optionConfig.key,
-            await listResource(optionConfig.endpoint),
-          ]),
-        ),
+        loadOptionsSafely(),
       ])
 
       setRecords(resourceRecords)
-      setOptions(Object.fromEntries(optionEntries))
+      setOptions(optionMap)
     } catch (requestError) {
       setError(requestError.message)
       setToast({ open: true, message: requestError.message, severity: 'error' })
     } finally {
       setLoading(false)
     }
-  }, [config.endpoint, optionConfigs])
+  }, [config.endpoint, loadOptionsSafely])
 
   useEffect(() => {
     let ignore = false
 
     async function fetchRecords() {
       try {
-        const [resourceRecords, optionEntries] = await Promise.all([
+        const [resourceRecords, optionMap] = await Promise.all([
           listResource(config.endpoint),
-          Promise.all(
-            optionConfigs.map(async (optionConfig) => [
-              optionConfig.key,
-              await listResource(optionConfig.endpoint),
-            ]),
-          ),
+          loadOptionsSafely(),
         ])
 
         if (!ignore) {
           setRecords(resourceRecords)
-          setOptions(Object.fromEntries(optionEntries))
+          setOptions(optionMap)
         }
       } catch (requestError) {
         if (!ignore) {
@@ -138,7 +144,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     return () => {
       ignore = true
     }
-  }, [config.endpoint, optionConfigs])
+  }, [config.endpoint, loadOptionsSafely])
 
   async function handleSubmit(payload) {
     setSaving(true)
@@ -353,13 +359,15 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-            Modul Operasional
+            {config.key === 'pekerjaan' && user?.role === 'karyawan' ? 'Tugas & Penugasan' : 'Modul Operasional'}
           </span>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-1">
-            {config.label}
+            {config.key === 'pekerjaan' && user?.role === 'karyawan' ? 'Pekerjaan Saya' : config.label}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Kelola dan pantau data {config.label.toLowerCase()} secara komprehensif.
+            {config.key === 'pekerjaan' && user?.role === 'karyawan'
+              ? 'Daftar penugasan dan pekerjaan yang ditugaskan secara khusus kepada Anda.'
+              : `Kelola dan pantau data ${config.label.toLowerCase()} secara komprehensif.`}
           </p>
         </div>
         <button

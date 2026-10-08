@@ -242,11 +242,12 @@ export default function ProtectedShell() {
             {operationsResources.length > 0 && (
               <div>
                 <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
-                  Operasional Proyek
+                  {user?.role === 'karyawan' ? 'Tugas & Pekerjaan' : 'Operasional Proyek'}
                 </p>
                 <div className="space-y-0.5">
                   {operationsResources.map((res) => {
                     const isActive = currentActiveKey === res.key
+                    const itemLabel = res.key === 'pekerjaan' && user?.role === 'karyawan' ? 'Pekerjaan Saya' : res.label
                     return (
                       <button
                         key={res.key}
@@ -265,7 +266,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{res.label}</span>
+                        <span className="truncate">{itemLabel}</span>
                       </button>
                     )
                   })}
