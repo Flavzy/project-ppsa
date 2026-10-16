@@ -71,7 +71,7 @@ class LeadConversionController extends Controller
             );
         });
 
-        return (new CalonKlienResource($calonKlien->refresh()->load(['user', 'kontrak.klien', 'interactions'])))
+        return (new CalonKlienResource($calonKlien->refresh()->load(['user', 'kontrak.klien'])))
             ->response();
     }
 }

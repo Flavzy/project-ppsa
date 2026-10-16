@@ -28,12 +28,13 @@ class ReportingPolicy
 
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan', 'karyawan'], true);
+        // Hanya karyawan yang mengerjakan tugas (dan admin untuk pemeliharaan) yang membuat laporan
+        return in_array($user->role, ['admin', 'karyawan'], true);
     }
 
     public function update(User $user, Reporting $reporting): bool
     {
-        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
+        if ($user->role === 'admin') {
             return true;
         }
 
@@ -47,11 +48,6 @@ class ReportingPolicy
 
     public function delete(User $user, Reporting $reporting): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan'], true);
-    }
-
-    public function publishClient(User $user, Reporting $reporting): bool
-    {
-        return in_array($user->role, ['admin', 'pimpinan'], true);
+        return $user->role === 'admin';
     }
 }

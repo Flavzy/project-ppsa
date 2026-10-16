@@ -7,6 +7,7 @@ use App\Http\Requests\StoreKontrakRequest;
 use App\Http\Requests\UpdateKontrakRequest;
 use App\Http\Resources\KontrakResource;
 use App\Models\Kontrak;
+use App\Helpers\FileUploadHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -73,7 +74,7 @@ class KontrakController extends Controller
 
         foreach (['dokumen_draft', 'dokumen_final'] as $field) {
             if ($request->hasFile($field)) {
-                $data[$field] = $request->file($field)->store('kontrak');
+                $data[$field] = FileUploadHelper::storeWithOriginalName($request->file($field), 'kontrak', 'public');
             } else {
                 unset($data[$field]);
             }

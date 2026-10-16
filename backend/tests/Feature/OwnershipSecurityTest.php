@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
-use App\Models\LeadInteraction;
 use App\Models\Pekerjaan;
 use App\Models\PerformanceReview;
 use App\Models\Reporting;
@@ -57,8 +56,10 @@ class OwnershipSecurityTest extends TestCase
         $task = Pekerjaan::factory()->inProgress()->create(['id_pic' => $karyawan->id_user]);
 
         Sanctum::actingAs($karyawan);
+        $file = \Illuminate\Http\UploadedFile::fake()->create('tugas.pdf', 100);
         $response = $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/submit", [
             'progress_persen' => 95,
+            'file_tugas' => $file,
         ]);
 
         $response->assertOk()
@@ -72,8 +73,10 @@ class OwnershipSecurityTest extends TestCase
         $taskB = Pekerjaan::factory()->inProgress()->create(['id_pic' => $karyawanB->id_user]);
 
         Sanctum::actingAs($karyawanA);
+        $file = \Illuminate\Http\UploadedFile::fake()->create('tugas.pdf', 100);
         $response = $this->postJson("/api/pekerjaan/{$taskB->id_pekerjaan}/submit", [
             'progress_persen' => 95,
+            'file_tugas' => $file,
         ]);
 
         $response->assertForbidden();
@@ -139,7 +142,6 @@ class OwnershipSecurityTest extends TestCase
         $this->postJson('/api/pekerjaan', [
             'id_klien' => $task->id_klien,
             'id_pic' => $karyawan->id_user,
-            'id_template' => $task->id_template,
             'judul' => 'Tugas Baru Ilegal',
             'deadline' => '2026-10-01',
             'status' => 'baru',
@@ -160,6 +162,41 @@ class OwnershipSecurityTest extends TestCase
         $this->getJson('/api/pekerjaan')->assertForbidden();
         $this->getJson("/api/pekerjaan/{$task->id_pekerjaan}")->assertForbidden();
         $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/submit")->assertForbidden();
+    }
+
+    public function test_operator_pic_can_update_pekerjaan(): void
+    {
+        $operatorA = User::factory()->create(['role' => 'operator']);
+        $leadA = CalonKlien::factory()->create(['id_user' => $operatorA->id_user]);
+        $kontrakA = Kontrak::factory()->create(['id_calon_klien' => $leadA->id_calon_klien]);
+        $klienA = Klien::factory()->create(['id_kontrak' => $kontrakA->id_kontrak]);
+        $taskA = Pekerjaan::factory()->create(['id_klien' => $klienA->id_klien]);
+
+        Sanctum::actingAs($operatorA);
+        $response = $this->putJson("/api/pekerjaan/{$taskA->id_pekerjaan}", [
+            'judul' => 'Judul Diupdate Operator PIC',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.judul', 'Judul Diupdate Operator PIC');
+    }
+
+    public function test_non_pic_operator_cannot_update_pekerjaan(): void
+    {
+        $operatorA = User::factory()->create(['role' => 'operator']);
+        $operatorB = User::factory()->create(['role' => 'operator']);
+
+        $leadA = CalonKlien::factory()->create(['id_user' => $operatorA->id_user]);
+        $kontrakA = Kontrak::factory()->create(['id_calon_klien' => $leadA->id_calon_klien]);
+        $klienA = Klien::factory()->create(['id_kontrak' => $kontrakA->id_kontrak]);
+        $taskA = Pekerjaan::factory()->create(['id_klien' => $klienA->id_klien]);
+
+        Sanctum::actingAs($operatorB);
+        $response = $this->putJson("/api/pekerjaan/{$taskA->id_pekerjaan}", [
+            'judul' => 'Judul Dibajak Operator Lain',
+        ]);
+
+        $response->assertForbidden();
     }
 
     // ==========================================
@@ -231,7 +268,7 @@ class OwnershipSecurityTest extends TestCase
         $response = $this->postJson('/api/reporting', [
             'id_pekerjaan' => $task->id_pekerjaan,
             'id_user' => $otherUser->id_user, // Attempted spoof
-            'tgl_lapor' => '2026-09-17',
+            'tgl_lapor' => now()->toDateString(),
             'catatan' => 'Laporan progress saya',
         ]);
 
@@ -319,20 +356,6 @@ class OwnershipSecurityTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_sales_cannot_delete_lead_interaction(): void
-    {
-        $sales = User::factory()->create(['role' => 'sales']);
-        $lead = CalonKlien::factory()->create(['id_user' => $sales->id_user]);
-        $interaction = LeadInteraction::factory()->create([
-            'id_calon_klien' => $lead->id_calon_klien,
-            'id_user' => $sales->id_user,
-        ]);
-
-        Sanctum::actingAs($sales);
-        $this->deleteJson("/api/lead-interactions/{$interaction->id_interaction}")
-            ->assertForbidden();
-    }
-
     public function test_sales_cannot_delete_kontrak_or_klien(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);
@@ -346,24 +369,6 @@ class OwnershipSecurityTest extends TestCase
 
         $this->deleteJson("/api/klien/{$klien->id_klien}")
             ->assertForbidden();
-    }
-
-    public function test_sales_cannot_create_interaction_on_other_sales_lead(): void
-    {
-        $salesA = User::factory()->create(['role' => 'sales']);
-        $salesB = User::factory()->create(['role' => 'sales']);
-        $leadB = CalonKlien::factory()->create(['id_user' => $salesB->id_user]);
-
-        Sanctum::actingAs($salesA);
-        $response = $this->postJson('/api/lead-interactions', [
-            'id_calon_klien' => $leadB->id_calon_klien,
-            'id_user' => $salesA->id_user,
-            'tipe_interaksi' => 'telepon',
-            'tanggal_interaksi' => '2026-09-17',
-            'ringkasan' => 'Percobaan kontak tidak sah',
-        ]);
-
-        $response->assertForbidden();
     }
 
     // ==========================================
@@ -472,7 +477,7 @@ class OwnershipSecurityTest extends TestCase
         Sanctum::actingAs($karyawanA);
         $response = $this->postJson('/api/reporting', [
             'id_pekerjaan' => $taskB->id_pekerjaan,
-            'tgl_lapor' => '2026-09-17',
+            'tgl_lapor' => now()->toDateString(),
             'catatan' => 'Laporan pada tugas orang lain',
         ]);
 

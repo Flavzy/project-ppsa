@@ -6,7 +6,6 @@ use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Models\Pekerjaan;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -37,6 +36,59 @@ class PerformanceReviewTest extends TestCase
             ->assertJsonPath('data.final_score', '94.00');
     }
 
+    public function test_storing_review_twice_rejects_duplicate_on_same_pekerjaan(): void
+    {
+        $leader = User::factory()->create(['role' => 'pimpinan']);
+        $task = $this->createCompletedTask();
+
+        Sanctum::actingAs($leader);
+        $this->postJson('/api/performance-reviews', [
+            'id_pekerjaan' => $task->id_pekerjaan,
+            'reviewed_by' => $leader->id_user,
+            'quality_score' => 80,
+            'revision_count' => 0,
+        ])->assertCreated();
+
+        $secondResponse = $this->postJson('/api/performance-reviews', [
+            'id_pekerjaan' => $task->id_pekerjaan,
+            'reviewed_by' => $leader->id_user,
+            'quality_score' => 95,
+            'revision_count' => 0,
+        ]);
+
+        $secondResponse->assertStatus(422)
+            ->assertJsonValidationErrors(['id_pekerjaan']);
+
+        // Verify in database there is only 1 row for this pekerjaan
+        $this->assertDatabaseCount('performance_reviews', 1);
+    }
+
+    public function test_storing_review_rejects_uncompleted_task(): void
+    {
+        $leader = User::factory()->create(['role' => 'pimpinan']);
+        $pic = User::factory()->create(['role' => 'karyawan']);
+        $client = Klien::factory()->create();
+
+        $uncompletedTask = Pekerjaan::create([
+            'id_klien' => $client->id_klien,
+            'id_pic' => $pic->id_user,
+            'judul' => 'Tugas Belum Selesai',
+            'deadline' => now()->addDays(7)->toDateString(),
+            'status' => 'baru',
+            'review_status' => 'pending',
+        ]);
+
+        Sanctum::actingAs($leader);
+        $res = $this->postJson('/api/performance-reviews', [
+            'id_pekerjaan' => $uncompletedTask->id_pekerjaan,
+            'quality_score' => 85,
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJsonValidationErrors(['id_pekerjaan']);
+        $this->assertDatabaseCount('performance_reviews', 0);
+    }
+
     private function createCompletedTask(): Pekerjaan
     {
         $pic = User::factory()->create(['role' => 'karyawan']);
@@ -63,14 +115,9 @@ class PerformanceReviewTest extends TestCase
             'kontak' => '08123456789',
             'layanan' => 'Review',
         ]);
-        $template = TemplateDeadline::create([
-            'nama_template' => 'Standar',
-        ]);
-
         return Pekerjaan::create([
             'id_klien' => $client->id_klien,
             'id_pic' => $pic->id_user,
-            'id_template' => $template->id_template,
             'judul' => 'Pekerjaan Dinilai',
             'deadline' => '2026-09-30',
             'prioritas' => 'medium',

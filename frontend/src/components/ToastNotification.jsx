@@ -4,16 +4,18 @@ export default function ToastNotification({
   open,
   message,
   severity = 'success', // 'success', 'error', 'info', 'warning'
+  action = null,
   onClose,
   duration = 4000,
 }) {
   useEffect(() => {
     if (!open) return
+    const effectiveDuration = action ? Math.max(duration, 7000) : duration
     const timer = setTimeout(() => {
       onClose?.()
-    }, duration)
+    }, effectiveDuration)
     return () => clearTimeout(timer)
-  }, [open, duration, onClose])
+  }, [open, duration, action, onClose])
 
   if (!open) return null
 
@@ -71,6 +73,21 @@ export default function ToastNotification({
         <div className="flex-1 min-w-0 pt-0.5">
           <p className="text-sm font-semibold text-gray-900 dark:text-white">{config.title}</p>
           <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{message}</p>
+          {action && (
+            <button
+              type="button"
+              onClick={() => {
+                action.onClick?.()
+                onClose?.()
+              }}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors cursor-pointer group"
+            >
+              <span className="underline">{action.label}</span>
+              <svg className="size-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
         </div>
         <button
           type="button"

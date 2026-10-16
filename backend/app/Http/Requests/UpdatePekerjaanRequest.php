@@ -29,9 +29,29 @@ class UpdatePekerjaanRequest extends FormRequest
                 'integer',
                 Rule::exists('users', 'id_user')->where(fn ($query) => $query->where('role', 'karyawan')),
             ],
-            'id_template' => ['nullable', 'integer'],
             'judul' => ['sometimes', 'required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string'],
+            'lampiran_instruksi' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    $files = is_array($value) ? $value : [$value];
+                    $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+                    foreach ($files as $file) {
+                        if ($file instanceof \Illuminate\Http\UploadedFile) {
+                            if ($file->getSize() > 20480 * 1024) {
+                                $fail("Ukuran file {$file->getClientOriginalName()} melebihi batas 20MB.");
+                            }
+                            $ext = strtolower($file->getClientOriginalExtension());
+                            if (!in_array($ext, $allowedExts, true)) {
+                                $fail("Format file {$file->getClientOriginalName()} ({$ext}) tidak didukung.");
+                            }
+                        }
+                    }
+                },
+            ],
+            'lampiran_instruksi_existing' => ['nullable'],
+            'lampiran_instruksi_existing.*' => ['nullable', 'string'],
+            'lampiran_instruksi_existing_present' => ['nullable', 'string'],
             'tgl_penugasan' => ['sometimes', 'nullable', 'date'],
             'deadline' => array_filter([
                 'sometimes',

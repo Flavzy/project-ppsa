@@ -36,7 +36,22 @@ class PerformanceReviewController extends Controller
         Gate::authorize('create', PerformanceReview::class);
 
         $validated = $request->validated();
-        $pekerjaan = Pekerjaan::with('pic')->findOrFail($validated['id_pekerjaan']);
+        $pekerjaan = Pekerjaan::with(['pic', 'performanceReview'])->findOrFail($validated['id_pekerjaan']);
+
+        if (! $pekerjaan->id_pic) {
+            abort(422, 'Pekerjaan ini belum memiliki PIC (Karyawan) yang ditugaskan.');
+        }
+
+        // Penilaian kinerja hanya dapat diberikan untuk pekerjaan yang telah selesai dan disetujui pimpinan
+        if (!in_array($pekerjaan->status, ['completed', 'approved']) || $pekerjaan->review_status !== 'approved') {
+            abort(422, 'Penilaian kinerja hanya dapat diberikan untuk pekerjaan yang telah selesai dan disetujui oleh pimpinan.');
+        }
+
+        // Pastikan pekerjaan belum pernah dinilai sebelumnya
+        if ($pekerjaan->performanceReview) {
+            abort(422, 'Pekerjaan ini sudah memiliki catatan evaluasi kinerja.');
+        }
+
         $speedScore = PerformanceReview::calculateSpeedScore($pekerjaan);
         $qualityScore = (int) $validated['quality_score'];
 

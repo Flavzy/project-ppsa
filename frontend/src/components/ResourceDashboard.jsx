@@ -4,29 +4,32 @@ import {
   createResource,
   deleteResource,
   listResource,
-  publishReportingClient,
   rejectPekerjaan,
+  startPekerjaan,
   submitPekerjaan,
   updateResource,
 } from '../api/resources'
-import { invalidateApiCache } from '../api/client'
+import { getCachedApiData, invalidateApiCache } from '../api/client'
 import { useAuth } from '../auth/useAuth'
 import ConfirmModal from './ConfirmModal'
 import ConvertLeadModal from './ConvertLeadModal'
 import DetailLegalitasModal from './DetailLegalitasModal'
 import DraftKontrakModal from './DraftKontrakModal'
+import ApproveTaskModal from './ApproveTaskModal'
 import PromptModal from './PromptModal'
 import ResourceForm from './ResourceForm'
 import ResourceTable from './ResourceTable'
 import ToastNotification from './ToastNotification'
 import LoadingSpinner from './common/LoadingSpinner'
+import { clearFormDraft } from '../utils/formDraft'
 
-function ResourceDashboard({ config, resourceConfigs, supportResources }) {
+function ResourceDashboard({ config, resourceConfigs, supportResources, onNavigate }) {
   const { user } = useAuth()
-  const [records, setRecords] = useState([])
+  const cachedRecords = getCachedApiData(config.endpoint)
+  const [records, setRecords] = useState(() => (Array.isArray(cachedRecords) ? cachedRecords : []))
   const [options, setOptions] = useState({})
   const [editingRecord, setEditingRecord] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !Array.isArray(cachedRecords))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -34,6 +37,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
   const [convertingLead, setConvertingLead] = useState(null)
   const [viewingLegalitas, setViewingLegalitas] = useState(null)
   const [viewingContract, setViewingContract] = useState(null)
+  const [formVersion, setFormVersion] = useState(0)
 
   // Custom modal dialogs to replace browser confirm/prompt
   const [confirmDialog, setConfirmDialog] = useState({
@@ -53,9 +57,15 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     defaultValue: '',
     placeholder: '',
     confirmText: 'Simpan',
+    attachmentUrl: null,
+    attachmentLabel: '',
+    notePreview: '',
     action: null,
     loading: false,
   })
+
+  const [approvingRecord, setApprovingRecord] = useState(null)
+  const [approvingLoading, setApprovingLoading] = useState(false)
 
   const [toast, setToast] = useState({
     open: false,
@@ -76,8 +86,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     return relationKeys
       .map((key) => allResources.find((resource) => resource.key === key))
       .filter(Boolean)
-      .filter((resource) => !resource.allowedRoles || resource.allowedRoles.includes(user?.role))
-  }, [config.fields, resourceConfigs, supportResources, user?.role])
+  }, [config.fields, resourceConfigs, supportResources])
 
   const loadOptionsSafely = useCallback(async () => {
     const entries = await Promise.all(
@@ -147,6 +156,16 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
   }, [config.endpoint, loadOptionsSafely])
 
   async function handleSubmit(payload) {
+    if (config.key === 'pekerjaan' && ['operator', 'sales'].includes(user?.role) && editingRecord) {
+      const opPicId = editingRecord.operator_pic_id ?? editingRecord.klien?.kontrak?.calon_klien?.id_user ?? editingRecord.klien?.kontrak?.calonKlien?.id_user
+      if (opPicId != null && Number(opPicId) !== Number(user?.id_user)) {
+        const errorMsg = 'Anda bukan Operator PIC untuk pekerjaan ini sehingga tidak berwenang mengubah data.'
+        setError(errorMsg)
+        setToast({ open: true, message: errorMsg, severity: 'error' })
+        return
+      }
+    }
+
     setSaving(true)
     setError('')
     setSuccessMessage('')
@@ -170,6 +189,9 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
       setSuccessMessage(successMsg)
       setToast({ open: true, message: successMsg, severity: 'success' })
       setEditingRecord(null)
+      // Bersihkan draf form setelah konfirmasi selesai / simpan berhasil
+      clearFormDraft(config.key, user?.id_user)
+      setFormVersion((v) => v + 1)
       await reload()
     } catch (requestError) {
       setError(requestError.message)
@@ -210,79 +232,85 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     })
   }
 
-  function handleSubmitTask(record) {
-    setConfirmDialog({
-      open: true,
-      title: 'Pengajuan Tugas Selesai',
-      message: `Kirim pekerjaan "${record.judul}" untuk ditinjau dan divalidasi oleh pimpinan?`,
-      confirmText: 'Kirim Pekerjaan',
-      type: 'info',
-      action: async () => {
-        setConfirmDialog((prev) => ({ ...prev, loading: true }))
-        setError('')
-        setSuccessMessage('')
-
-        try {
-          await submitPekerjaan(record.id_pekerjaan, { progress_persen: 100 })
-          const msg = `Pekerjaan "${record.judul}" berhasil diajukan untuk direview.`
-          setSuccessMessage(msg)
-          setToast({ open: true, message: msg, severity: 'success' })
-          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
-          await reload()
-        } catch (err) {
-          setError(err.message || 'Gagal mengirim pekerjaan.')
-          setToast({ open: true, message: err.message || 'Gagal mengirim pekerjaan.', severity: 'error' })
-          setConfirmDialog((prev) => ({ ...prev, loading: false }))
-        }
-      },
-    })
+  function handleApproveTask(record) {
+    setApprovingRecord(record)
   }
 
-  function handleApproveTask(record) {
-    setPromptDialog({
-      open: true,
-      title: 'Setujui Pekerjaan',
-      message: `Berikan catatan persetujuan untuk pekerjaan "${record.judul}":`,
-      defaultValue: 'Pekerjaan telah diverifikasi dan disetujui.',
-      placeholder: 'Tuliskan catatan persetujuan...',
-      confirmText: 'Setujui Pekerjaan',
-      action: async (note) => {
-        setPromptDialog((prev) => ({ ...prev, loading: true }))
-        setError('')
-        setSuccessMessage('')
+  async function handleConfirmApproveTask(payload) {
+    if (!approvingRecord) return
+    const isReporting = config.key === 'reporting'
+    const targetPekerjaanId = isReporting
+      ? (approvingRecord.id_pekerjaan || approvingRecord.pekerjaan?.id_pekerjaan)
+      : approvingRecord.id_pekerjaan
+    const jobTitle = isReporting
+      ? (approvingRecord.pekerjaan?.judul || `Pekerjaan #${targetPekerjaanId}`)
+      : approvingRecord.judul
 
-        try {
-          await approvePekerjaan(record.id_pekerjaan, { catatan_review: note })
-          const msg = `Pekerjaan "${record.judul}" berhasil disetujui (Status: Selesai).`
-          setSuccessMessage(msg)
-          setToast({ open: true, message: msg, severity: 'success' })
-          setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
-          await reload()
-        } catch (err) {
-          setError(err.message || 'Gagal menyetujui pekerjaan.')
-          setToast({ open: true, message: err.message || 'Gagal menyetujui pekerjaan.', severity: 'error' })
-          setPromptDialog((prev) => ({ ...prev, loading: false }))
-        }
-      },
-    })
+    setApprovingLoading(true)
+    setError('')
+    setSuccessMessage('')
+
+    try {
+      await approvePekerjaan(targetPekerjaanId, payload)
+      const hasRating = payload.quality_score !== null && payload.quality_score !== undefined
+      const msg = `Pekerjaan "${jobTitle}" berhasil disetujui (Status: Selesai)${
+        hasRating ? ' dan nilai kinerja karyawan telah dicatat' : ''
+      }.`
+      setSuccessMessage(msg)
+      setToast({
+        open: true,
+        message: msg,
+        severity: 'success',
+        action: hasRating && onNavigate
+          ? {
+              label: 'Buka Menu Kinerja Karyawan',
+              onClick: () => onNavigate('kinerjaKaryawan'),
+            }
+          : null,
+      })
+      setApprovingRecord(null)
+      await reload()
+    } catch (err) {
+      setError(err.message || 'Gagal menyetujui pekerjaan.')
+      setToast({ open: true, message: err.message || 'Gagal menyetujui pekerjaan.', severity: 'error' })
+    } finally {
+      setApprovingLoading(false)
+    }
   }
 
   function handleRejectTask(record) {
+    const isReporting = config.key === 'reporting'
+    const targetPekerjaanId = isReporting ? (record.id_pekerjaan || record.pekerjaan?.id_pekerjaan) : record.id_pekerjaan
+    const jobTitle = isReporting ? (record.pekerjaan?.judul || `Pekerjaan #${targetPekerjaanId}`) : record.judul
+    const fileUrl = isReporting
+      ? (record.dokumen_bukti_url || record.pekerjaan?.file_tugas_url)
+      : (record.file_tugas_url || record.latest_reporting?.dokumen_bukti_url)
+    const fileUrls = isReporting
+      ? (record.dokumen_bukti_urls?.length ? record.dokumen_bukti_urls : (record.pekerjaan?.file_tugas_urls?.length ? record.pekerjaan.file_tugas_urls : []))
+      : (record.file_tugas_urls?.length ? record.file_tugas_urls : (record.latest_reporting?.dokumen_bukti_urls?.length ? record.latest_reporting.dokumen_bukti_urls : []))
+    const notePreview = isReporting
+      ? (record.catatan || record.pekerjaan?.catatan_karyawan)
+      : record.catatan_karyawan
+
     setPromptDialog({
       open: true,
       title: 'Minta Revisi Pekerjaan',
-      message: `Tuliskan catatan perbaikan untuk karyawan atas pekerjaan "${record.judul}":`,
+      message: `Tuliskan catatan perbaikan untuk karyawan atas pekerjaan "${jobTitle}":`,
       defaultValue: 'Harap perbaiki dan lengkapi bukti dokumen.',
       placeholder: 'Tuliskan instruksi perbaikan...',
       confirmText: 'Kirim Permintaan Revisi',
+      attachmentUrl: fileUrl,
+      attachmentUrls: fileUrls,
+      attachmentLabel: 'Buka / Unduh Berkas Tugas Karyawan',
+      notePreview: notePreview,
       action: async (note) => {
         setPromptDialog((prev) => ({ ...prev, loading: true }))
         setError('')
         setSuccessMessage('')
 
         try {
-          await rejectPekerjaan(record.id_pekerjaan, { catatan_review: note })
-          const msg = `Pekerjaan "${record.judul}" dikembalikan kepada karyawan untuk revisi.`
+          await rejectPekerjaan(targetPekerjaanId, { catatan_review: note })
+          const msg = `Pekerjaan "${jobTitle}" dikembalikan kepada karyawan untuk revisi.`
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'warning' })
           setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
@@ -291,34 +319,6 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
           setError(err.message || 'Gagal meminta revisi pekerjaan.')
           setToast({ open: true, message: err.message || 'Gagal meminta revisi pekerjaan.', severity: 'error' })
           setPromptDialog((prev) => ({ ...prev, loading: false }))
-        }
-      },
-    })
-  }
-
-  function handlePublishReport(record) {
-    setConfirmDialog({
-      open: true,
-      title: 'Publikasikan Laporan Klien',
-      message: `Publikasikan laporan ID #${record.id_reporting} ke klien? Klien akan dapat melihat laporan ini secara langsung.`,
-      confirmText: 'Ya, Publikasikan',
-      type: 'info',
-      action: async () => {
-        setConfirmDialog((prev) => ({ ...prev, loading: true }))
-        setError('')
-        setSuccessMessage('')
-
-        try {
-          await publishReportingClient(record.id_reporting)
-          const msg = `Laporan ID #${record.id_reporting} berhasil dipublikasikan ke klien.`
-          setSuccessMessage(msg)
-          setToast({ open: true, message: msg, severity: 'success' })
-          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
-          await reload()
-        } catch (err) {
-          setError(err.message || 'Gagal mempublikasikan laporan.')
-          setToast({ open: true, message: err.message || 'Gagal mempublikasikan laporan.', severity: 'error' })
-          setConfirmDialog((prev) => ({ ...prev, loading: false }))
         }
       },
     })
@@ -354,19 +354,63 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
     }
   }
 
+  async function handleStartTask(record) {
+    setConfirmDialog({
+      open: true,
+      title: 'Mulai Kerjakan Tugas',
+      message: `Apakah Anda ingin menandai tugas "${record.judul}" sebagai sedang dikerjakan? Status akan berubah menjadi "Dalam Pengerjaan".`,
+      confirmText: 'Ya, Mulai Kerjakan',
+      type: 'info',
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
+
+        try {
+          await startPekerjaan(record.id_pekerjaan)
+          const msg = `Tugas "${record.judul}" berhasil dimulai (Status: Dalam Pengerjaan).`
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'success' })
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
+          await reload()
+        } catch (err) {
+          setError(err.message || 'Gagal memulai pengerjaan tugas.')
+          setToast({ open: true, message: err.message || 'Gagal memulai pengerjaan tugas.', severity: 'error' })
+          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-            {config.key === 'pekerjaan' && user?.role === 'karyawan' ? 'Tugas & Penugasan' : 'Modul Operasional'}
+            {config.key === 'pekerjaan' && user?.role === 'karyawan'
+              ? 'Tugas & Penugasan'
+              : config.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
+              ? 'Evaluasi & Penilaian Pribadi'
+              : config.key === 'kinerjaKaryawan' && user?.role === 'pimpinan'
+              ? 'Evaluasi & Penilaian Karyawan'
+              : 'Modul Operasional'}
           </span>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-1">
-            {config.key === 'pekerjaan' && user?.role === 'karyawan' ? 'Pekerjaan Saya' : config.label}
+            {config.key === 'pekerjaan' && user?.role === 'karyawan'
+              ? 'Pekerjaan Saya'
+              : config.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
+              ? 'Kinerja Saya'
+              : config.label}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {config.key === 'pekerjaan' && user?.role === 'karyawan'
               ? 'Daftar penugasan dan pekerjaan yang ditugaskan secara khusus kepada Anda.'
+              : config.key === 'reporting' && user?.role === 'pimpinan'
+              ? 'Pantau riwayat laporan progres dan periksa berkas penyerahan tugas dari seluruh karyawan.'
+              : config.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
+              ? 'Pantau riwayat evaluasi, skor kecepatan, kualitas kerja, dan catatan penilaian kinerja Anda dari pimpinan.'
+              : config.key === 'kinerjaKaryawan' && user?.role === 'pimpinan'
+              ? 'Kelola, evaluasi, dan pantau penilaian kinerja seluruh karyawan secara komprehensif.'
               : `Kelola dan pantau data ${config.label.toLowerCase()} secara komprehensif.`}
           </p>
         </div>
@@ -374,7 +418,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
           type="button"
           onClick={reload}
           disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-xs self-start sm:self-auto cursor-pointer disabled:opacity-50"
+          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-2xs transition-all active:scale-95 self-start sm:self-auto cursor-pointer disabled:opacity-50"
         >
           {loading ? (
             <LoadingSpinner size="xs" text="" />
@@ -399,24 +443,96 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
         </div>
       )}
 
-      <ResourceForm
-        key={editingRecord ? editingRecord[config.primaryKey] : 'new'}
-        config={config}
-        record={editingRecord}
-        options={options}
-        saving={saving}
-        errors={validationErrors}
-        currentUser={user}
-        canCreate={canCreate}
-        canEdit={canEdit}
-        onCancel={() => setEditingRecord(null)}
-        onSubmit={handleSubmit}
-      />
+      {/* Callout Panduan Alur untuk Modul Kontrak */}
+      {config.key === 'kontrak' && !editingRecord && (
+        <div className="p-4 rounded-2xl border border-brand-200 bg-brand-50/70 dark:border-brand-900/60 dark:bg-brand-500/10 flex items-start sm:items-center gap-3.5 shadow-xs">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h5 className="text-sm font-bold text-gray-900 dark:text-white">Alur Penerbitan Kontrak Baru</h5>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+              Untuk menerbitkan kontrak baru, silakan lakukan melalui tombol <strong>Konversi</strong> pada menu <strong>Calon Klien</strong> yang sudah berstatus <strong>Deal</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Callout Panduan Alur untuk Modul Klien */}
+      {config.key === 'klien' && !editingRecord && (
+        <div className="p-4 rounded-2xl border border-blue-light-200 bg-blue-light-50/70 dark:border-blue-light-900/60 dark:bg-blue-light-500/10 flex items-start sm:items-center gap-3.5 shadow-xs">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-light-100 text-blue-light-600 dark:bg-blue-light-500/20 dark:text-blue-light-400">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <div>
+            <h5 className="text-sm font-bold text-gray-900 dark:text-white">Informasi Data Klien</h5>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+              Data Klien otomatis terdaftar saat <strong>Calon Klien</strong> berstatus <strong>Deal</strong> dikonversi menjadi Kontrak resmi. Menu ini digunakan untuk meninjau dan memperbarui informasi klien aktif.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Callout Panduan untuk Modul Pekerjaan bagi Pimpinan / Admin */}
+      {config.key === 'pekerjaan' && ['admin', 'pimpinan'].includes(user?.role) && !editingRecord && (
+        <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/60 dark:bg-indigo-500/10 flex items-start sm:items-center gap-3.5 shadow-xs">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <div>
+            <h5 className="text-sm font-bold text-gray-900 dark:text-white">Pusat Pengelolaan Tugas & Penugasan</h5>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+              Gunakan menu ini untuk membuat tugas, menetapkan PIC karyawan, mengatur batas waktu, serta mengedit atau menghapus pekerjaan. Untuk memeriksa berkas laporan dan memberikan persetujuan atau revisi tugas, silakan buka menu <strong>Reporting</strong>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Callout Panduan untuk Modul Reporting bagi Pimpinan / Admin */}
+      {config.key === 'reporting' && ['admin', 'pimpinan'].includes(user?.role) && (
+        <div className="p-4 rounded-2xl border border-blue-light-200 bg-blue-light-50/70 dark:border-blue-light-900/60 dark:bg-blue-light-500/10 flex items-start sm:items-center gap-3.5 shadow-xs">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-light-100 text-blue-light-600 dark:bg-blue-light-500/20 dark:text-blue-light-400">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div>
+            <h5 className="text-sm font-bold text-gray-900 dark:text-white">Pusat Peninjauan & Persetujuan Laporan Karyawan</h5>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+              Periksa berkas bukti tugas yang dikumpulkan karyawan dan ambil keputusan langsung di sini. Klik tombol <strong>Setujui</strong> untuk menyelesaikan pekerjaan secara resmi atau <strong>Revisi</strong> jika tugas memerlukan perbaikan.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Form disembunyikan jika role tidak berhak membuat data baru (kecuali saat mode edit), serta untuk modul kontrak dan klien */}
+      {(canCreate || editingRecord) && !((config.key === 'kontrak' || config.key === 'klien') && !editingRecord) && (
+        <ResourceForm
+          key={editingRecord ? editingRecord[config.primaryKey] : `${config.key}_v${formVersion}`}
+          config={config}
+          record={editingRecord}
+          options={options}
+          saving={saving}
+          errors={validationErrors}
+          currentUser={user}
+          canCreate={['kontrak', 'klien'].includes(config.key) ? false : canCreate}
+          canEdit={canEdit}
+          onCancel={() => setEditingRecord(null)}
+          onSubmit={handleSubmit}
+        />
+      )}
 
       <ResourceTable
         config={config}
         records={records}
         loading={loading}
+        canCreate={['kontrak', 'klien'].includes(config.key) ? false : canCreate}
         canEdit={canEdit}
         canDelete={canDelete}
         user={user}
@@ -425,10 +541,9 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
         onConvert={setConvertingLead}
         onViewLegalitas={setViewingLegalitas}
         onViewContract={setViewingContract}
-        onSubmitTask={handleSubmitTask}
-        onApproveTask={handleApproveTask}
-        onRejectTask={handleRejectTask}
-        onPublishReport={handlePublishReport}
+        onApproveTask={config.key === 'reporting' ? handleApproveTask : undefined}
+        onRejectTask={config.key === 'reporting' ? handleRejectTask : undefined}
+        onStartTask={config.key === 'pekerjaan' ? handleStartTask : undefined}
       />
 
       {convertingLead && (
@@ -455,9 +570,17 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
           lead={config.key === 'calonKlien' ? viewingContract : viewingContract.calon_klien}
           contract={config.key === 'kontrak' ? viewingContract : viewingContract.kontrak}
           onClose={() => setViewingContract(null)}
-          onSign={handleSignContract}
         />
       )}
+
+      {/* Modal Shortcut Penilaian Cepat saat Setujui Pekerjaan */}
+      <ApproveTaskModal
+        open={Boolean(approvingRecord)}
+        record={approvingRecord}
+        loading={approvingLoading}
+        onConfirm={handleConfirmApproveTask}
+        onClose={() => setApprovingRecord(null)}
+      />
 
       {/* Modern Confirmation Modal */}
       <ConfirmModal
@@ -480,6 +603,10 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
         placeholder={promptDialog.placeholder}
         confirmText={promptDialog.confirmText}
         loading={promptDialog.loading}
+        attachmentUrl={promptDialog.attachmentUrl}
+        attachmentUrls={promptDialog.attachmentUrls}
+        attachmentLabel={promptDialog.attachmentLabel}
+        notePreview={promptDialog.notePreview}
         onConfirm={(val) => promptDialog.action && promptDialog.action(val)}
         onClose={() => setPromptDialog((prev) => ({ ...prev, open: false }))}
       />
@@ -489,6 +616,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources }) {
         open={toast.open}
         message={toast.message}
         severity={toast.severity}
+        action={toast.action}
         onClose={() => setToast((prev) => ({ ...prev, open: false }))}
       />
     </div>

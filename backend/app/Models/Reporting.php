@@ -25,10 +25,7 @@ class Reporting extends Model
         'id_user',
         'tgl_lapor',
         'progress_persen',
-        'tipe_laporan',
         'status_laporan',
-        'is_visible_to_client',
-        'published_at',
         'dokumen_bukti',
         'catatan',
     ];
@@ -43,17 +40,52 @@ class Reporting extends Model
         return $this->belongsTo(User::class, 'id_user', 'id_user');
     }
 
-    public function getDokumenBuktiUrlAttribute(): ?string
+    public function getDokumenBuktiUrlsAttribute(): array
     {
         if (!$this->dokumen_bukti) {
-            return null;
+            return [];
         }
 
-        if (str_starts_with($this->dokumen_bukti, 'http://') || str_starts_with($this->dokumen_bukti, 'https://')) {
-            return $this->dokumen_bukti;
+        if (str_starts_with($this->dokumen_bukti, '[') && str_ends_with($this->dokumen_bukti, ']')) {
+            $decoded = json_decode($this->dokumen_bukti, true);
+            if (is_array($decoded)) {
+                $result = [];
+                foreach ($decoded as $item) {
+                    $path = is_array($item) ? ($item['path'] ?? '') : $item;
+                    $name = is_array($item) ? ($item['name'] ?? basename($path)) : basename($path);
+                    if (!$path) {
+                        continue;
+                    }
+                    $url = (str_starts_with($path, 'http://') || str_starts_with($path, 'https://'))
+                        ? $path
+                        : Storage::disk('public')->url($path);
+                    $result[] = [
+                        'name' => $name,
+                        'url' => $url,
+                        'path' => $path,
+                    ];
+                }
+                return $result;
+            }
         }
 
-        return Storage::disk('public')->url($this->dokumen_bukti);
+        $url = (str_starts_with($this->dokumen_bukti, 'http://') || str_starts_with($this->dokumen_bukti, 'https://'))
+            ? $this->dokumen_bukti
+            : Storage::disk('public')->url($this->dokumen_bukti);
+
+        return [
+            [
+                'name' => basename($this->dokumen_bukti),
+                'url' => $url,
+                'path' => $this->dokumen_bukti,
+            ]
+        ];
+    }
+
+    public function getDokumenBuktiUrlAttribute(): ?string
+    {
+        $urls = $this->dokumen_bukti_urls;
+        return !empty($urls) ? $urls[0]['url'] : null;
     }
 
     /**
@@ -63,8 +95,6 @@ class Reporting extends Model
     {
         return [
             'tgl_lapor' => 'date',
-            'is_visible_to_client' => 'boolean',
-            'published_at' => 'datetime',
         ];
     }
 }

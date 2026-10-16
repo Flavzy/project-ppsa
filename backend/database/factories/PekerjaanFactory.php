@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\Klien;
 use App\Models\Pekerjaan;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -21,13 +20,12 @@ class PekerjaanFactory extends Factory
         return [
             'id_klien' => Klien::factory(),
             'id_pic' => User::factory(),
-            'id_template' => null,
             'judul' => fake()->sentence(3),
             'deskripsi' => fake()->optional()->paragraph(),
             'deadline' => fake()->dateTimeBetween('now', '+3 months')->format('Y-m-d'),
             'prioritas' => fake()->randomElement(['low', 'medium', 'high', 'urgent']),
             'progress_persen' => fake()->numberBetween(0, 100),
-            'status' => fake()->randomElement(['baru', 'in_progress', 'submitted', 'completed', 'revision_needed']),
+            'status' => 'in_progress',
             'tgl_selesai' => null,
             'submitted_at' => null,
             'approved_at' => null,

@@ -10,6 +10,10 @@ function PromptModalInner({
   confirmText,
   cancelText,
   loading,
+  attachmentUrl,
+  attachmentUrls,
+  attachmentLabel,
+  notePreview,
   onConfirm,
   onClose,
 }) {
@@ -63,6 +67,49 @@ function PromptModalInner({
             </div>
           </div>
 
+          {(attachmentUrls?.length || attachmentUrl || notePreview) && (
+            <div className="mt-4 p-3.5 rounded-2xl bg-orange-50/70 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-800/40 text-xs space-y-2">
+              {notePreview && (
+                <p className="text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold text-gray-500 dark:text-gray-400">Catatan Karyawan:</span> {notePreview}
+                </p>
+              )}
+              {attachmentUrls && attachmentUrls.length > 0 ? (
+                <div className="space-y-1.5">
+                  <span className="block text-[11px] font-semibold text-orange-800 dark:text-orange-300 uppercase tracking-wider">
+                    Berkas Hasil Tugas ({attachmentUrls.length} Berkas):
+                  </span>
+                  <div className="flex flex-col gap-1.5 items-start">
+                    {attachmentUrls.map((item, idx) => (
+                      <a
+                        key={idx}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300 text-xs font-semibold border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-full"
+                        title={`Buka / Unduh ${item.name || `Berkas ${idx + 1}`}`}
+                      >
+                        <span className="shrink-0">📄</span>
+                        <span className="truncate max-w-[280px]">{item.name || `Berkas ${idx + 1}`}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : attachmentUrl ? (
+                  <a
+                    href={attachmentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300 text-xs font-semibold border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-full"
+                    title={`Buka / Unduh ${attachmentUrl ? decodeURIComponent(attachmentUrl.split('/').pop()) : 'Berkas Tugas'}`}
+                  >
+                    <span className="shrink-0">📄</span>
+                    <span className="truncate max-w-[280px]">{attachmentUrl ? decodeURIComponent(attachmentUrl.split('/').pop()) : (attachmentLabel || 'Buka Berkas')}</span>
+                  </a>
+              ) : null}
+            </div>
+          )}
+
           <div className="mt-5">
             <textarea
               autoFocus
@@ -80,14 +127,14 @@ function PromptModalInner({
               type="button"
               disabled={loading}
               onClick={onClose}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               {cancelText}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 font-semibold text-sm text-white transition-all shadow-theme-xs shadow-brand-500/20 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-10 px-5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 font-semibold text-sm text-white transition-all active:scale-95 shadow-theme-xs shadow-brand-500/20 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -114,6 +161,10 @@ export default function PromptModal({
   confirmText = 'Simpan',
   cancelText = 'Batal',
   loading = false,
+  attachmentUrl,
+  attachmentUrls,
+  attachmentLabel,
+  notePreview,
   onConfirm,
   onClose,
 }) {
@@ -129,6 +180,10 @@ export default function PromptModal({
       confirmText={confirmText}
       cancelText={cancelText}
       loading={loading}
+      attachmentUrl={attachmentUrl}
+      attachmentUrls={attachmentUrls}
+      attachmentLabel={attachmentLabel}
+      notePreview={notePreview}
       onConfirm={onConfirm}
       onClose={onClose}
     />

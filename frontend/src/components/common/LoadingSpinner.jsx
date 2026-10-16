@@ -18,7 +18,7 @@ export default function LoadingSpinner({
         <img
           src="/images/logo/loading-logo.png"
           alt=""
-          className="size-2.5 object-contain select-none pointer-events-none"
+          className="size-3 rounded-full object-cover select-none pointer-events-none"
         />
       </span>
     )
@@ -76,7 +76,7 @@ export default function LoadingSpinner({
           <img
             src="/images/logo/loading-logo.png"
             alt="Loading..."
-            className={`${currentSize.logo} object-contain transition-transform duration-700 drop-shadow-sm select-none pointer-events-none`}
+            className={`${currentSize.logo} rounded-full object-cover transition-transform duration-700 drop-shadow-sm select-none pointer-events-none`}
             style={{
               animation: 'logo-breathe 2.2s ease-in-out infinite',
             }}

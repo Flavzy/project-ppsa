@@ -28,6 +28,17 @@ export function invalidateApiCache() {
   requestCache.clear()
 }
 
+export function getCachedApiData(path) {
+  const cleanPath = path.replace(/^\//, '')
+  const token = getToken()
+  const cacheKey = `GET:${cleanPath}:${token || 'anon'}`
+  const cached = requestCache.get(cacheKey)
+  if (cached && cached.data !== undefined && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data
+  }
+  return null
+}
+
 async function parseResponse(response, isLoginRequest) {
   if (response.status === 204) {
     return null

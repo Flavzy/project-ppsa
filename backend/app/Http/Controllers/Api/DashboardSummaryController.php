@@ -39,19 +39,31 @@ class DashboardSummaryController extends Controller
                     'deadline' => $p->deadline?->toDateString() ?? '-',
                     'status' => $p->status,
                     'progress_persen' => $p->progress_persen,
+                    'submitted_at' => $p->submitted_at?->toDateTimeString(),
+                    'tgl_selesai' => $p->tgl_selesai?->toDateString(),
+                    'catatan_review' => $p->catatan_review,
+                    'catatan_karyawan' => $p->catatan_karyawan,
+                    'deskripsi' => $p->deskripsi,
                 ]);
+
+            $today = today()->toDateString();
+            $taskAggregates = Pekerjaan::query()
+                ->where('id_pic', $user->id_user)
+                ->selectRaw("
+                    COUNT(*) as total_tasks,
+                    SUM(CASE WHEN deadline < ? AND status NOT IN ('completed', 'approved') THEN 1 ELSE 0 END) as overdue_tasks,
+                    SUM(CASE WHEN status IN ('completed', 'approved') THEN 1 ELSE 0 END) as completed_tasks,
+                    SUM(CASE WHEN status IN ('revision_needed', 'revision') THEN 1 ELSE 0 END) as revision_tasks
+                ", [$today])
+                ->first();
 
             return response()->json([
                 'data' => [
                     'totals' => [
-                        'tasks' => Pekerjaan::where('id_pic', $user->id_user)->count(),
-                        'overdue_tasks' => Pekerjaan::where('id_pic', $user->id_user)
-                            ->whereDate('deadline', '<', today())
-                            ->whereNotIn('status', ['completed', 'approved'])
-                            ->count(),
-                        'completed_tasks' => Pekerjaan::where('id_pic', $user->id_user)
-                            ->whereIn('status', ['completed', 'approved'])
-                            ->count(),
+                        'tasks' => (int) ($taskAggregates?->total_tasks ?? 0),
+                        'overdue_tasks' => (int) ($taskAggregates?->overdue_tasks ?? 0),
+                        'completed_tasks' => (int) ($taskAggregates?->completed_tasks ?? 0),
+                        'revision_tasks' => (int) ($taskAggregates?->revision_tasks ?? 0),
                         'average_performance_score' => round((float) PerformanceReview::where('id_user', $user->id_user)->avg('final_score'), 2),
                     ],
                     'work_by_status' => $workByStatus,
@@ -60,7 +72,7 @@ class DashboardSummaryController extends Controller
             ]);
         }
 
-        // Operator / Sales role: CRM leads and contract metrics
+        // Operator / Sales role: CRM leads, contract metrics, and operational task metrics
         if (in_array($user->role, ['operator', 'sales'], true)) {
             $leadByStatus = CalonKlien::query()
                 ->selectRaw('status_prospek as status, count(*) as total')
@@ -72,17 +84,43 @@ class DashboardSummaryController extends Controller
                 ->groupBy('status')
                 ->pluck('total', 'status');
 
+            $workByStatus = Pekerjaan::query()
+                ->selectRaw('status, count(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status');
+
+            $leadTotal = (int) $leadByStatus->sum();
+            $leadDeal = (int) ($leadByStatus['deal'] ?? 0);
+            $contractTotal = (int) $contractByStatus->sum();
+            $workTotal = (int) $workByStatus->sum();
+            $inProgressTasks = (int) ($workByStatus['in_progress'] ?? 0);
+            $submittedTasks = (int) ($workByStatus['submitted'] ?? 0);
+            $completedTasks = (int) (($workByStatus['completed'] ?? 0) + ($workByStatus['approved'] ?? 0));
+
+            $overdueTasks = Pekerjaan::query()
+                ->whereDate('deadline', '<', today())
+                ->whereNotIn('status', ['completed', 'approved'])
+                ->count();
+
+            $activeClients = Klien::count();
+
             return response()->json([
                 'data' => [
                     'totals' => [
-                        'leads' => CalonKlien::count(),
-                        'lead_deal' => CalonKlien::where('status_prospek', 'deal')->count(),
-                        'lead_lost' => CalonKlien::where('status_prospek', 'lost')->count(),
-                        'active_clients' => Klien::count(),
-                        'contracts' => Kontrak::count(),
+                        'leads' => $leadTotal,
+                        'lead_deal' => $leadDeal,
+                        'lead_lost' => $leadTotal - $leadDeal,
+                        'active_clients' => $activeClients,
+                        'contracts' => $contractTotal,
+                        'tasks' => $workTotal,
+                        'in_progress_tasks' => $inProgressTasks,
+                        'submitted_tasks' => $submittedTasks,
+                        'overdue_tasks' => $overdueTasks,
+                        'completed_tasks' => $completedTasks,
                     ],
                     'lead_by_status' => $leadByStatus,
                     'contract_by_status' => $contractByStatus,
+                    'work_by_status' => $workByStatus,
                 ],
             ]);
         }
@@ -117,19 +155,30 @@ class DashboardSummaryController extends Controller
                 'total_reviews' => (int) $review->total_reviews,
             ]);
 
+        $leadTotal = (int) $leadByStatus->sum();
+        $leadDeal = (int) ($leadByStatus['deal'] ?? 0);
+        $contractTotal = (int) $contractByStatus->sum();
+        $workTotal = (int) $workByStatus->sum();
+        $completedTasks = (int) (($workByStatus['completed'] ?? 0) + ($workByStatus['approved'] ?? 0));
+
+        $overdueTasks = Pekerjaan::query()
+            ->whereDate('deadline', '<', today())
+            ->whereNotIn('status', ['completed', 'approved'])
+            ->count();
+
+        $activeClients = Klien::count();
+
         return response()->json([
             'data' => [
                 'totals' => [
-                    'leads' => CalonKlien::count(),
-                    'lead_deal' => CalonKlien::where('status_prospek', 'deal')->count(),
-                    'lead_lost' => CalonKlien::where('status_prospek', 'lost')->count(),
-                    'active_clients' => Klien::count(),
-                    'contracts' => Kontrak::count(),
-                    'tasks' => Pekerjaan::count(),
-                    'overdue_tasks' => Pekerjaan::whereDate('deadline', '<', today())
-                        ->whereNotIn('status', ['completed', 'approved'])
-                        ->count(),
-                    'client_reports_sent' => Reporting::where('is_visible_to_client', true)->count(),
+                    'leads' => $leadTotal,
+                    'lead_deal' => $leadDeal,
+                    'lead_lost' => $leadTotal - $leadDeal,
+                    'active_clients' => $activeClients,
+                    'contracts' => $contractTotal,
+                    'tasks' => $workTotal,
+                    'overdue_tasks' => $overdueTasks,
+                    'completed_tasks' => $completedTasks,
                     'average_performance_score' => round((float) PerformanceReview::avg('final_score'), 2),
                 ],
                 'lead_by_status' => $leadByStatus,

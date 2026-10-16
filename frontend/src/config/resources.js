@@ -10,11 +10,11 @@ export const resourceConfigs = [
     canEdit: ['admin', 'pimpinan', 'operator', 'sales'],
     canDelete: ['admin', 'pimpinan'],
     columns: [
-      { key: 'id_calon_klien', label: 'ID' },
-      { key: 'nama_klien', label: 'Nama Klien' },
       { key: 'nama_perusahaan', label: 'Nama Perusahaan' },
+      { key: 'nama_klien', label: 'Nama Klien' },
       { key: 'nama_direktur', label: 'Nama Direktur' },
       { key: 'kontak_person', label: 'Kontak Person' },
+      { key: 'id_user', label: 'Operator PIC' },
       { key: 'status_prospek', label: 'Status' },
       { key: 'legalitas_status', label: 'Legalitas' },
     ],
@@ -24,23 +24,32 @@ export const resourceConfigs = [
       { name: 'nama_perusahaan', label: '2. Nama Perusahaan', type: 'text', required: true, section: 'Informasi Profil Klien & Perusahaan' },
       { name: 'alamat_perusahaan', label: '3. Alamat Perusahaan', type: 'textarea', rows: 2, required: false, section: 'Informasi Profil Klien & Perusahaan' },
       { name: 'nama_direktur', label: '4. Nama Direktur', type: 'text', required: false, section: 'Informasi Profil Klien & Perusahaan' },
-      { name: 'kontak_person', label: '5. Kontak Person', type: 'text', required: true, placeholder: 'No. HP / WhatsApp / Telepon', section: 'Informasi Profil Klien & Perusahaan' },
-      { name: 'id_user', label: 'Operator PIC', type: 'select', optionsResource: 'users', optionValue: 'id_user', optionLabel: 'nama', required: true, section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'kontak_person', label: '5. Kontak Person (No. HP / WhatsApp / Telepon)', type: 'text', required: true, placeholder: 'No. HP / WhatsApp / Telepon (maks. 16 digit angka)', numericOnly: true, maxLength: 16, section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'email', label: '6. Email Klien / Perusahaan', type: 'email', required: false, placeholder: 'contoh: kontak@perusahaan.com', section: 'Informasi Profil Klien & Perusahaan' },
+      {
+        name: 'id_user',
+        label: 'Operator PIC',
+        type: 'select',
+        optionsResource: 'users',
+        optionsFilter: (user) => ['operator', 'sales'].includes(user.role),
+        optionValue: 'id_user',
+        optionLabel: 'nama',
+        required: true,
+        section: 'Informasi Profil Klien & Perusahaan'
+      },
       {
         name: 'status_prospek',
         label: 'Status Prospek',
         type: 'select',
         required: true,
+        defaultValue: 'belum_deal',
         section: 'Informasi Profil Klien & Perusahaan',
         options: [
-          { value: 'prospek', label: 'Prospek' },
-          { value: 'proposal', label: 'Proposal' },
-          { value: 'negotiation', label: 'Negosiasi' },
+          { value: 'belum_deal', label: 'Belum Deal' },
           { value: 'deal', label: 'Deal' },
-          { value: 'lost', label: 'Lost' },
         ],
       },
-      { name: 'tgl_followup', label: 'Tanggal Follow Up', type: 'date', section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'tgl_followup', label: 'Tanggal Follow Up', type: 'date', defaultValue: () => new Date().toISOString().split('T')[0], section: 'Informasi Profil Klien & Perusahaan' },
 
       // 2. Legalitas Perusahaan (Nomor & Dokumen Pendukung)
       { name: 'nomor_nib', label: '1. NIB (Nomor Induk Berusaha)', type: 'text', placeholder: 'Masukkan nomor NIB', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
@@ -58,7 +67,7 @@ export const resourceConfigs = [
       { name: 'nomor_izin_usaha', label: '5. Izin Usaha', type: 'text', placeholder: 'Masukkan nomor Izin Usaha', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
       { name: 'file_izin_usaha', label: 'Upload Dokumen Izin Usaha', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
 
-      { name: 'file_dokumen_pendukung', label: 'Upload Dokumen Pendukung Lainnya', type: 'file', accept: '.pdf,image/*,.zip,.rar', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_dokumen_pendukung', label: 'Upload Dokumen Pendukung Lainnya', type: 'file', multiple: true, accept: '.pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
     ],
   },
   {
@@ -72,18 +81,40 @@ export const resourceConfigs = [
     canEdit: ['admin', 'pimpinan', 'operator', 'sales'],
     canDelete: ['admin', 'pimpinan'],
     columns: [
-      { key: 'id_kontrak', label: 'ID' },
       { key: 'no_kontrak', label: 'No Kontrak' },
+      { key: 'id_calon_klien', label: 'Nama Perusahaan' },
       { key: 'tgl_mulai', label: 'Mulai' },
       { key: 'tgl_selesai', label: 'Selesai' },
       { key: 'status', label: 'Status' },
     ],
     fields: [
-      { name: 'id_calon_klien', label: 'Calon Klien', type: 'select', optionsResource: 'calonKlien', optionValue: 'id_calon_klien', optionLabel: 'nama_perusahaan', required: true },
+      {
+        name: 'id_calon_klien',
+        label: 'Nama Perusahaan',
+        type: 'select',
+        optionsResource: 'calonKlien',
+        optionsFilter: (client) => client.status_prospek === 'deal',
+        optionValue: 'id_calon_klien',
+        optionLabel: 'nama_perusahaan',
+        required: true,
+      },
       { name: 'no_kontrak', label: 'No Kontrak', type: 'text', required: true },
-      { name: 'tgl_mulai', label: 'Tanggal Mulai', type: 'date', required: true },
+      { name: 'tgl_mulai', label: 'Tanggal Mulai', type: 'date', defaultValue: () => new Date().toISOString().split('T')[0], required: true },
       { name: 'tgl_selesai', label: 'Tanggal Selesai', type: 'date', required: true },
-      { name: 'status', label: 'Status', type: 'text', required: true },
+      {
+        name: 'status',
+        label: 'Status Kontrak',
+        type: 'select',
+        required: true,
+        defaultValue: 'draft',
+        options: [
+          { value: 'draft', label: 'Draft (Menunggu Tanda Tangan)' },
+          { value: 'aktif', label: 'Aktif (Berjalan)' },
+          { value: 'selesai', label: 'Selesai' },
+          { value: 'nonaktif', label: 'Nonaktif / Berakhir' },
+          { value: 'batal', label: 'Dibatalkan' },
+        ],
+      },
     ],
   },
   {
@@ -97,14 +128,13 @@ export const resourceConfigs = [
     canEdit: ['admin', 'pimpinan', 'operator', 'sales'],
     canDelete: ['admin', 'pimpinan'],
     columns: [
-      { key: 'id_klien', label: 'ID' },
-      { key: 'nama_perusahaan', label: 'Perusahaan' },
+      { key: 'nama_perusahaan', label: 'Nama Perusahaan' },
       { key: 'alamat', label: 'Alamat' },
       { key: 'kontak', label: 'Kontak' },
       { key: 'layanan', label: 'Layanan' },
     ],
     fields: [
-      { name: 'id_kontrak', label: 'Kontrak', type: 'select', optionsResource: 'kontrak', optionValue: 'id_kontrak', optionLabel: 'no_kontrak', required: true },
+      { name: 'id_kontrak', label: 'Nomor Kontrak', type: 'select', optionsResource: 'kontrak', optionValue: 'id_kontrak', optionLabel: 'no_kontrak', required: true },
       { name: 'nama_perusahaan', label: 'Nama Perusahaan', type: 'text', required: true },
       { name: 'alamat', label: 'Alamat', type: 'textarea', required: true },
       { name: 'kontak', label: 'Kontak', type: 'text', required: true },
@@ -122,17 +152,18 @@ export const resourceConfigs = [
     canEdit: ['admin', 'pimpinan', 'operator', 'karyawan'],
     canDelete: ['admin', 'pimpinan'],
     columns: [
-      { key: 'id_pekerjaan', label: 'ID' },
-      { key: 'id_klien', label: 'Klien Penyewa Jasa' },
-      { key: 'id_pic', label: 'Penanggung Jawab (PIC Karyawan)' },
       { key: 'judul', label: 'Judul Pekerjaan' },
+      { key: 'id_klien', label: 'Nama Perusahaan (Klien)' },
+      { key: 'id_pic', label: 'Penanggung Jawab (PIC Karyawan)' },
       { key: 'tgl_penugasan', label: 'Tgl Memasukkan Tugas' },
       { key: 'deadline', label: 'Batas Waktu' },
       { key: 'status', label: 'Status' },
+      { key: 'lampiran_instruksi', label: 'Dokumen Acuan (TOR)' },
+      { key: 'file_tugas', label: 'Berkas Tugas Selesai' },
       { key: 'tgl_selesai', label: 'Tanggal Selesai' },
     ],
     fields: [
-      { name: 'id_klien', label: 'Klien yang Menyewa Jasa', type: 'select', optionsResource: 'klien', optionValue: 'id_klien', optionLabel: 'nama_perusahaan', required: true },
+      { name: 'id_klien', label: 'Nama Perusahaan (Klien)', type: 'select', optionsResource: 'klien', optionValue: 'id_klien', optionLabel: 'nama_perusahaan', required: true },
       {
         name: 'id_pic',
         label: 'Penanggung Jawab (PIC Karyawan)',
@@ -162,7 +193,27 @@ export const resourceConfigs = [
           { value: 'baru', label: 'Baru (Menunggu Dikerjakan)' },
           { value: 'in_progress', label: 'Dalam Pengerjaan' },
           { value: 'submitted', label: 'Diajukan untuk Ditinjau' },
+          { value: 'revision_needed', label: 'Perlu Revisi' },
+          { value: 'completed', label: 'Selesai' },
         ],
+      },
+      {
+        name: 'deskripsi',
+        label: 'Rincian & Instruksi Pekerjaan',
+        type: 'textarea',
+        rows: 4,
+        fullWidth: true,
+        required: false,
+        placeholder: 'Tuliskan instruksi penugasan, rincian pekerjaan, atau ruang lingkup yang harus diselesaikan karyawan...',
+      },
+      {
+        name: 'lampiran_instruksi',
+        label: 'Berkas Acuan / Dokumen Panduan (TOR / Brief)',
+        type: 'file',
+        multiple: true,
+        accept: '.pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx,.ppt,.pptx',
+        required: false,
+        fullWidth: true,
       },
     ],
   },
@@ -173,18 +224,28 @@ export const resourceConfigs = [
     primaryKey: 'id_reporting',
     displayField: 'catatan',
     allowedRoles: ['admin', 'karyawan', 'pimpinan'],
-    canCreate: ['admin', 'karyawan', 'pimpinan'],
-    canEdit: ['admin', 'karyawan', 'pimpinan'],
-    canDelete: ['admin', 'pimpinan'],
+    canCreate: ['admin', 'karyawan'],
+    canEdit: ['admin', 'karyawan'],
+    canDelete: ['admin'],
     columns: [
-      { key: 'id_reporting', label: 'ID' },
       { key: 'id_pekerjaan', label: 'Pekerjaan Terkait' },
+      { key: 'id_user', label: 'Karyawan Pelapor' },
       { key: 'tgl_lapor', label: 'Tanggal Lapor' },
       { key: 'dokumen_bukti', label: 'Dokumen Bukti' },
       { key: 'catatan', label: 'Catatan Laporan' },
+      { key: 'status_laporan', label: 'Status Peninjauan' },
     ],
     fields: [
-      { name: 'id_pekerjaan', label: 'Pilih Pekerjaan', type: 'select', optionsResource: 'pekerjaan', optionValue: 'id_pekerjaan', optionLabel: 'judul', required: true },
+      {
+        name: 'id_pekerjaan',
+        label: 'Judul Pekerjaan',
+        type: 'select',
+        optionsResource: 'pekerjaan',
+        optionsFilter: (job) => ['baru', 'in_progress', 'revision_needed'].includes(job.status),
+        optionValue: 'id_pekerjaan',
+        optionLabel: 'judul',
+        required: true,
+      },
       {
         name: 'tgl_lapor',
         label: 'Tanggal Lapor',
@@ -196,8 +257,10 @@ export const resourceConfigs = [
         name: 'dokumen_bukti',
         label: 'Upload Dokumen Bukti (PDF, Gambar, Zip, Dokumen)',
         type: 'file',
+        multiple: true,
         accept: '.pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx',
         required: false,
+        fullWidth: true,
       },
       { name: 'catatan', label: 'Catatan & Rincian Laporan', type: 'textarea', rows: 3, required: true },
     ],
@@ -213,19 +276,49 @@ export const resourceConfigs = [
     canEdit: ['admin', 'pimpinan'],
     canDelete: ['admin', 'pimpinan'],
     columns: [
-      { key: 'id_performance_review', label: 'ID' },
-      { key: 'id_pekerjaan', label: 'ID Tugas' },
-      { key: 'id_user', label: 'ID Karyawan' },
+      { key: 'id_user', label: 'Nama Karyawan' },
+      { key: 'id_pekerjaan', label: 'Judul Pekerjaan' },
       { key: 'speed_score', label: 'Skor Kecepatan' },
       { key: 'quality_score', label: 'Skor Kualitas' },
       { key: 'final_score', label: 'Skor Akhir' },
       { key: 'catatan', label: 'Catatan Review' },
     ],
     fields: [
-      { name: 'id_pekerjaan', label: 'Pekerjaan yang Direview', type: 'select', optionsResource: 'pekerjaan', optionValue: 'id_pekerjaan', optionLabel: 'judul', required: true },
-      { name: 'quality_score', label: 'Skor Kualitas (0-100)', type: 'number', required: true },
-      { name: 'revision_count', label: 'Jumlah Revisi', type: 'number' },
-      { name: 'catatan', label: 'Catatan Evaluasi', type: 'textarea' },
+      {
+        name: 'id_pekerjaan',
+        label: 'Judul Pekerjaan',
+        type: 'select',
+        optionsResource: 'pekerjaan',
+        optionValue: 'id_pekerjaan',
+        optionLabel: 'judul',
+        formatOptionLabel: (job) => `${job.judul} (PIC: ${job.pic?.nama || 'Tanpa PIC'})`,
+        optionsFilter: (job) => {
+          // 1. Wajib memiliki PIC karyawan
+          if (!job.id_pic) return false
+
+          // 2. Hanya tugas yang sudah selesai dan sudah disetujui oleh pimpinan
+          const statusLower = String(job.status || '').toLowerCase()
+          const reviewStatusLower = String(job.review_status || '').toLowerCase()
+          const isCompleted = ['completed', 'approved'].includes(statusLower)
+          const isApproved = reviewStatusLower === 'approved'
+          if (!isCompleted || !isApproved) return false
+
+          // 3. Tugas yang sudah dinilai kinerjanya JANGAN dimunculkan lagi
+          const hasReview = Boolean(
+            job.has_performance_review === true ||
+            job.performance_review?.id_performance_review ||
+            job.performance_review ||
+            job.performanceReview
+          )
+          if (hasReview) return false
+
+          return true
+        },
+        required: true,
+      },
+      { name: 'quality_score', label: 'Skor Kualitas (0-100)', type: 'number', required: true, min: 0, max: 100 },
+      { name: 'revision_count', label: 'Jumlah Revisi', type: 'number', min: 0, defaultValue: 0 },
+      { name: 'catatan', label: 'Catatan Evaluasi', type: 'textarea', rows: 3 },
     ],
   },
   {
@@ -239,7 +332,6 @@ export const resourceConfigs = [
     canEdit: ['admin', 'pimpinan'],
     canDelete: ['admin', 'pimpinan'],
     columns: [
-      { key: 'id_user', label: 'ID' },
       { key: 'nama', label: 'Nama Pengguna' },
       { key: 'email', label: 'Email' },
       { key: 'role', label: 'Role / Peran' },

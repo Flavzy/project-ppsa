@@ -151,13 +151,11 @@ class RoleMiddlewareTest extends TestCase
         $operator = User::factory()->create(['role' => 'operator']);
         $karyawan = User::factory()->create(['role' => 'karyawan']);
         $klien = \App\Models\Klien::factory()->create();
-        $template = \App\Models\TemplateDeadline::factory()->create();
 
         Sanctum::actingAs($operator);
         $response = $this->postJson('/api/pekerjaan', [
             'id_klien' => $klien->id_klien,
             'id_pic' => $karyawan->id_user,
-            'id_template' => $template->id_template,
             'judul' => 'Pembuatan Landing Page Klien',
             'deadline' => '2026-10-30',
             'status' => 'baru',

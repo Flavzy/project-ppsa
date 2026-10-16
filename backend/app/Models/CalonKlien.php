@@ -75,6 +75,7 @@ class CalonKlien extends Model
         'file_sk_kemenkumham_url',
         'file_izin_usaha_url',
         'file_dokumen_pendukung_url',
+        'file_dokumen_pendukung_urls',
     ];
 
     public function user(): BelongsTo
@@ -85,11 +86,6 @@ class CalonKlien extends Model
     public function kontrak(): HasOne
     {
         return $this->hasOne(Kontrak::class, 'id_calon_klien', 'id_calon_klien');
-    }
-
-    public function interactions(): HasMany
-    {
-        return $this->hasMany(LeadInteraction::class, 'id_calon_klien', 'id_calon_klien');
     }
 
     // Accessors for Document URLs
@@ -118,9 +114,52 @@ class CalonKlien extends Model
         return $this->file_izin_usaha ? Storage::disk('public')->url($this->file_izin_usaha) : null;
     }
 
+    public function getFileDokumenPendukungUrlsAttribute(): array
+    {
+        if (!$this->file_dokumen_pendukung) {
+            return [];
+        }
+
+        if (str_starts_with($this->file_dokumen_pendukung, '[') && str_ends_with($this->file_dokumen_pendukung, ']')) {
+            $decoded = json_decode($this->file_dokumen_pendukung, true);
+            if (is_array($decoded)) {
+                $result = [];
+                foreach ($decoded as $item) {
+                    $path = is_array($item) ? ($item['path'] ?? '') : $item;
+                    $name = is_array($item) ? ($item['name'] ?? basename($path)) : basename($path);
+                    if (!$path) {
+                        continue;
+                    }
+                    $url = (str_starts_with($path, 'http://') || str_starts_with($path, 'https://'))
+                        ? $path
+                        : Storage::disk('public')->url($path);
+                    $result[] = [
+                        'name' => $name,
+                        'url' => $url,
+                        'path' => $path,
+                    ];
+                }
+                return $result;
+            }
+        }
+
+        $url = (str_starts_with($this->file_dokumen_pendukung, 'http://') || str_starts_with($this->file_dokumen_pendukung, 'https://'))
+            ? $this->file_dokumen_pendukung
+            : Storage::disk('public')->url($this->file_dokumen_pendukung);
+
+        return [
+            [
+                'name' => basename($this->file_dokumen_pendukung),
+                'url' => $url,
+                'path' => $this->file_dokumen_pendukung,
+            ]
+        ];
+    }
+
     public function getFileDokumenPendukungUrlAttribute(): ?string
     {
-        return $this->file_dokumen_pendukung ? Storage::disk('public')->url($this->file_dokumen_pendukung) : null;
+        $urls = $this->file_dokumen_pendukung_urls;
+        return !empty($urls) ? $urls[0]['url'] : null;
     }
 
     /**

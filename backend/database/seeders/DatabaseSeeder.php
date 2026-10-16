@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
-use App\Models\LeadInteraction;
 use App\Models\Pekerjaan;
 use App\Models\PerformanceReview;
 use App\Models\Reporting;
@@ -78,22 +77,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         CalonKlien::factory()->lost()->create([
-            'id_user' => $sales->id_user,
-        ]);
-
-        // ── Lead Interactions ──
-        LeadInteraction::factory()->count(3)->create([
-            'id_calon_klien' => $leadDeal1->id_calon_klien,
-            'id_user' => $sales->id_user,
-        ]);
-
-        LeadInteraction::factory()->count(2)->create([
-            'id_calon_klien' => $leadDeal2->id_calon_klien,
-            'id_user' => $sales->id_user,
-        ]);
-
-        // Spread some interactions to other leads
-        LeadInteraction::factory()->count(5)->create([
             'id_user' => $sales->id_user,
         ]);
 
@@ -220,10 +203,10 @@ class DatabaseSeeder extends Seeder
             'id_user' => $karyawan1->id_user,
         ]);
 
-        Reporting::factory()->publishedToClient()->create([
+        Reporting::factory()->approved()->create([
             'id_pekerjaan' => $taskCompleted1->id_pekerjaan,
             'id_user' => $karyawan1->id_user,
-            'catatan' => 'Laporan hasil audit website telah dikirim ke klien.',
+            'catatan' => 'Laporan hasil audit website telah selesai dan disetujui.',
         ]);
 
         Reporting::factory()->create([
@@ -231,16 +214,15 @@ class DatabaseSeeder extends Seeder
             'id_user' => $karyawan2->id_user,
         ]);
 
-        Reporting::factory()->publishedToClient()->create([
+        Reporting::factory()->approved()->create([
             'id_pekerjaan' => $taskCompleted2->id_pekerjaan,
             'id_user' => $karyawan2->id_user,
-            'catatan' => 'Laporan konsultansi final dikirim ke klien.',
+            'catatan' => 'Laporan konsultansi final telah disetujui.',
         ]);
 
         Reporting::factory()->approved()->create([
             'id_pekerjaan' => $taskCompleted2->id_pekerjaan,
             'id_user' => $karyawan2->id_user,
-            'is_visible_to_client' => true,
             'catatan' => 'Laporan tambahan yang disetujui.',
         ]);
 

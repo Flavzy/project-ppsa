@@ -55,11 +55,11 @@ class CalonKlienResource extends JsonResource
             'file_izin_usaha_url' => $this->file_izin_usaha_url,
             'file_dokumen_pendukung' => $this->file_dokumen_pendukung,
             'file_dokumen_pendukung_url' => $this->file_dokumen_pendukung_url,
+            'file_dokumen_pendukung_urls' => $this->file_dokumen_pendukung_urls,
 
             // Relations
             'user' => new UserResource($this->whenLoaded('user')),
             'kontrak' => new KontrakResource($this->whenLoaded('kontrak')),
-            'interactions' => LeadInteractionResource::collection($this->whenLoaded('interactions')),
         ];
     }
 }

@@ -3,20 +3,38 @@ import LoadingSpinner from './common/LoadingSpinner'
 import { convertLead } from '../api/resources'
 
 export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
-  const [noKontrak, setNoKontrak] = useState(() => `KTR-${lead?.id_calon_klien}-${Date.now().toString().slice(-4)}`)
-  const [jenisDokumen, setJenisDokumen] = useState('kontrak')
-  const [tglMulai, setTglMulai] = useState(() => new Date().toISOString().split('T')[0])
+  const draftKey = `ppsa_draft_convert_${lead?.id_calon_klien}`
+  const savedDraft = (() => {
+    try {
+      const raw = localStorage.getItem(`ppsa_draft_convert_${lead?.id_calon_klien}`)
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })()
+
+  const [noKontrak, setNoKontrak] = useState(() => savedDraft?.noKontrak || `KTR-${lead?.id_calon_klien}-${Date.now().toString().slice(-4)}`)
+  const [jenisDokumen, setJenisDokumen] = useState(() => savedDraft?.jenisDokumen || 'kontrak')
+  const [tglMulai, setTglMulai] = useState(() => savedDraft?.tglMulai || new Date().toISOString().split('T')[0])
   const [tglSelesai, setTglSelesai] = useState(() => {
+    if (savedDraft?.tglSelesai) return savedDraft.tglSelesai
     const nextMonth = new Date()
     nextMonth.setDate(nextMonth.getDate() + 30)
     return nextMonth.toISOString().split('T')[0]
   })
-  const [alamat, setAlamat] = useState(lead?.alamat_perusahaan || 'Gedung Bisnis Center, Jakarta')
-  const [layanan, setLayanan] = useState('Implementasi & Konsultansi Sistem')
-  const [nilaiProyek, setNilaiProyek] = useState(() => lead?.nilai_estimasi || '')
+  const [alamat, setAlamat] = useState(() => savedDraft?.alamat || lead?.alamat_perusahaan || 'Gedung Bisnis Center, Jakarta')
+  const [layanan, setLayanan] = useState(() => savedDraft?.layanan || 'Implementasi & Konsultansi Sistem')
+  const [nilaiProyek, setNilaiProyek] = useState(() => (savedDraft?.nilaiProyek !== undefined ? savedDraft.nilaiProyek : (lead?.nilai_estimasi || '')))
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  // Simpan draf konversi otomatis ke localStorage
+  useEffect(() => {
+    if (!lead) return
+    const draft = { noKontrak, jenisDokumen, tglMulai, tglSelesai, alamat, layanan, nilaiProyek }
+    try {
+      localStorage.setItem(`ppsa_draft_convert_${lead.id_calon_klien}`, JSON.stringify(draft))
+    } catch {}
+  }, [lead, noKontrak, jenisDokumen, tglMulai, tglSelesai, alamat, layanan, nilaiProyek])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -51,6 +69,11 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
         layanan: layanan,
         nilai_proyek: nilaiProyek ? Number(nilaiProyek) : undefined,
       })
+
+      // Bersihkan draf konversi saat berhasil
+      try {
+        localStorage.removeItem(`ppsa_draft_convert_${lead.id_calon_klien}`)
+      } catch {}
 
       onSuccess(`Calon klien "${lead.nama_perusahaan}" berhasil dikonversi menjadi Kontrak & Klien aktif!`)
       onClose()
@@ -138,11 +161,13 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
-                Tanggal Mulai <span className="text-error-500">*</span>
+                Tanggal Mulai (Hanya Hari Ini) <span className="text-error-500">*</span>
               </label>
               <input
                 type="date"
                 value={tglMulai}
+                min={new Date().toISOString().split('T')[0]}
+                max={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setTglMulai(e.target.value)}
                 required
                 disabled={submitting}
@@ -156,6 +181,7 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
               <input
                 type="date"
                 value={tglSelesai}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setTglSelesai(e.target.value)}
                 required
                 disabled={submitting}
@@ -211,14 +237,14 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center justify-center h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 font-semibold text-sm text-white shadow-theme-xs shadow-brand-500/20 transition-all cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 h-10 px-6 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 font-semibold text-sm text-white shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
               {submitting ? (
                 <>

@@ -20,6 +20,8 @@ class ReviewPekerjaanRequest extends FormRequest
         return [
             'approved_by' => ['nullable', 'integer'],
             'catatan_review' => ['nullable', 'string'],
+            'quality_score' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'catatan_evaluasi' => ['nullable', 'string'],
         ];
     }
 }

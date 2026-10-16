@@ -140,44 +140,65 @@ export default function DetailLegalitasModal({ record, onClose }) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {item.fileUrl ? (
-                        <a
-                          href={item.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-brand-50 text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-400 transition-colors"
-                        >
-                          <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          Buka File
-                        </a>
-                      ) : (
+                      {item.fileUrl ? (() => {
+                        const fileName = decodeURIComponent(item.fileUrl.split('/').pop()) || 'Buka File'
+                        return (
+                          <a
+                            href={item.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-[220px]"
+                            title={`Buka / Unduh ${fileName}`}
+                          >
+                            <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span className="truncate">{fileName}</span>
+                          </a>
+                        )
+                      })() : (
                         <span className="text-xs text-gray-400">Tidak ada berkas</span>
                       )}
                     </td>
                   </tr>
                 ))}
-                {record.file_dokumen_pendukung_url && (
+                {Boolean(record.file_dokumen_pendukung_urls?.length || record.file_dokumen_pendukung_url) && (
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
                       Dokumen Pendukung Tambahan
+                      {record.file_dokumen_pendukung_urls && record.file_dokumen_pendukung_urls.length > 1 && (
+                        <span className="ml-1.5 text-[11px] font-normal text-gray-500 dark:text-gray-400">
+                          ({record.file_dokumen_pendukung_urls.length} Berkas)
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-400">-</td>
                     <td className="px-4 py-3 text-center">
-                      <a
-                        href={record.file_dokumen_pendukung_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-brand-50 text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-400 transition-colors"
-                      >
-                        <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        Buka File
-                      </a>
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {(record.file_dokumen_pendukung_urls && record.file_dokumen_pendukung_urls.length > 0
+                          ? record.file_dokumen_pendukung_urls
+                          : [{ name: 'Buka File', url: record.file_dokumen_pendukung_url }]
+                        ).map((doc, idx) => {
+                          const docName = doc.name || (doc.url ? decodeURIComponent(doc.url.split('/').pop()) : `Berkas ${idx + 1}`)
+                          return (
+                            <a
+                              key={idx}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-[220px]"
+                              title={`Buka / Unduh ${docName}`}
+                            >
+                              <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                              <span className="truncate">{docName}</span>
+                            </a>
+                          )
+                        })}
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -191,7 +212,7 @@ export default function DetailLegalitasModal({ record, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
           >
             Tutup
           </button>

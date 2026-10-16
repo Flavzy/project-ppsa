@@ -23,7 +23,7 @@ class UpdateCalonKlienRequest extends FormRequest
             'nama_perusahaan' => ['sometimes', 'required', 'string', 'max:255'],
             'alamat_perusahaan' => ['nullable', 'string'],
             'nama_direktur' => ['nullable', 'string', 'max:255'],
-            'kontak_person' => ['nullable', 'string', 'max:255'],
+            'kontak_person' => ['nullable', 'string', 'max:16', 'regex:/^[0-9]+$/'],
             'decision_maker' => ['nullable', 'string', 'max:255'],
             'kontak' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
@@ -49,8 +49,27 @@ class UpdateCalonKlienRequest extends FormRequest
             'file_npwp' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'file_akta_pendirian' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'file_sk_kemenkumham' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
-            'file_izin_usaha' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
-            'file_dokumen_pendukung' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,zip,rar', 'max:20480'],
+            'file_dokumen_pendukung' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    $files = is_array($value) ? $value : [$value];
+                    $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar', 'doc', 'docx', 'xls', 'xlsx'];
+                    foreach ($files as $file) {
+                        if ($file instanceof \Illuminate\Http\UploadedFile) {
+                            if ($file->getSize() > 20480 * 1024) {
+                                $fail("Ukuran file {$file->getClientOriginalName()} melebihi batas 20MB.");
+                            }
+                            $ext = strtolower($file->getClientOriginalExtension());
+                            if (!in_array($ext, $allowedExts, true)) {
+                                $fail("Format file {$file->getClientOriginalName()} ({$ext}) tidak didukung.");
+                            }
+                        }
+                    }
+                },
+            ],
+            'file_dokumen_pendukung_existing' => ['nullable'],
+            'file_dokumen_pendukung_existing.*' => ['nullable', 'string'],
+            'file_dokumen_pendukung_existing_present' => ['nullable', 'string'],
         ];
     }
 }

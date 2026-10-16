@@ -2,17 +2,14 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalonKlienController;
-use App\Http\Controllers\Api\ClientReportController;
 use App\Http\Controllers\Api\DashboardSummaryController;
 use App\Http\Controllers\Api\KlienController;
 use App\Http\Controllers\Api\KontrakController;
 use App\Http\Controllers\Api\LeadConversionController;
-use App\Http\Controllers\Api\LeadInteractionController;
 use App\Http\Controllers\Api\PekerjaanController;
 use App\Http\Controllers\Api\PekerjaanWorkflowController;
 use App\Http\Controllers\Api\PerformanceReviewController;
 use App\Http\Controllers\Api\ReportingController;
-use App\Http\Controllers\Api\ReportingWorkflowController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,7 +30,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('role:admin,pimpinan')->name('users.destroy');
 
     Route::get('dashboard-summary', DashboardSummaryController::class)->name('dashboard-summary');
-    Route::get('client-reports', [ClientReportController::class, 'index'])->name('client-reports.index');
 
     // Calon Klien & Conversion
     Route::post('calon-klien/{calonKlien}/convert', [LeadConversionController::class, 'store'])
@@ -45,15 +41,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('calon-klien', CalonKlienController::class)
         ->except(['destroy'])
         ->parameters(['calon-klien' => 'calonKlien'])
-        ->middleware('role:admin,pimpinan,operator,sales');
-
-    // Lead Interactions
-    Route::delete('lead-interactions/{leadInteraction}', [LeadInteractionController::class, 'destroy'])
-        ->middleware('role:admin,pimpinan')
-        ->name('lead-interactions.destroy');
-    Route::apiResource('lead-interactions', LeadInteractionController::class)
-        ->except(['destroy'])
-        ->parameters(['lead-interactions' => 'leadInteraction'])
         ->middleware('role:admin,pimpinan,operator,sales');
 
     // Kontrak
@@ -73,6 +60,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->middleware('role:admin,pimpinan,operator,sales,karyawan');
 
     // Pekerjaan Workflow
+    Route::post('pekerjaan/{pekerjaan}/start', [PekerjaanWorkflowController::class, 'start'])
+        ->middleware('role:admin,karyawan,pimpinan')
+        ->name('pekerjaan.start');
     Route::post('pekerjaan/{pekerjaan}/submit', [PekerjaanWorkflowController::class, 'submit'])
         ->middleware('role:admin,karyawan,pimpinan')
         ->name('pekerjaan.submit');
@@ -97,11 +87,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->middleware('role:admin,pimpinan,karyawan,operator')->name('pekerjaan.show');
     Route::match(['put', 'patch'], 'pekerjaan/{pekerjaan}', [PekerjaanController::class, 'update'])
         ->middleware('role:admin,pimpinan,karyawan,operator')->name('pekerjaan.update');
-
-    // Reporting Workflow
-    Route::post('reporting/{reporting}/publish-client', [ReportingWorkflowController::class, 'publishClient'])
-        ->middleware('role:admin,pimpinan')
-        ->name('reporting.publish-client');
 
     // Reporting:
     // destroy restricted to admin,pimpinan

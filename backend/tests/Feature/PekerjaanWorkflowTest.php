@@ -6,7 +6,6 @@ use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Models\Pekerjaan;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -21,9 +20,11 @@ class PekerjaanWorkflowTest extends TestCase
         [$leader, $task, $pic] = $this->createTask();
 
         Sanctum::actingAs($pic);
+        $file = \Illuminate\Http\UploadedFile::fake()->create('tugas.pdf', 100);
         $submitResponse = $this
             ->postJson("/api/pekerjaan/{$task->id_pekerjaan}/submit", [
                 'progress_persen' => 90,
+                'file_tugas' => $file,
             ]);
 
         $submitResponse->assertOk()
@@ -35,12 +36,19 @@ class PekerjaanWorkflowTest extends TestCase
             ->postJson("/api/pekerjaan/{$task->id_pekerjaan}/approve", [
                 'approved_by' => $leader->id_user,
                 'catatan_review' => 'Hasil sudah sesuai.',
+                'quality_score' => 90,
+                'catatan_evaluasi' => 'Pekerjaan sangat memuaskan.',
             ]);
 
         $approveResponse->assertOk()
             ->assertJsonPath('data.status', 'completed')
             ->assertJsonPath('data.progress_persen', 100)
             ->assertJsonPath('data.review_status', 'approved');
+
+        $this->assertDatabaseHas('performance_reviews', [
+            'id_pekerjaan' => $task->id_pekerjaan,
+            'quality_score' => 90,
+        ]);
     }
 
     public function test_task_can_be_rejected_for_revision(): void
@@ -60,10 +68,61 @@ class PekerjaanWorkflowTest extends TestCase
             ->assertJsonPath('data.catatan_review', 'Perlu revisi bukti kerja.');
     }
 
+    public function test_task_can_be_started_by_assigned_karyawan(): void
+    {
+        [$leader, $task, $pic] = $this->createTask('baru');
+
+        Sanctum::actingAs($pic);
+        $response = $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/start");
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
+
+        $this->assertDatabaseHas('pekerjaan', [
+            'id_pekerjaan' => $task->id_pekerjaan,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    public function test_karyawan_cannot_start_others_task(): void
+    {
+        [$leader, $task] = $this->createTask('baru');
+        $otherKaryawan = User::factory()->create(['role' => 'karyawan']);
+
+        Sanctum::actingAs($otherKaryawan);
+        $response = $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/start");
+
+        $response->assertForbidden();
+    }
+
+    public function test_cannot_start_task_that_is_not_new(): void
+    {
+        [$leader, $task, $pic] = $this->createTask('in_progress');
+
+        Sanctum::actingAs($pic);
+        $response = $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/start");
+
+        $response->assertStatus(422);
+    }
+
+    public function test_cannot_report_task_that_is_already_completed(): void
+    {
+        [$leader, $task, $pic] = $this->createTask('completed');
+
+        Sanctum::actingAs($pic);
+        $response = $this->postJson('/api/reporting', [
+            'id_pekerjaan' => $task->id_pekerjaan,
+            'tgl_lapor' => '2026-10-13',
+            'catatan' => 'Mencoba lapor tugas yang sudah selesai.',
+        ]);
+
+        $response->assertStatus(422);
+    }
+
     /**
      * @return array{0: User, 1: Pekerjaan, 2: User}
      */
-    private function createTask(): array
+    private function createTask(string $status = 'in_progress'): array
     {
         $leader = User::factory()->create(['role' => 'pimpinan']);
         $pic = User::factory()->create(['role' => 'karyawan']);
@@ -90,19 +149,14 @@ class PekerjaanWorkflowTest extends TestCase
             'kontak' => '08123456789',
             'layanan' => 'Audit',
         ]);
-        $template = TemplateDeadline::create([
-            'nama_template' => 'Standar',
-            'keterangan' => 'Template standar',
-        ]);
         $task = Pekerjaan::create([
             'id_klien' => $client->id_klien,
             'id_pic' => $pic->id_user,
-            'id_template' => $template->id_template,
             'judul' => 'Pekerjaan Test',
             'deadline' => '2026-09-30',
             'prioritas' => 'high',
             'progress_persen' => 50,
-            'status' => 'in_progress',
+            'status' => $status,
         ]);
 
         return [$leader, $task, $pic];

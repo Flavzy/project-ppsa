@@ -18,7 +18,6 @@ class RouteProtectionTest extends TestCase
     {
         $this->getJson('/api/users')->assertUnauthorized();
         $this->getJson('/api/dashboard-summary')->assertUnauthorized();
-        $this->getJson('/api/client-reports')->assertUnauthorized();
         $this->getJson('/api/calon-klien')->assertUnauthorized();
         $this->getJson('/api/pekerjaan')->assertUnauthorized();
         $this->getJson('/api/kontrak')->assertUnauthorized();
@@ -132,26 +131,11 @@ class RouteProtectionTest extends TestCase
         $task = Pekerjaan::factory()->inProgress()->create(['id_pic' => $karyawan->id_user]);
 
         Sanctum::actingAs($karyawan);
-        $response = $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/submit");
+        $file = \Illuminate\Http\UploadedFile::fake()->create('tugas.pdf', 100);
+        $response = $this->postJson("/api/pekerjaan/{$task->id_pekerjaan}/submit", [
+            'file_tugas' => $file,
+        ]);
         $response->assertOk();
-    }
-
-    public function test_reporting_publication_role_authorization(): void
-    {
-        $pimpinan = User::factory()->create(['role' => 'pimpinan']);
-        $karyawan = User::factory()->create(['role' => 'karyawan']);
-        $reporting = Reporting::factory()->create(['is_visible_to_client' => false]);
-
-        // Pimpinan is allowed
-        Sanctum::actingAs($pimpinan);
-        $this->postJson("/api/reporting/{$reporting->id_reporting}/publish-client")
-            ->assertOk();
-
-        // Karyawan is forbidden
-        $reporting2 = Reporting::factory()->create(['is_visible_to_client' => false]);
-        Sanctum::actingAs($karyawan);
-        $this->postJson("/api/reporting/{$reporting2->id_reporting}/publish-client")
-            ->assertForbidden();
     }
 
     public function test_dashboard_summary_accessible_by_authenticated_user(): void
@@ -162,14 +146,5 @@ class RouteProtectionTest extends TestCase
         $this->getJson('/api/dashboard-summary')
             ->assertOk()
             ->assertJsonStructure(['data' => ['totals', 'lead_by_status', 'contract_by_status', 'work_by_status']]);
-    }
-
-    public function test_client_report_access_requires_authentication(): void
-    {
-        $this->getJson('/api/client-reports')->assertUnauthorized();
-
-        $user = User::factory()->create(['role' => 'pimpinan']);
-        Sanctum::actingAs($user);
-        $this->getJson('/api/client-reports')->assertOk();
     }
 }

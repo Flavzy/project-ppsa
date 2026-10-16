@@ -5,11 +5,9 @@ namespace Tests\Feature;
 use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
-use App\Models\LeadInteraction;
 use App\Models\Pekerjaan;
 use App\Models\PerformanceReview;
 use App\Models\Reporting;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -125,7 +123,8 @@ class EndToEndIntegrationTest extends TestCase
         // Karyawan cannot access CRM routes (403 Forbidden)
         $this->withToken($token)->getJson('/api/calon-klien')->assertForbidden();
         $this->withToken($token)->getJson('/api/kontrak')->assertForbidden();
-        $this->withToken($token)->getJson('/api/klien')->assertForbidden();
+        // Karyawan can view clients
+        $this->withToken($token)->getJson('/api/klien')->assertOk();
     }
 
     /**
@@ -285,7 +284,7 @@ class EndToEndIntegrationTest extends TestCase
         $reportRes = $this->withToken($tokenA)->postJson('/api/reporting', [
             'id_pekerjaan' => $task->id_pekerjaan,
             'id_user' => $karyawanB->id_user, // Attempted spoof
-            'tgl_lapor' => '2026-09-19',
+            'tgl_lapor' => now()->toDateString(),
             'catatan' => 'Laporan dari karyawan A',
         ]);
 
@@ -357,21 +356,11 @@ class EndToEndIntegrationTest extends TestCase
         $leadRes->assertCreated();
         $idCalonKlien = $leadRes->json('data.id_calon_klien');
 
-        // Step 2: Sales logs interaction
-        $interactionRes = $this->withToken($salesToken)->postJson('/api/lead-interactions', [
-            'id_calon_klien' => $idCalonKlien,
-            'id_user' => $sales->id_user,
-            'tipe_interaksi' => 'meeting',
-            'tanggal_interaksi' => '2026-09-19',
-            'ringkasan' => 'Kesepakatan kontrak awal dicapai.',
-        ]);
-        $interactionRes->assertCreated();
-
-        // Step 3: Sales converts deal lead to contract and client
+        // Step 2: Sales converts deal lead to contract and client
         $convertRes = $this->withToken($salesToken)->postJson("/api/calon-klien/{$idCalonKlien}/convert", [
             'no_kontrak' => 'KTR-PPSA-2026-001',
             'jenis_dokumen' => 'kontrak',
-            'tgl_mulai' => '2026-09-19',
+            'tgl_mulai' => now()->toDateString(),
             'tgl_selesai' => '2026-12-31',
             'alamat' => 'Gedung Wisma Bisnis Lt. 5, Jakarta',
             'layanan' => 'Implementasi Sistem Informasi Manajemen',
@@ -383,16 +372,10 @@ class EndToEndIntegrationTest extends TestCase
         $this->flushHeaders();
         auth()->forgetGuards();
 
-        // Step 4: Admin creates Template and Task for Karyawan
-        $template = TemplateDeadline::create([
-            'nama_template' => 'Implementasi Standard',
-            'keterangan' => 'Template milestone implementasi',
-        ]);
-
+        // Step 4: Admin creates Task for Karyawan
         $taskRes = $this->withToken($adminToken)->postJson('/api/pekerjaan', [
             'id_klien' => $idKlien,
             'id_pic' => $karyawan->id_user,
-            'id_template' => $template->id_template,
             'judul' => 'Setup dan Konfigurasi Database',
             'deadline' => '2026-10-15',
             'prioritas' => 'high',
@@ -413,14 +396,16 @@ class EndToEndIntegrationTest extends TestCase
 
         $this->withToken($karyawanToken)->postJson('/api/reporting', [
             'id_pekerjaan' => $idPekerjaan,
-            'tgl_lapor' => '2026-09-19',
+            'tgl_lapor' => now()->toDateString(),
             'catatan' => 'Migrasi dan verifikasi data selesai.',
             'progress_saat_lapor' => 80,
         ])->assertCreated();
 
         // Step 6: Karyawan submits task for review
+        $file = \Illuminate\Http\UploadedFile::fake()->create('tugas.pdf', 100);
         $submitRes = $this->withToken($karyawanToken)->postJson("/api/pekerjaan/{$idPekerjaan}/submit", [
             'progress_persen' => 100,
+            'file_tugas' => $file,
         ]);
         $submitRes->assertOk()
             ->assertJsonPath('data.status', 'submitted')

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getDashboardSummary } from '../api/resources'
+import { getCachedApiData } from '../api/client'
 import { useAuth } from '../auth/useAuth'
 import Badge from './ui/Badge'
 import GridShape from './common/GridShape'
 import LoadingSpinner from './common/LoadingSpinner'
+import DeadlineBadge from './common/DeadlineBadge'
 
 // Status labels & Tailwind color maps
 const WORK_STATUS_CONFIG = {
@@ -19,17 +21,19 @@ const WORK_STATUS_CONFIG = {
 }
 
 const LEAD_STATUS_CONFIG = {
-  prospek: { label: 'Prospek Awal', color: 'bg-gray-400', badgeColor: 'light' },
-  approach: { label: 'Pendekatan', color: 'bg-blue-light-500', badgeColor: 'info' },
-  negotiation: { label: 'Negosiasi', color: 'bg-warning-500', badgeColor: 'warning' },
   deal: { label: 'Deal (Berhasil)', color: 'bg-success-500', badgeColor: 'success' },
-  lost: { label: 'Batal / Lost', color: 'bg-error-400', badgeColor: 'error' },
+  belum_deal: { label: 'Belum Deal', color: 'bg-warning-500', badgeColor: 'warning' },
+  prospek: { label: 'Belum Deal', color: 'bg-warning-500', badgeColor: 'warning' },
+  approach: { label: 'Belum Deal', color: 'bg-warning-500', badgeColor: 'warning' },
+  negotiation: { label: 'Belum Deal', color: 'bg-warning-500', badgeColor: 'warning' },
+  lost: { label: 'Belum Deal (Lost)', color: 'bg-error-400', badgeColor: 'error' },
 }
 
 const CONTRACT_STATUS_CONFIG = {
   draft: { label: 'Draft', color: 'bg-gray-400', badgeColor: 'light' },
   aktif: { label: 'Aktif Berjalan', color: 'bg-success-500', badgeColor: 'success' },
   selesai: { label: 'Selesai', color: 'bg-blue-light-500', badgeColor: 'info' },
+  nonaktif: { label: 'Nonaktif / Berakhir', color: 'bg-warning-500', badgeColor: 'warning' },
   batal: { label: 'Dibatalkan', color: 'bg-error-500', badgeColor: 'error' },
 }
 
@@ -123,7 +127,7 @@ function WelcomeBannerWidget({ user }) {
           <img
             src="/img/welcome.svg"
             alt="SIM-KK Welcome"
-            className="w-36 md:w-44 h-auto object-contain drop-shadow-xs"
+            className="w-36 md:w-44 h-auto object-contain drop-shadow-xs animate-welcome-entrance"
           />
         </div>
       </div>
@@ -236,7 +240,7 @@ function LeaderboardTable({ employees }) {
 
                 return (
                   <tr key={emp.id_user} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 align-middle">
                       <span
                         className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-bold ${
                           isTop3 ? rankBadges[index] : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
@@ -245,7 +249,7 @@ function LeaderboardTable({ employees }) {
                         #{index + 1}
                       </span>
                     </td>
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 align-middle">
                       <div className="flex items-center gap-2.5">
                         <div className="size-8 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-xs">
                           {emp.nama ? emp.nama.charAt(0).toUpperCase() : 'K'}
@@ -258,10 +262,10 @@ function LeaderboardTable({ employees }) {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-gray-600 dark:text-gray-300 font-medium">
+                    <td className="py-3 px-3 align-middle text-gray-600 dark:text-gray-300 font-medium">
                       {emp.total_reviews} evaluasi
                     </td>
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-3 px-3 align-middle text-right">
                       <Badge
                         size="sm"
                         color={emp.average_score >= 80 ? 'success' : emp.average_score >= 60 ? 'warning' : 'error'}
@@ -288,7 +292,7 @@ function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStat
         <MetricCard
           title="Total Calon Klien"
           value={totals.leads ?? 0}
-          subtitle={`${totals.lead_deal ?? 0} Deal / ${totals.lead_lost ?? 0} Lost`}
+          subtitle={`${totals.lead_deal ?? 0} Deal / ${totals.lead_lost ?? 0} Belum Deal`}
           icon={
             <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -488,10 +492,16 @@ function PimpinanDashboardView({ totals, workByStatus, leadByStatus, employeeSco
   )
 }
 
-// Subcomponent: Sales Dashboard View
-function SalesDashboardView({ totals, leadByStatus, contractByStatus }) {
+// Subcomponent: Sales & Operator Dashboard View
+function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStatus }) {
   return (
     <>
+      {/* 1. Ringkasan Pipeline & Penjualan (CRM) */}
+      <div className="mb-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Ringkasan Pipeline CRM & Kontrak
+        </h3>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <MetricCard
           title="Total Calon Klien"
@@ -518,15 +528,15 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus }) {
         />
 
         <MetricCard
-          title="Prospek Lost"
+          title="Belum Deal"
           value={totals.lead_lost ?? 0}
-          subtitle="Peluang terhenti"
+          subtitle="Belum berlanjut kontrak"
           icon={
             <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           }
-          iconBg="bg-gray-100 text-gray-500 dark:bg-gray-800"
+          iconBg="bg-warning-50 text-warning-600 dark:bg-warning-500/15"
         />
 
         <MetricCard
@@ -554,10 +564,68 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus }) {
         />
       </div>
 
+      {/* 2. Ringkasan Tugas & Pekerjaan Karyawan */}
+      <div className="mb-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Ringkasan Operasional Tugas & Pekerjaan
+        </h3>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <MetricCard
+          title="Total Pekerjaan"
+          value={totals.tasks ?? 0}
+          subtitle="Penugasan operasional"
+          icon={
+            <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          }
+          iconBg="bg-brand-50 text-brand-600 dark:bg-brand-500/15"
+        />
+
+        <MetricCard
+          title="Dalam Pengerjaan"
+          value={totals.in_progress_tasks ?? 0}
+          subtitle="Sedang diproses karyawan"
+          icon={
+            <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          iconBg="bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15"
+        />
+
+        <MetricCard
+          title="Menunggu Review"
+          value={totals.submitted_tasks ?? 0}
+          subtitle="Tugas diajukan karyawan"
+          icon={
+            <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          iconBg="bg-warning-50 text-warning-600 dark:bg-warning-500/15"
+        />
+
+        <MetricCard
+          title="Tugas Terlambat"
+          value={totals.overdue_tasks ?? 0}
+          subtitle={totals.overdue_tasks > 0 ? 'Melewati batas deadline' : 'Semua pengerjaan tepat waktu'}
+          icon={
+            <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          }
+          iconBg="bg-error-50 text-error-600 dark:bg-error-500/15"
+          alert={totals.overdue_tasks > 0}
+        />
+      </div>
+
+      {/* 3. Distribusi Status & Funnel */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-7">
+        <div className="md:col-span-4">
           <StatusBreakdownCard
-            title="Funnel Tahapan Calon Klien (CRM)"
+            title="Funnel Calon Klien"
             icon={
               <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -568,9 +636,9 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus }) {
             totalLabel="Total Calon Klien"
           />
         </div>
-        <div className="md:col-span-5">
+        <div className="md:col-span-4">
           <StatusBreakdownCard
-            title="Distribusi Status Kontrak"
+            title="Distribusi Kontrak"
             icon={
               <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -581,15 +649,127 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus }) {
             totalLabel="Total Kontrak"
           />
         </div>
+        <div className="md:col-span-4">
+          <StatusBreakdownCard
+            title="Distribusi Pekerjaan"
+            icon={
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            }
+            data={workByStatus}
+            configMap={WORK_STATUS_CONFIG}
+            totalLabel="Total Pekerjaan"
+          />
+        </div>
       </div>
     </>
   )
 }
 
 // Subcomponent: Karyawan Dashboard View
-function KaryawanDashboardView({ totals, workByStatus, recentTasks = [] }) {
+function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], onNavigate }) {
+  const revisionTasks = recentTasks.filter(
+    (task) => task.status === 'revision_needed' || task.status === 'revision'
+  )
+
   return (
     <>
+      {/* ⚠️ Alert Banner: Tugas Perlu Segera Direvisi */}
+      {revisionTasks.length > 0 && (
+        <div className="relative overflow-hidden rounded-3xl border-2 border-amber-400 bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 p-5 sm:p-6 shadow-md shadow-amber-500/10 dark:border-amber-600/70 dark:from-amber-950/40 dark:via-amber-900/25 dark:to-amber-950/30 mb-6">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
+                <svg className="size-6.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white tracking-wide uppercase">
+                    Peringatan Tindakan
+                  </span>
+                  <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    {revisionTasks.length} Tugas Perlu Segera Diperbaiki
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                  Ada tugas yang perlu segera Anda perbaiki!
+                </h3>
+                <p className="mt-1 text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed max-w-3xl">
+                  Pimpinan telah memeriksa hasil tugas Anda dan meminta perbaikan. Mohon tinjau catatan instruksi di bawah ini dan unggah kembali hasil revisi agar pekerjaan dapat disetujui.
+                </p>
+              </div>
+            </div>
+
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('reporting')}
+                className="shrink-0 inline-flex items-center justify-center gap-2 h-10 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs sm:text-sm shadow-sm transition-all active:scale-95 cursor-pointer"
+              >
+                <span>Buka Menu Reporting</span>
+                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* List of Tasks Needing Revision */}
+          <div className="mt-5 space-y-3">
+            {revisionTasks.map((task) => (
+              <div
+                key={task.id_pekerjaan}
+                className="rounded-2xl border border-amber-300/80 bg-white/90 p-4 dark:border-amber-700/60 dark:bg-gray-900/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">
+                      {task.judul}
+                    </span>
+                    <span className="text-2xs px-2 py-0.5 rounded-md font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                      Klien: {task.klien}
+                    </span>
+                    {task.deadline && (
+                      <span className="text-2xs px-2 py-0.5 rounded-md font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                        Batas Deadline: {task.deadline}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Catatan Perbaikan dari Pimpinan */}
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 text-xs">
+                    <span className="font-bold text-amber-900 dark:text-amber-300">
+                      💬 Catatan Perbaikan dari Pimpinan:
+                    </span>{' '}
+                    <span className="text-gray-800 dark:text-gray-200 font-medium italic">
+                      "{task.catatan_review || 'Mohon periksa kembali berkas tugas dan sesuaikan sesuai instruksi pimpinan.'}"
+                    </span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex items-center gap-2">
+                  {onNavigate && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('reporting')}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                    >
+                      <span>Perbaiki Sekarang</span>
+                      <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard
           title="Total Tugas Saya"
@@ -732,21 +912,33 @@ function KaryawanDashboardView({ totals, workByStatus, recentTasks = [] }) {
                   const statusInfo = WORK_STATUS_CONFIG[task.status] || { label: task.status, badgeColor: 'light' }
                   return (
                     <tr key={task.id_pekerjaan} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                      <td className="py-3.5 px-3">
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {task.judul}
-                        </span>
+                      <td className="py-3.5 px-3 align-middle">
+                        <div className="flex flex-col max-w-xs">
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {task.judul}
+                          </span>
+                          {task.deskripsi && (
+                            <span className="text-xs text-gray-400 line-clamp-1 truncate" title={task.deskripsi}>
+                              {task.deskripsi}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300">
+                      <td className="py-3.5 px-3 align-middle text-gray-600 dark:text-gray-300">
                         {task.klien}
                       </td>
-                      <td className="py-3.5 px-3 text-gray-500 dark:text-gray-400 text-xs">
+                      <td className="py-3.5 px-3 align-middle text-gray-500 dark:text-gray-400 text-xs">
                         {task.tgl_penugasan}
                       </td>
-                      <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300 font-mono text-xs">
-                        {task.deadline}
+                      <td className="py-3.5 px-3 align-middle">
+                        <DeadlineBadge
+                          deadline={task.deadline}
+                          status={task.status}
+                          submittedAt={task.submitted_at}
+                          tglSelesai={task.tgl_selesai}
+                        />
                       </td>
-                      <td className="py-3.5 px-3 text-right">
+                      <td className="py-3.5 px-3 align-middle text-right">
                         <Badge size="sm" color={statusInfo.badgeColor}>
                           {statusInfo.label}
                         </Badge>
@@ -763,10 +955,11 @@ function KaryawanDashboardView({ totals, workByStatus, recentTasks = [] }) {
   )
 }
 
-export default function DashboardView() {
+export default function DashboardView({ onNavigate }) {
   const { user } = useAuth()
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const cachedData = getCachedApiData('dashboard-summary')
+  const [summary, setSummary] = useState(cachedData)
+  const [loading, setLoading] = useState(!cachedData)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -796,7 +989,7 @@ export default function DashboardView() {
     }
   }, [])
 
-  if (loading) {
+  if (loading && !summary) {
     return <LoadingSpinner size="screen" text="" />
   }
 
@@ -837,6 +1030,7 @@ export default function DashboardView() {
           totals={totals}
           leadByStatus={leadByStatus}
           contractByStatus={contractByStatus}
+          workByStatus={workByStatus}
         />
       )}
 
@@ -845,6 +1039,7 @@ export default function DashboardView() {
           totals={totals}
           workByStatus={workByStatus}
           recentTasks={summary?.recent_tasks || []}
+          onNavigate={onNavigate}
         />
       )}
     </div>

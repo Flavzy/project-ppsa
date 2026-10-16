@@ -9,6 +9,7 @@ use App\Http\Resources\CalonKlienResource;
 use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
+use App\Helpers\FileUploadHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -32,7 +33,7 @@ class CalonKlienController extends Controller
         Gate::authorize('viewAny', CalonKlien::class);
 
         $calonKlien = CalonKlien::query()
-            ->with(['user', 'kontrak.klien', 'interactions'])
+            ->with(['user', 'kontrak.klien'])
             ->orderByDesc('id_calon_klien')
             ->get();
 
@@ -57,20 +58,35 @@ class CalonKlienController extends Controller
         }
 
         if (empty($data['status_prospek'])) {
-            $data['status_prospek'] = 'prospek';
+            $data['status_prospek'] = 'belum_deal';
         }
 
         // Handle file uploads
         foreach (self::FILE_FIELDS as $field) {
             if ($request->hasFile($field)) {
-                $data[$field] = $request->file($field)->store('dokumen_legalitas', 'public');
+                $file = $request->file($field);
+                if ($field === 'file_dokumen_pendukung') {
+                    $files = is_array($file) ? $file : [$file];
+                    $storedList = [];
+                    foreach ($files as $f) {
+                        if ($f instanceof \Illuminate\Http\UploadedFile) {
+                            $storedList[] = [
+                                'path' => FileUploadHelper::storeWithOriginalName($f, 'dokumen_legalitas', 'public'),
+                                'name' => $f->getClientOriginalName(),
+                            ];
+                        }
+                    }
+                    $data[$field] = !empty($storedList) ? json_encode($storedList) : null;
+                } else {
+                    $data[$field] = FileUploadHelper::storeWithOriginalName($file, 'dokumen_legalitas', 'public');
+                }
             }
         }
 
         $calonKlien = CalonKlien::create($data);
         $this->autoGenerateKontrakAndKlien($calonKlien);
 
-        return (new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien', 'interactions'])))
+        return (new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien'])))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
@@ -79,7 +95,7 @@ class CalonKlienController extends Controller
     {
         Gate::authorize('view', $calonKlien);
 
-        return new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien', 'interactions']));
+        return new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien']));
     }
 
     public function update(UpdateCalonKlienRequest $request, CalonKlien $calonKlien): CalonKlienResource
@@ -87,9 +103,6 @@ class CalonKlienController extends Controller
         Gate::authorize('update', $calonKlien);
 
         $data = $request->validated();
-        if (in_array($request->user()->role, ['operator', 'sales'], true)) {
-            unset($data['id_user']);
-        }
 
         // Sync kontak and kontak_person
         if (!empty($data['kontak_person']) && empty($data['kontak'])) {
@@ -98,20 +111,81 @@ class CalonKlienController extends Controller
             $data['kontak_person'] = $data['kontak'];
         }
 
-        // Handle file uploads (replace old file if new one is uploaded)
+        // Handle file uploads (replace old file if new one is uploaded, or merge for multiple)
         foreach (self::FILE_FIELDS as $field) {
-            if ($request->hasFile($field)) {
-                if ($calonKlien->$field && Storage::disk('public')->exists($calonKlien->$field)) {
-                    Storage::disk('public')->delete($calonKlien->$field);
+            if ($field === 'file_dokumen_pendukung') {
+                $currentDocs = [];
+                if ($calonKlien->file_dokumen_pendukung) {
+                    if (str_starts_with($calonKlien->file_dokumen_pendukung, '[') && str_ends_with($calonKlien->file_dokumen_pendukung, ']')) {
+                        $decoded = json_decode($calonKlien->file_dokumen_pendukung, true);
+                        if (is_array($decoded)) {
+                            foreach ($decoded as $item) {
+                                $p = is_array($item) ? ($item['path'] ?? '') : $item;
+                                $n = is_array($item) ? ($item['name'] ?? basename($p)) : basename($p);
+                                if ($p) {
+                                    $currentDocs[$p] = ['path' => $p, 'name' => $n];
+                                }
+                            }
+                        }
+                    } else {
+                        $p = $calonKlien->file_dokumen_pendukung;
+                        $currentDocs[$p] = ['path' => $p, 'name' => basename($p)];
+                    }
                 }
-                $data[$field] = $request->file($field)->store('dokumen_legalitas', 'public');
+
+                $hasExistingInput = $request->has('file_dokumen_pendukung_existing_present') || $request->has('file_dokumen_pendukung_existing');
+                $finalDocs = [];
+
+                if ($hasExistingInput) {
+                    $retainedInput = $request->input('file_dokumen_pendukung_existing', []);
+                    $retainedArr = is_array($retainedInput) ? $retainedInput : (empty($retainedInput) ? [] : [$retainedInput]);
+                    foreach ($retainedArr as $rp) {
+                        if (isset($currentDocs[$rp])) {
+                            $finalDocs[] = $currentDocs[$rp];
+                            unset($currentDocs[$rp]);
+                        }
+                    }
+                    // Hapus file yang tidak lagi dipertahankan
+                    foreach ($currentDocs as $removed) {
+                        if (Storage::disk('public')->exists($removed['path'])) {
+                            Storage::disk('public')->delete($removed['path']);
+                        }
+                    }
+                } else {
+                    $finalDocs = array_values($currentDocs);
+                }
+
+                // Tambah berkas baru
+                if ($request->hasFile('file_dokumen_pendukung')) {
+                    $newFiles = $request->file('file_dokumen_pendukung');
+                    $newFiles = is_array($newFiles) ? $newFiles : [$newFiles];
+                    foreach ($newFiles as $f) {
+                        if ($f instanceof \Illuminate\Http\UploadedFile) {
+                            $finalDocs[] = [
+                                'path' => FileUploadHelper::storeWithOriginalName($f, 'dokumen_legalitas', 'public'),
+                                'name' => $f->getClientOriginalName(),
+                            ];
+                        }
+                    }
+                }
+
+                if ($hasExistingInput || $request->hasFile('file_dokumen_pendukung')) {
+                    $data['file_dokumen_pendukung'] = !empty($finalDocs) ? json_encode($finalDocs) : null;
+                }
+            } else {
+                if ($request->hasFile($field)) {
+                    if ($calonKlien->$field && Storage::disk('public')->exists($calonKlien->$field)) {
+                        Storage::disk('public')->delete($calonKlien->$field);
+                    }
+                    $data[$field] = FileUploadHelper::storeWithOriginalName($request->file($field), 'dokumen_legalitas', 'public');
+                }
             }
         }
 
         $calonKlien->update($data);
         $this->autoGenerateKontrakAndKlien($calonKlien);
 
-        return new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien', 'interactions']));
+        return new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien']));
     }
 
     public function destroy(CalonKlien $calonKlien): Response
@@ -120,8 +194,20 @@ class CalonKlienController extends Controller
 
         // Delete uploaded files from storage
         foreach (self::FILE_FIELDS as $field) {
-            if ($calonKlien->$field && Storage::disk('public')->exists($calonKlien->$field)) {
-                Storage::disk('public')->delete($calonKlien->$field);
+            if ($calonKlien->$field) {
+                if ($field === 'file_dokumen_pendukung' && str_starts_with($calonKlien->$field, '[') && str_ends_with($calonKlien->$field, ']')) {
+                    $oldPaths = json_decode($calonKlien->$field, true);
+                    if (is_array($oldPaths)) {
+                        foreach ($oldPaths as $oldPath) {
+                            $p = is_array($oldPath) ? ($oldPath['path'] ?? '') : $oldPath;
+                            if ($p && Storage::disk('public')->exists($p)) {
+                                Storage::disk('public')->delete($p);
+                            }
+                        }
+                    }
+                } elseif (Storage::disk('public')->exists($calonKlien->$field)) {
+                    Storage::disk('public')->delete($calonKlien->$field);
+                }
             }
         }
 

@@ -1,5 +1,6 @@
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/useAuth'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import LoadingSpinner from './components/common/LoadingSpinner'
 import ProtectedShell from './components/ProtectedShell'
 import LoginPage from './pages/LoginPage'
@@ -20,9 +21,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 

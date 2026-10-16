@@ -6,7 +6,6 @@ use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Models\Pekerjaan;
-use App\Models\TemplateDeadline;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -42,13 +41,9 @@ class DashboardSummaryTest extends TestCase
             'kontak' => '08123456789',
             'layanan' => 'Dashboard',
         ]);
-        $template = TemplateDeadline::create([
-            'nama_template' => 'Standar',
-        ]);
         Pekerjaan::create([
             'id_klien' => $client->id_klien,
             'id_pic' => $pic->id_user,
-            'id_template' => $template->id_template,
             'judul' => 'Overdue Task',
             'deadline' => '2020-01-01',
             'prioritas' => 'urgent',

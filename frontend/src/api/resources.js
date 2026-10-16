@@ -41,10 +41,17 @@ export function convertLead(idCalonKlien, payload) {
   })
 }
 
+export function startPekerjaan(idPekerjaan) {
+  return apiRequest(`pekerjaan/${idPekerjaan}/start`, {
+    method: 'POST',
+  })
+}
+
 export function submitPekerjaan(idPekerjaan, payload = { progress_persen: 100 }) {
+  const isFormData = payload instanceof FormData
   return apiRequest(`pekerjaan/${idPekerjaan}/submit`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: isFormData ? payload : JSON.stringify(payload),
   })
 }
 

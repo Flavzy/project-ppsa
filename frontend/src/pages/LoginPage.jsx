@@ -20,10 +20,7 @@ export default function LoginPage() {
     setSubmitting(true)
 
     try {
-      await Promise.all([
-        login(email, password),
-        new Promise((resolve) => setTimeout(resolve, 750)),
-      ])
+      await login(email, password)
       setPassword('')
     } catch (requestError) {
       setSubmitting(false)
@@ -45,11 +42,16 @@ export default function LoginPage() {
       <div className="lg:hidden relative bg-brand-950 text-white px-5 py-7 text-center overflow-hidden border-b border-brand-900">
         <GridShape className="opacity-30" />
         <div className="relative z-10 flex flex-col items-center">
-          <img
-            src="/img/startup.svg"
-            alt="SIM-KK Portal Illustration"
-            className="w-full max-w-[160px] h-auto mb-3 drop-shadow-md"
-          />
+          <div className="relative mb-4 w-28 h-28 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full bg-brand-500/25 blur-xl pointer-events-none" />
+            <div className="relative w-full h-full rounded-full p-2 bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-xl backdrop-blur-xs flex items-center justify-center">
+              <img
+                src="/images/logo/sim-kk-logo.png"
+                alt="Emblem Logo SIM-KK PPSA"
+                className="w-full h-full object-contain rounded-full drop-shadow-md"
+              />
+            </div>
+          </div>
           <span className="inline-block text-[11px] font-bold tracking-widest text-brand-400 uppercase mb-1">
             SIM-KK PLATFORM
           </span>
@@ -65,11 +67,11 @@ export default function LoginPage() {
           {/* Header */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50/80 p-2 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20 shadow-theme-xs">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full overflow-hidden shadow-md ring-2 ring-brand-500/25 bg-white dark:bg-gray-800 shrink-0">
                 <img
                   src="/images/logo/loading-logo.png"
-                  alt="Logo"
-                  className="size-8 object-contain drop-shadow-xs"
+                  alt="Logo SIM-KK"
+                  className="size-full object-cover"
                 />
               </div>
               <div>
@@ -240,11 +242,18 @@ export default function LoginPage() {
         <GridShape className="opacity-40" />
 
         <div className="relative z-10 max-w-lg text-center">
-          <img
-            src="/img/startup.svg"
-            alt="SIM-KK Portal Illustration"
-            className="w-full max-w-[360px] h-auto mx-auto mb-8 drop-shadow-2xl"
-          />
+          <div className="relative mx-auto mb-8 w-48 h-48 xl:w-56 xl:h-56 flex items-center justify-center">
+            {/* Ambient executive glow behind emblem */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-brand-500/35 via-blue-light-400/25 to-transparent blur-2xl transform scale-110 pointer-events-none" />
+            {/* Elegant glassmorphic badge container */}
+            <div className="relative w-full h-full rounded-full p-3.5 bg-gradient-to-b from-white/15 to-white/5 border border-white/20 shadow-2xl backdrop-blur-xs flex items-center justify-center">
+              <img
+                src="/images/logo/sim-kk-logo.png"
+                alt="Emblem Logo SIM-KK PPSA"
+                className="w-full h-full object-contain rounded-full drop-shadow-xl"
+              />
+            </div>
+          </div>
 
           <span className="inline-block text-xs font-bold tracking-widest text-brand-400 uppercase mb-2">
             SIM-KK PLATFORM
@@ -259,11 +268,6 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-
-      {/* Fullscreen Pure White Loading saat Login (Hanya Logo di Tengah) */}
-      {submitting && (
-        <LoadingSpinner size="screen" text="" />
-      )}
     </div>
   )
 }

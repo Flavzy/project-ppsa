@@ -52,6 +52,10 @@ class PerformanceReview extends Model
             return 0;
         }
 
+        if (! $pekerjaan->deadline) {
+            return 100;
+        }
+
         if ($finishedAt->lt($pekerjaan->deadline)) {
             return 100;
         }

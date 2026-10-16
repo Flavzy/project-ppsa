@@ -101,7 +101,7 @@ export default function ConfirmModal({
             type="button"
             disabled={loading}
             onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer disabled:opacity-50"
+            className="w-full sm:w-auto inline-flex items-center justify-center h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
           >
             {cancelText}
           </button>
@@ -109,10 +109,10 @@ export default function ConfirmModal({
             type="button"
             disabled={loading}
             onClick={onConfirm}
-            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm text-white transition-all shadow-theme-xs cursor-pointer disabled:opacity-50 ${
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 h-10 px-5 rounded-xl font-semibold text-sm text-white transition-all active:scale-95 shadow-theme-xs cursor-pointer disabled:opacity-50 ${
               isDanger
-                ? 'bg-error-500 hover:bg-error-600 shadow-error-500/20'
-                : 'bg-brand-500 hover:bg-brand-600 shadow-brand-500/20'
+                ? 'bg-error-500 hover:bg-error-600 active:bg-error-700 shadow-error-500/20'
+                : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 shadow-brand-500/20'
             }`}
           >
             {loading ? (

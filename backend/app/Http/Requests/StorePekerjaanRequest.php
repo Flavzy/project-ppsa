@@ -27,10 +27,30 @@ class StorePekerjaanRequest extends FormRequest
                 'integer',
                 Rule::exists('users', 'id_user')->where(fn ($query) => $query->where('role', 'karyawan')),
             ],
-            'id_template' => ['nullable', 'integer'],
             'judul' => ['required', 'string', 'max:255'],
             'deskripsi' => ['nullable', 'string'],
-            'tgl_penugasan' => ['nullable', 'date', 'after_or_equal:today'],
+            'lampiran_instruksi' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    $files = is_array($value) ? $value : [$value];
+                    $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+                    foreach ($files as $file) {
+                        if ($file instanceof \Illuminate\Http\UploadedFile) {
+                            if ($file->getSize() > 20480 * 1024) {
+                                $fail("Ukuran file {$file->getClientOriginalName()} melebihi batas 20MB.");
+                            }
+                            $ext = strtolower($file->getClientOriginalExtension());
+                            if (!in_array($ext, $allowedExts, true)) {
+                                $fail("Format file {$file->getClientOriginalName()} ({$ext}) tidak didukung.");
+                            }
+                        }
+                    }
+                },
+            ],
+            'lampiran_instruksi_existing' => ['nullable'],
+            'lampiran_instruksi_existing.*' => ['nullable', 'string'],
+            'lampiran_instruksi_existing_present' => ['nullable', 'string'],
+            'tgl_penugasan' => ['nullable', 'date', 'after_or_equal:today', 'before_or_equal:today'],
             'deadline' => ['required', 'date', 'after_or_equal:today', 'after_or_equal:' . $tglPenugasan],
             'prioritas' => ['nullable', 'string', 'max:255'],
             'progress_persen' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -48,7 +68,8 @@ class StorePekerjaanRequest extends FormRequest
     {
         return [
             'id_pic.exists' => 'Penanggung jawab (PIC) harus merupakan pengguna dengan peran Karyawan.',
-            'tgl_penugasan.after_or_equal' => 'Tanggal menambahkan tugas tidak boleh dibawah tanggal hari ini.',
+            'tgl_penugasan.after_or_equal' => 'Tanggal memasukkan tugas hanya boleh tanggal hari ini.',
+            'tgl_penugasan.before_or_equal' => 'Tanggal memasukkan tugas hanya boleh tanggal hari ini.',
             'deadline.after_or_equal' => 'Tanggal batas waktu deadline tidak boleh dibawah tanggal hari ini atau sebelum tanggal memasukkan tugas.',
         ];
     }

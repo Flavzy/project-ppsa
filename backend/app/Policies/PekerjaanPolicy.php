@@ -32,8 +32,13 @@ class PekerjaanPolicy
 
     public function update(User $user, Pekerjaan $pekerjaan): bool
     {
-        if (in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true)) {
+        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
             return true;
+        }
+
+        if (in_array($user->role, ['operator', 'sales'], true)) {
+            $operatorPicId = $pekerjaan->operator_pic_id;
+            return $operatorPicId !== null && (int) $operatorPicId === (int) $user->id_user;
         }
 
         if ($user->role === 'karyawan') {
@@ -69,5 +74,18 @@ class PekerjaanPolicy
     public function reject(User $user, Pekerjaan $pekerjaan): bool
     {
         return in_array($user->role, ['admin', 'pimpinan'], true);
+    }
+
+    public function start(User $user, Pekerjaan $pekerjaan): bool
+    {
+        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
+            return true;
+        }
+
+        if ($user->role === 'karyawan') {
+            return (int) $pekerjaan->id_pic === (int) $user->id_user;
+        }
+
+        return false;
     }
 }

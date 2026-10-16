@@ -49,6 +49,7 @@ function NavIcon({ type, className = '' }) {
         </svg>
       )
     case 'performanceReviews':
+    case 'kinerjaKaryawan':
       return (
         <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -99,10 +100,7 @@ export default function ProtectedShell() {
     setLoggingOut(true)
     setShowLogoutModal(false)
     try {
-      await Promise.all([
-        logout(),
-        new Promise((resolve) => setTimeout(resolve, 800)),
-      ])
+      await logout()
     } catch {
       setLoggingOut(false)
     }
@@ -127,7 +125,7 @@ export default function ProtectedShell() {
   // Group resources for clean TailAdmin sidebar sections
   const crmResources = allowedResources.filter((r) => ['calonKlien', 'kontrak'].includes(r.key))
   const operationsResources = allowedResources.filter((r) => ['klien', 'pekerjaan'].includes(r.key))
-  const reportingResources = allowedResources.filter((r) => ['reporting', 'performanceReviews'].includes(r.key))
+  const reportingResources = allowedResources.filter((r) => ['reporting', 'performanceReviews', 'kinerjaKaryawan'].includes(r.key))
   const adminResources = allowedResources.filter((r) => ['users'].includes(r.key))
 
   return (
@@ -150,11 +148,11 @@ export default function ProtectedShell() {
           {/* Logo & Brand Header */}
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 px-5 dark:border-gray-800">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50/80 p-1.5 border border-brand-100 dark:bg-brand-500/10 dark:border-brand-500/20 shadow-theme-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-xs ring-2 ring-brand-500/20 bg-white dark:bg-gray-800 shrink-0">
                 <img
                   src="/images/logo/loading-logo.png"
-                  alt="Logo"
-                  className="size-7 object-contain drop-shadow-xs"
+                  alt="Logo SIM-KK"
+                  className="size-full object-cover"
                 />
               </div>
               <div className="min-w-0">
@@ -283,6 +281,10 @@ export default function ProtectedShell() {
                 <div className="space-y-0.5">
                   {reportingResources.map((res) => {
                     const isActive = currentActiveKey === res.key
+                    const itemLabel =
+                      res.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
+                        ? 'Kinerja Saya'
+                        : res.label
                     return (
                       <button
                         key={res.key}
@@ -301,7 +303,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{res.label}</span>
+                        <span className="truncate">{itemLabel}</span>
                       </button>
                     )
                   })}
@@ -389,6 +391,10 @@ export default function ProtectedShell() {
               <h1 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
                 {currentActiveKey === 'dashboard'
                   ? 'Dasbor Utama'
+                  : activeConfig?.key === 'pekerjaan' && user?.role === 'karyawan'
+                  ? 'Pekerjaan Saya'
+                  : activeConfig?.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
+                  ? 'Kinerja Saya'
                   : activeConfig?.label || 'Modul Operasional'}
               </h1>
             </div>
@@ -404,7 +410,7 @@ export default function ProtectedShell() {
               type="button"
               onClick={() => setShowLogoutModal(true)}
               disabled={loggingOut}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-error-50 hover:border-error-200 hover:text-error-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-error-500/10 dark:hover:text-error-400 cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 transition hover:bg-error-50 hover:border-error-200 hover:text-error-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-error-500/10 dark:hover:text-error-400 cursor-pointer shadow-2xs active:scale-95"
               title="Keluar dari akun Anda"
             >
               <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -419,13 +425,14 @@ export default function ProtectedShell() {
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6 lg:p-7">
             {currentActiveKey === 'dashboard' ? (
-              <DashboardView />
+              <DashboardView onNavigate={(key) => setActiveKey(key)} />
             ) : activeConfig ? (
               <ResourceDashboard
                 key={currentActiveKey}
                 config={activeConfig}
                 resourceConfigs={resourceConfigs}
                 supportResources={supportResources}
+                onNavigate={(key) => setActiveKey(key)}
               />
             ) : (
               <div className="rounded-3xl border border-gray-200 bg-white p-8 text-center text-gray-500 dark:border-gray-800 dark:bg-gray-900">
