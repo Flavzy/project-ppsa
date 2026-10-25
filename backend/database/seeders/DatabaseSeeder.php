@@ -248,5 +248,7 @@ class DatabaseSeeder extends Seeder
             'revision_count' => 1,
             'catatan' => 'Baik, ada revisi minor.',
         ]);
+        // ── Master Data Layanan & Pekerjaan ──
+        $this->call(MasterDataSeeder::class);
     }
 }

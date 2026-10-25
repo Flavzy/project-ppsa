@@ -86,10 +86,12 @@ function PromptModalInner({
                         href={item.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300 text-xs font-semibold border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-full"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 text-xs font-semibold border border-brand-200/80 dark:border-brand-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-full"
                         title={`Buka / Unduh ${item.name || `Berkas ${idx + 1}`}`}
                       >
-                        <span className="shrink-0">📄</span>
+                        <svg className="w-4 h-4 shrink-0 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
                         <span className="truncate max-w-[280px]">{item.name || `Berkas ${idx + 1}`}</span>
                       </a>
                     ))}
@@ -100,10 +102,12 @@ function PromptModalInner({
                     href={attachmentUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300 text-xs font-semibold border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-full"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 text-xs font-semibold border border-brand-200/80 dark:border-brand-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-full"
                     title={`Buka / Unduh ${attachmentUrl ? decodeURIComponent(attachmentUrl.split('/').pop()) : 'Berkas Tugas'}`}
                   >
-                    <span className="shrink-0">📄</span>
+                    <svg className="w-4 h-4 shrink-0 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
                     <span className="truncate max-w-[280px]">{attachmentUrl ? decodeURIComponent(attachmentUrl.split('/').pop()) : (attachmentLabel || 'Buka Berkas')}</span>
                   </a>
               ) : null}

@@ -37,6 +37,8 @@ class StoreKontrakRequest extends FormRequest
             'dokumen_final' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:5120'],
             'ditandatangani_pada' => ['nullable', 'date'],
             'reviewed_by' => ['nullable', 'integer', 'exists:users,id_user'],
+            'layanan_ids' => ['nullable', 'array'],
+            'layanan_ids.*' => ['integer', 'exists:layanan,id_layanan'],
         ];
     }
 

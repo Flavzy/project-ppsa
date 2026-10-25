@@ -69,6 +69,11 @@ class LeadConversionController extends Controller
                     'layanan' => $validated['layanan'],
                 ]
             );
+
+            if (!empty($validated['layanan_ids']) && is_array($validated['layanan_ids'])) {
+                $calonKlien->update(['layanan_ids' => $validated['layanan_ids']]);
+                $kontrak->layanan()->sync($validated['layanan_ids']);
+            }
         });
 
         return (new CalonKlienResource($calonKlien->refresh()->load(['user', 'kontrak.klien'])))

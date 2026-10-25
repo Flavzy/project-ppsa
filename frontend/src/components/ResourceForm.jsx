@@ -1,5 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
 import LoadingSpinner from './common/LoadingSpinner'
+import MonthInputField from './common/MonthInputField'
+import ConfirmModal from './ConfirmModal'
 import { loadFormDraft, saveFormDraft, clearFormDraft } from '../utils/formDraft'
 
 function getInitialValue(field, record, currentUser, config) {
@@ -7,7 +9,21 @@ function getInitialValue(field, record, currentUser, config) {
     return ''
   }
 
+  if (field.type === 'checkbox_group') {
+    if (record?.[field.name] && Array.isArray(record[field.name])) {
+      return record[field.name].map(Number)
+    }
+    if (record?.layanan && Array.isArray(record.layanan)) {
+      return record.layanan.map((l) => Number(l.id_layanan))
+    }
+    return []
+  }
+
   if (record?.[field.name] !== undefined && record?.[field.name] !== null) {
+    if (field.type === 'number' && (typeof record[field.name] === 'string' || typeof record[field.name] === 'number')) {
+      const num = Number(record[field.name])
+      return isNaN(num) ? '' : num
+    }
     return record[field.name]
   }
 
@@ -39,10 +55,10 @@ function isFieldLockedForUser(field, record, config, currentUser) {
       return true
     }
     // 3. Saat pekerjaan dibuka oleh Karyawan:
-    // Seluruh field (judul, status, pic, tgl_penugasan, deadline, id_klien, deskripsi, lampiran_instruksi) terkunci (read-only)
+    // Seluruh field (judul, status, pic, tgl_penugasan, deadline, id_klien, id_layanan, periode_bulan, deskripsi, lampiran_instruksi) terkunci (read-only)
     // Penyelesaian tugas dilakukan melalui pelaporan di menu Reporting
     if (record && currentUser?.role === 'karyawan') {
-      return ['judul', 'status', 'id_pic', 'tgl_penugasan', 'deadline', 'id_klien', 'deskripsi', 'lampiran_instruksi'].includes(field.name)
+      return ['judul', 'status', 'id_pic', 'tgl_penugasan', 'deadline', 'id_klien', 'id_layanan', 'periode_bulan', 'deskripsi', 'lampiran_instruksi'].includes(field.name)
     }
     // 4. Jika role operator/sales dan BUKAN operator PIC pekerjaan ini: SELURUH field terkunci permanen
     if (record && ['operator', 'sales'].includes(currentUser?.role)) {
@@ -71,6 +87,85 @@ function isFieldLockedForUser(field, record, config, currentUser) {
   return false
 }
 
+export function isImageFile(fileNameOrUrl) {
+  if (!fileNameOrUrl) return false
+  if (typeof fileNameOrUrl === 'object' && fileNameOrUrl.type) {
+    return fileNameOrUrl.type.startsWith('image/')
+  }
+  const clean = String(fileNameOrUrl).split('?')[0].toLowerCase()
+  return (
+    clean.endsWith('.jpg') ||
+    clean.endsWith('.jpeg') ||
+    clean.endsWith('.png') ||
+    clean.endsWith('.webp') ||
+    clean.endsWith('.gif') ||
+    clean.endsWith('.svg')
+  )
+}
+
+export function ImagePreviewModal({ isOpen, imageUrl, fileName, onClose }) {
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
+  if (!isOpen || !imageUrl) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-3xl p-4 sm:p-5 shadow-2xl overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-3 mb-2 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 min-w-0 pr-4">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-300 shrink-0">
+              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+              {fileName || 'Pratinjau Gambar'}
+            </h4>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={imageUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors"
+            >
+              Buka Tab Baru ↗
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="size-8 rounded-xl bg-gray-100 hover:bg-rose-100 text-gray-500 hover:text-rose-600 dark:bg-gray-800 dark:hover:bg-rose-900/40 dark:text-gray-400 dark:hover:text-rose-300 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+              title="Tutup (Esc)"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto flex items-center justify-center p-2 rounded-2xl bg-gray-50 dark:bg-gray-950/50">
+          <img
+            src={imageUrl}
+            alt={fileName || 'Pratinjau'}
+            className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-xs"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function FileInputField({
   name,
   accept,
@@ -84,6 +179,7 @@ function FileInputField({
 }) {
   const inputRef = useRef(null)
   const [selectedFiles, setSelectedFiles] = useState([])
+  const [previewModal, setPreviewModal] = useState({ open: false, url: '', name: '' })
 
   const normalizedExisting = useMemo(() => {
     if (existingFileUrls && existingFileUrls.length > 0) {
@@ -110,6 +206,25 @@ function FileInputField({
       isChanged: false,
     })
   }, [normalizedExisting, record])
+
+  const newFilePreviews = useMemo(() => {
+    return selectedFiles.map((file) => {
+      const isImg = isImageFile(file)
+      return {
+        file,
+        isImg,
+        url: isImg ? URL.createObjectURL(file) : null,
+      }
+    })
+  }, [selectedFiles])
+
+  useEffect(() => {
+    return () => {
+      newFilePreviews.forEach((item) => {
+        if (item.url) URL.revokeObjectURL(item.url)
+      })
+    }
+  }, [newFilePreviews])
 
   const emitChange = (newFiles, retained) => {
     const isChanged = multiple
@@ -171,80 +286,186 @@ function FileInputField({
     emitChange(selectedFiles, normalizedExisting)
   }
 
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!disabled) setIsDragging(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (disabled) return
+    const dt = e.dataTransfer
+    const fresh = dt.files ? Array.from(dt.files) : []
+    if (!fresh.length) return
+
+    if (multiple) {
+      setSelectedFiles((prev) => {
+        const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`))
+        const uniqueFresh = fresh.filter((f) => !existingKeys.has(`${f.name}-${f.size}`))
+        const updated = [...prev, ...uniqueFresh]
+        emitChange(updated, retainedExisting)
+        return updated
+      })
+    } else {
+      const chosen = [fresh[0]]
+      setSelectedFiles(chosen)
+      emitChange(chosen, retainedExisting)
+    }
+  }
+
   const hasExisting = normalizedExisting.length > 0
   const deletedCount = normalizedExisting.length - retainedExisting.length
 
   return (
     <div className="space-y-2.5">
       {!disabled && (
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <input
-              ref={inputRef}
-              type="file"
-              accept={accept}
-              multiple={multiple}
-              onChange={handleFileChange}
-              className="hidden"
-              tabIndex={-1}
-            />
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => inputRef.current?.click()}
-              className="inline-flex items-center gap-2 py-1.5 px-3.5 rounded-xl border border-transparent bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-xs font-semibold text-white shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 shrink-0"
-            >
-              <span>
-                {multiple
-                  ? selectedFiles.length > 0
-                    ? '+ Tambah Berkas Lain'
-                    : '+ Pilih Berkas (Bisa Banyak File)'
-                  : 'Pilih Berkas'}
-              </span>
-            </button>
+        <div className="space-y-2.5">
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            multiple={multiple}
+            onChange={handleFileChange}
+            className="hidden"
+            tabIndex={-1}
+          />
+
+          {/* Area Unggah Berkas Interaktif (Drag & Drop + Klik) */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            className={`group relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
+              isDragging
+                ? 'border-brand-500 bg-brand-50/70 dark:bg-brand-500/15 ring-4 ring-brand-500/10 scale-[1.005]'
+                : 'border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/40 hover:border-brand-400 dark:hover:border-brand-500 hover:bg-gray-50 dark:hover:bg-gray-800/70'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 group-hover:scale-105 transition-transform">
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  <span className="text-brand-600 dark:text-brand-400 underline">Klik untuk memilih berkas</span> atau seret & jatuhkan berkas ke sini
+                </p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  {accept ? `Format didukung: ${accept.replace(/\./g, ' ').toUpperCase()}` : 'Mendukung format PDF, dokumen acuan, dan gambar'} {multiple ? '(Bisa banyak berkas sekaligus)' : ''}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Berkas yang Dipilih */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <span className="text-xs text-gray-500 dark:text-gray-400 select-none">
               {selectedFiles.length === 0
-                ? (multiple ? 'Belum ada berkas baru dipilih (bisa pilih beberapa berkas sekaligus atau klik berulang)' : 'Belum ada berkas dipilih')
+                ? 'Belum ada berkas baru dipilih'
                 : multiple
-                ? `${selectedFiles.length} berkas baru dipilih`
+                ? `${selectedFiles.length} berkas baru siap diunggah`
                 : `${selectedFiles[0].name} (${(selectedFiles[0].size / 1024).toFixed(0)} KB)`}
             </span>
             {selectedFiles.length > 0 && (
               <button
                 type="button"
                 onClick={handleClearAllNew}
-                className="inline-flex items-center gap-1 text-gray-400 hover:text-error-600 dark:hover:text-error-400 text-xs py-1 px-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 text-gray-400 hover:text-error-600 dark:hover:text-error-400 text-xs py-0.5 px-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
                 title="Batalkan seluruh pilihan berkas baru"
               >
-                <span>✕ Batalkan</span>
+                <span>✕ Batalkan Semua</span>
               </button>
             )}
           </div>
 
-          {/* List badge file baru yang dipilih (khusus multiple) - disusun ke bawah agar rapi */}
-          {multiple && selectedFiles.length > 0 && (
+          {/* Pratinjau Berkas Baru Tunggal (Single File Preview) */}
+          {!multiple && newFilePreviews.length === 1 && (
+            <div className="pt-1">
+              {newFilePreviews[0].isImg ? (
+                <div className="flex items-center gap-3 p-2 rounded-2xl bg-brand-50/70 dark:bg-brand-500/15 border border-brand-200 dark:border-brand-800 shadow-2xs max-w-full sm:max-w-md">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewModal({ open: true, url: newFilePreviews[0].url, name: newFilePreviews[0].file.name })}
+                    className="relative group shrink-0 size-11 rounded-xl overflow-hidden border border-brand-300 dark:border-brand-700 cursor-pointer shadow-2xs"
+                    title="Klik untuk memperbesar pratinjau gambar"
+                  >
+                    <img src={newFilePreviews[0].url} alt={newFilePreviews[0].file.name} className="size-full object-cover group-hover:scale-110 transition-transform duration-200" />
+                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                      🔍
+                    </div>
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-brand-900 dark:text-brand-100 block truncate">
+                      {newFilePreviews[0].file.name}
+                    </span>
+                    <span className="text-[10px] text-brand-600 dark:text-brand-400">
+                      {(newFilePreviews[0].file.size / 1024).toFixed(0)} KB • Pratinjau gambar siap diunggah
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearAllNew}
+                    className="text-brand-500 hover:text-rose-600 dark:text-brand-400 dark:hover:text-rose-400 p-1.5 cursor-pointer font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors shrink-0"
+                    title="Batalkan pilihan berkas"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* List badge file baru yang dipilih (khusus multiple) - dilengkapi pratinjau visual thumbnail */}
+          {multiple && newFilePreviews.length > 0 && (
             <div className="flex flex-col gap-1.5 items-start pt-1">
-              {selectedFiles.map((f, idx) => (
-                <span
+              {newFilePreviews.map((item, idx) => (
+                <div
                   key={idx}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 shadow-2xs max-w-full sm:max-w-lg"
+                  className="inline-flex items-center gap-2.5 p-1.5 pr-3 rounded-xl text-xs bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 shadow-2xs max-w-full sm:max-w-lg"
                 >
-                  <svg className="size-3.5 text-brand-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span className="truncate max-w-[260px] sm:max-w-xs font-medium">{f.name}</span>
+                  {item.isImg ? (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewModal({ open: true, url: item.url, name: item.file.name })}
+                      className="relative group shrink-0 size-9 rounded-lg overflow-hidden border border-brand-300 dark:border-brand-700 cursor-pointer shadow-2xs"
+                      title="Klik untuk memperbesar pratinjau gambar"
+                    >
+                      <img src={item.url} alt={item.file.name} className="size-full object-cover group-hover:scale-110 transition-transform" />
+                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[9px]">
+                        🔍
+                      </div>
+                    </button>
+                  ) : (
+                    <svg className="size-4 text-brand-500 shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
+                  <span className="truncate max-w-[220px] sm:max-w-xs font-medium">{item.file.name}</span>
                   <span className="text-[11px] text-gray-400 font-normal shrink-0">
-                    ({(f.size / 1024).toFixed(0)} KB)
+                    ({(item.file.size / 1024).toFixed(0)} KB)
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveSingleNew(idx)}
                     className="text-gray-400 hover:text-rose-600 ml-1 cursor-pointer font-bold hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-full size-4 inline-flex items-center justify-center transition-colors shrink-0"
-                    title={`Hapus ${f.name} dari daftar pilihan`}
+                    title={`Hapus ${item.file.name} dari daftar pilihan`}
                   >
                     ×
                   </button>
-                </span>
+                </div>
               ))}
             </div>
           )}
@@ -266,44 +487,100 @@ function FileInputField({
                 <button
                   type="button"
                   onClick={handleRestoreExisting}
-                  className="text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold underline cursor-pointer"
+                  className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold underline cursor-pointer"
                 >
-                  ↺ Pulihkan Semua
+                  <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Pulihkan Semua</span>
                 </button>
               </div>
             )}
           </div>
           {retainedExisting.length > 0 ? (
             <div className="flex flex-col gap-1.5 items-start">
-              {retainedExisting.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-500/15 border border-teal-200 dark:border-teal-800 shadow-2xs max-w-full sm:max-w-lg"
-                >
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-300 hover:underline font-semibold text-xs"
-                    title={`Buka / Unduh ${item.name}`}
-                  >
-                    <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="truncate max-w-[260px] sm:max-w-xs">{item.name || `Berkas ${idx + 1}`}</span>
-                  </a>
-                  {!disabled && record && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveExisting(idx)}
-                      className="text-teal-500 hover:text-rose-600 dark:text-teal-400 dark:hover:text-rose-400 ml-1 cursor-pointer font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full size-4 inline-flex items-center justify-center transition-colors shrink-0"
-                      title={`Hapus berkas ini (${item.name})`}
+              {retainedExisting.map((item, idx) => {
+                const isImg = isImageFile(item.url || item.path || item.name)
+
+                if (isImg) {
+                  return (
+                    <div
+                      key={idx}
+                      className="inline-flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl bg-teal-50 dark:bg-teal-500/15 border border-teal-200 dark:border-teal-800 shadow-2xs max-w-full sm:max-w-lg"
                     >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
+                      <button
+                        type="button"
+                        onClick={() => setPreviewModal({ open: true, url: item.url, name: item.name })}
+                        className="relative group shrink-0 size-10 rounded-xl overflow-hidden border border-teal-300 dark:border-teal-700 cursor-pointer shadow-2xs"
+                        title="Klik untuk memperbesar pratinjau gambar"
+                      >
+                        <img
+                          src={item.url}
+                          alt={item.name}
+                          className="size-full object-cover group-hover:scale-110 transition-transform duration-200"
+                        />
+                        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                          🔍
+                        </div>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-teal-800 dark:text-teal-200 hover:underline font-semibold text-xs truncate max-w-[220px] sm:max-w-xs"
+                          title={`Buka / Unduh ${item.name}`}
+                        >
+                          <span>{item.name || `Berkas ${idx + 1}`}</span>
+                        </a>
+                        <span className="text-[10px] text-teal-600 dark:text-teal-400 block">
+                          Pratinjau gambar tersedia • Klik untuk memperbesar
+                        </span>
+                      </div>
+                      {!disabled && record && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExisting(idx)}
+                          className="text-teal-500 hover:text-rose-600 dark:text-teal-400 dark:hover:text-rose-400 ml-1 cursor-pointer font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full size-5 inline-flex items-center justify-center transition-colors shrink-0"
+                          title={`Hapus berkas ini (${item.name})`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  )
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-500/15 border border-teal-200 dark:border-teal-800 shadow-2xs max-w-full sm:max-w-lg"
+                  >
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-teal-700 dark:text-teal-300 hover:underline font-semibold text-xs"
+                      title={`Buka / Unduh ${item.name}`}
+                    >
+                      <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="truncate max-w-[260px] sm:max-w-xs">{item.name || `Berkas ${idx + 1}`}</span>
+                    </a>
+                    {!disabled && record && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExisting(idx)}
+                        className="text-teal-500 hover:text-rose-600 dark:text-teal-400 dark:hover:text-rose-400 ml-1 cursor-pointer font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full size-4 inline-flex items-center justify-center transition-colors shrink-0"
+                        title={`Hapus berkas ini (${item.name})`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <span className="text-gray-400 text-xs italic block">
@@ -314,6 +591,16 @@ function FileInputField({
       ) : disabled ? (
         <span className="text-gray-400 text-xs italic">Tidak ada berkas yang dilampirkan</span>
       ) : null}
+
+      {/* Modal Pratinjau Visual Gambar */}
+      {previewModal.open && (
+        <ImagePreviewModal
+          isOpen={previewModal.open}
+          imageUrl={previewModal.url}
+          fileName={previewModal.name}
+          onClose={() => setPreviewModal({ open: false, url: '', name: '' })}
+        />
+      )}
     </div>
   )
 }
@@ -321,6 +608,7 @@ function FileInputField({
 function ResourceForm({
   config,
   record,
+  existingRecords = [],
   options,
   saving,
   errors,
@@ -350,11 +638,16 @@ function ResourceForm({
       }
     })
 
+    if (config?.key === 'pekerjaan' && record?.id_master_pekerjaan) {
+      initialMap.id_master_pekerjaan = record.id_master_pekerjaan
+    }
+
     return initialMap
   })
 
   // Pelacakan status berkas/file yang dipilih secara lokal untuk deteksi perubahan
   const [fileStates, setFileStates] = useState({})
+  const [clientErrors, setClientErrors] = useState({})
 
   function handleFileChangeState(name, fileData) {
     setFileStates((prev) => ({
@@ -368,14 +661,42 @@ function ResourceForm({
 
   // Tangani perubahan nilai input dan otomatis simpan ke draf jika mode tambah baru
   function handleFieldChange(fieldName, val) {
+    if (config?.key === 'pekerjaan' && fieldName === 'deadline') {
+      const recordDeadlineStr = record?.deadline ? String(record.deadline).split('T')[0] : null
+      if (val && val !== recordDeadlineStr && val < todayStr) {
+        setClientErrors((prev) => ({
+          ...prev,
+          deadline: ['Batas waktu (deadline) tidak boleh sebelum hari ini.'],
+        }))
+      } else {
+        setClientErrors((prev) => {
+          if (!prev.deadline) return prev
+          const copy = { ...prev }
+          delete copy.deadline
+          return copy
+        })
+      }
+    }
+
     setValues((prev) => {
       const next = { ...prev, [fieldName]: val }
+      if (config?.key === 'pekerjaan' && fieldName === 'id_klien') {
+        const newKlien = (options?.klien || []).find((k) => String(k.id_klien) === String(val))
+        const newKontrak = newKlien?.kontrak || (options?.kontrak || []).find((c) => String(c.id_kontrak) === String(newKlien?.id_kontrak))
+        const contractLayananIds = newKontrak?.layanan_ids ||
+          (Array.isArray(newKontrak?.layanan) ? newKontrak.layanan.map((l) => l.id_layanan) : [])
+        if (contractLayananIds.length > 0 && prev.id_layanan && !contractLayananIds.includes(Number(prev.id_layanan))) {
+          next.id_layanan = ''
+        }
+      }
       if (!record) {
         saveFormDraft(config.key, currentUser?.id_user, next)
       }
       return next
     })
   }
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   // Tombol untuk mereset / menghapus draf kembali ke awal
   function handleClearDraft() {
@@ -450,6 +771,20 @@ function ResourceForm({
       const origRaw = record[field.name]
       const currentRaw = values[field.name]
 
+      if (field.type === 'checkbox_group') {
+        const origArr = Array.isArray(origRaw)
+          ? origRaw.map(Number).sort((a, b) => a - b)
+          : (record?.layanan ? record.layanan.map((l) => Number(l.id_layanan)).sort((a, b) => a - b) : [])
+        const currArr = Array.isArray(currentRaw) ? currentRaw.map(Number).sort((a, b) => a - b) : []
+        return JSON.stringify(origArr) !== JSON.stringify(currArr)
+      }
+
+      if (field.type === 'number') {
+        const numOrig = origRaw !== undefined && origRaw !== null && origRaw !== '' ? Number(origRaw) : null
+        const numCurrent = currentRaw !== undefined && currentRaw !== null && currentRaw !== '' ? Number(currentRaw) : null
+        return numOrig !== numCurrent
+      }
+
       const origVal = String(origRaw !== undefined && origRaw !== null ? origRaw : '').trim()
       const currentVal = String(currentRaw !== undefined && currentRaw !== null ? currentRaw : '').trim()
 
@@ -471,6 +806,18 @@ function ResourceForm({
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    // Validasi client-side: Deadline pekerjaan tidak boleh sebelum hari ini jika diubah atau ditambah baru
+    if (config?.key === 'pekerjaan' && values.deadline) {
+      const recordDeadlineStr = record?.deadline ? String(record.deadline).split('T')[0] : null
+      if (values.deadline !== recordDeadlineStr && values.deadline < todayStr) {
+        setClientErrors((prev) => ({
+          ...prev,
+          deadline: ['Batas waktu (deadline) tidak boleh sebelum hari ini.'],
+        }))
+        return
+      }
+    }
 
     // Jika mode edit dan tidak ada perubahan sama sekali, cegah penyimpanan
     if (record && !isDirty) {
@@ -521,11 +868,20 @@ function ResourceForm({
               formData.append(field.name, fs.newFiles[0])
             }
           }
+        } else if (field.type === 'checkbox_group') {
+          const arr = Array.isArray(values[field.name]) ? values[field.name] : []
+          arr.forEach((item) => {
+            formData.append(`${field.name}[]`, item)
+          })
         } else {
           const val = values[field.name] !== undefined ? values[field.name] : ''
           formData.append(field.name, val)
         }
       })
+
+      if (config?.key === 'pekerjaan' && values.id_master_pekerjaan) {
+        formData.append('id_master_pekerjaan', values.id_master_pekerjaan)
+      }
 
       onSubmit(formData)
     } else {
@@ -542,12 +898,21 @@ function ResourceForm({
           return
         }
 
+        if (field.type === 'checkbox_group') {
+          payload[field.name] = Array.isArray(values[field.name]) ? values[field.name] : []
+          return
+        }
+
         const val = values[field.name] !== undefined ? values[field.name] : ''
         if (record && (field.name === 'password' || field.type === 'password') && (!val || String(val).trim() === '')) {
           return
         }
         payload[field.name] = val === '' ? null : val
       })
+
+      if (config?.key === 'pekerjaan' && values.id_master_pekerjaan) {
+        payload['id_master_pekerjaan'] = values.id_master_pekerjaan
+      }
 
       onSubmit(payload)
     }
@@ -564,6 +929,24 @@ function ResourceForm({
     }
     group.fields.push(field)
   })
+
+  // State untuk sub-navigasi tab formulir (khusus form bertingkat / panjang seperti Calon Klien)
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0)
+
+  useEffect(() => {
+    setActiveSectionIndex(0)
+  }, [config?.key, record])
+
+  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit
+  useEffect(() => {
+    const errorKeys = Object.keys(clientErrors || {}).concat(Object.keys(errors || {}))
+    if (errorKeys.length > 0 && sections.length > 1) {
+      const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
+      if (targetIdx !== -1 && activeSectionIndex !== -1 && activeSectionIndex !== targetIdx) {
+        setActiveSectionIndex(targetIdx)
+      }
+    }
+  }, [clientErrors, errors, sections, activeSectionIndex])
 
   const isTaskCompleted = config?.key === 'pekerjaan' && record && ['completed', 'approved'].includes(record.status)
   const isReportCompleted = config?.key === 'reporting' && record && (['approved', 'completed'].includes(record.status_laporan) || record.pekerjaan?.status === 'completed')
@@ -594,6 +977,20 @@ function ResourceForm({
     ? 'Detail Pekerjaan (Bukan Operator PIC)'
     : record
     ? `Edit Data ${config.label}`
+    : config.key === 'calonKlien'
+    ? 'Tambah Calon Klien'
+    : config.key === 'pekerjaan'
+    ? 'Buat Penugasan Baru'
+    : config.key === 'users'
+    ? 'Tambah Pengguna Baru'
+    : config.key === 'reporting'
+    ? 'Buat Laporan Baru'
+    : config.key === 'masterPekerjaan'
+    ? 'Tambah Template Pekerjaan'
+    : config.key === 'kinerjaKaryawan'
+    ? 'Beri Penilaian Kinerja'
+    : config.key === 'layanan'
+    ? 'Tambah Layanan Baru'
     : `Tambah ${config.label} Baru`
 
   return (
@@ -606,10 +1003,10 @@ function ResourceForm({
             </span>
             {hasDraft && !record && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 shadow-2xs">
-                <span>✏️ Draf aktif</span>
+                <span>Draf aktif</span>
                 <button
                   type="button"
-                  onClick={handleClearDraft}
+                  onClick={() => setShowResetConfirm(true)}
                   className="ml-1 text-xs text-amber-800 dark:text-amber-300 underline hover:font-bold cursor-pointer"
                   title="Hapus draf dan kosongkan isian form"
                 >
@@ -622,40 +1019,88 @@ function ResourceForm({
             {headerTitle}
           </h2>
         </div>
-        {record && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex items-center justify-center h-8 px-3.5 rounded-lg border border-gray-300 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-2xs transition-all active:scale-95 self-start sm:self-auto cursor-pointer"
-          >
-            {isReadOnlyDetail ? 'Tutup Detail' : 'Batal Ubah'}
-          </button>
-        )}
+
       </div>
 
       <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6">
         {/* Input semu tersembunyi untuk mencegah autofill paksa dari browser password manager */}
         <input type="text" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" aria-hidden="true" />
         <input type="password" style={{ display: 'none' }} tabIndex={-1} autoComplete="new-password" aria-hidden="true" />
-        {sections.map((section, sIndex) => (
-          <div key={section.title} className="space-y-4">
-            {sections.length > 1 && (
-              <div className="pt-2 pb-1 border-b border-gray-100 dark:border-gray-800">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  {sIndex + 1}. {section.title}
-                </h3>
-              </div>
-            )}
+        {/* Navigasi Sub-Bagian / Tab Formulir (Mencegah Vertical Scroll Fatigue) */}
+        {sections.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-gray-100/80 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/60 mb-6">
+            {sections.map((sec, sIdx) => {
+              const isActive = activeSectionIndex === sIdx
+              const hasSecError = sec.fields.some((f) => clientErrors?.[f.name] || errors?.[f.name])
+              return (
+                <button
+                  key={sec.title}
+                  type="button"
+                  onClick={() => setActiveSectionIndex(sIdx)}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold select-none cursor-pointer outline-hidden focus:outline-hidden focus:ring-0 transition-colors duration-200 border ${
+                    isActive
+                      ? 'bg-white dark:bg-gray-900 text-brand-600 dark:text-brand-400 shadow-xs border-gray-200/80 dark:border-gray-700/80'
+                      : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-750/50'
+                  }`}
+                >
+                  <span
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold transition-colors ${
+                      isActive
+                        ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-300'
+                        : 'bg-gray-200/60 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                    }`}
+                  >
+                    {sIdx + 1}
+                  </span>
+                  <span>{sec.title}</span>
+                  {hasSecError && (
+                    <span
+                      className="size-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-gray-900"
+                      title="Terdapat isian yang perlu diperiksa pada bagian ini"
+                    />
+                  )}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setActiveSectionIndex(activeSectionIndex === -1 ? 0 : -1)}
+              className={`ml-auto px-3 py-1.5 rounded-xl text-xs font-medium outline-hidden focus:outline-hidden focus:ring-0 transition-colors duration-200 cursor-pointer ${
+                activeSectionIndex === -1
+                  ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-semibold'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+              }`}
+            >
+              {activeSectionIndex === -1 ? '✓ Mode Semua Bagian' : 'Tampilkan Semua Bagian'}
+            </button>
+          </div>
+        )}
+
+        {sections
+          .map((section, sIndex) => ({ section, sIndex }))
+          .filter(({ sIndex }) => activeSectionIndex === -1 || activeSectionIndex === sIndex)
+          .map(({ section, sIndex }) => (
+            <div key={section.title} className="space-y-4">
+              {sections.length > 1 && (
+                <div className="pt-2 pb-1 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    {sIndex + 1}. {section.title}
+                  </h3>
+                  <span className="text-[11px] text-gray-400">
+                    Bagian {sIndex + 1} dari {sections.length}
+                  </span>
+                </div>
+              )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {section.fields.map((field) => {
-                const fieldError = errors?.[field.name]?.[0]
+                const fieldError = clientErrors?.[field.name]?.[0] || errors?.[field.name]?.[0]
                 const isFieldDisabled = isFieldLockedForUser(field, record, config, currentUser)
                 const initialVal = values[field.name] !== undefined ? values[field.name] : getInitialValue(field, record, currentUser, config)
                 const rawFieldVal = record?.[field.name]
                 const isJsonArrayStr = typeof rawFieldVal === 'string' && rawFieldVal.trim().startsWith('[')
                 const existingFileUrl = record?.[`${field.name}_url`] || (rawFieldVal && typeof rawFieldVal === 'string' && !isJsonArrayStr ? (rawFieldVal.startsWith('http') ? rawFieldVal : `/storage/${rawFieldVal}`) : null)
-                const isFullWidth = field.type === 'textarea' || field.fullWidth
+                const isFullWidth = field.type === 'textarea' || field.type === 'checkbox_group' || field.fullWidth
 
                 return (
                   <div
@@ -735,6 +1180,29 @@ function ResourceForm({
                         })
                       }
 
+                      if (config.key === 'pekerjaan' && field.name === 'id_layanan') {
+                        selectOptions = selectOptions.filter((opt) => {
+                          if (record && initialVal && String(opt[valKey]) === String(initialVal)) return true
+                          return Boolean(opt.is_active)
+                        })
+
+                        const selectedKlienId = values.id_klien || record?.id_klien
+                        if (selectedKlienId && options?.klien) {
+                          const matchedKlien = options.klien.find((k) => String(k.id_klien) === String(selectedKlienId))
+                          const matchedKontrak = matchedKlien?.kontrak || (options?.kontrak || []).find((c) => String(c.id_kontrak) === String(matchedKlien?.id_kontrak))
+                          if (matchedKontrak) {
+                            const contractLayananIds = matchedKontrak.layanan_ids ||
+                              (Array.isArray(matchedKontrak.layanan) ? matchedKontrak.layanan.map((l) => l.id_layanan) : [])
+                            if (contractLayananIds.length > 0) {
+                              selectOptions = selectOptions.filter((opt) => {
+                                if (record && initialVal && String(opt[valKey]) === String(initialVal)) return true
+                                return contractLayananIds.includes(opt.id_layanan)
+                              })
+                            }
+                          }
+                        }
+                      }
+
                       const statusLabelFallback = {
                         baru: 'Baru (Menunggu Dikerjakan)',
                         in_progress: 'Dalam Pengerjaan',
@@ -773,6 +1241,10 @@ function ResourceForm({
                             fallbackHumanName = record?.user?.nama
                           } else if (field.name === 'id_pekerjaan') {
                             fallbackHumanName = record?.pekerjaan?.judul
+                          } else if (field.name === 'id_layanan') {
+                            fallbackHumanName = record?.layanan?.nama_layanan
+                          } else if (field.name === 'judul') {
+                            fallbackHumanName = record?.judul
                           } else if (statusLabelFallback[initialVal]) {
                             fallbackHumanName = statusLabelFallback[initialVal]
                           }
@@ -805,8 +1277,8 @@ function ResourceForm({
                                 ? field.formatOptionLabel(opt)
                                 : (typeof opt === 'object' ? (opt[lblKey] || opt[valKey] || opt) : opt)
                               return (
-                                <option key={optVal} value={optVal}>
-                                  {optLabel}
+                                <option key={optVal} value={optVal} disabled={Boolean(opt.__disabled)}>
+                                  {opt.__displayLabel || optLabel}
                                 </option>
                               )
                             })}
@@ -815,6 +1287,80 @@ function ResourceForm({
                             <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                               <span className="font-semibold text-gray-600 dark:text-gray-300">Catatan:</span> Penilaian hanya untuk tugas yang telah selesai &amp; disetujui pimpinan.
                             </p>
+                          )}
+                        </div>
+                      )
+                    })() : field.type === 'checkbox_group' ? (() => {
+                      const rawOptions = options[field.optionsResource] || []
+                      const relationOptions = typeof field.optionsFilter === 'function'
+                        ? rawOptions.filter(field.optionsFilter)
+                        : rawOptions
+                      const valKey = field.optionValue || 'id'
+                      const lblKey = field.optionLabel || 'name'
+                      const currentSelected = Array.isArray(values[field.name])
+                        ? values[field.name]
+                        : (Array.isArray(initialVal) ? initialVal : [])
+
+                      const toggleOption = (id) => {
+                        if (isFieldDisabled) return
+                        const numId = Number(id)
+                        const exists = currentSelected.some((x) => Number(x) === numId)
+                        const next = exists
+                          ? currentSelected.filter((x) => Number(x) !== numId)
+                          : [...currentSelected, numId]
+                        setValues((prev) => ({ ...prev, [field.name]: next }))
+                      }
+
+                      return (
+                        <div className="space-y-2">
+                          {field.description && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {field.description}
+                            </p>
+                          )}
+                          {relationOptions.length === 0 ? (
+                            <div className="p-4 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 text-xs text-gray-500 text-center bg-gray-50/50 dark:bg-gray-800/30">
+                              Belum ada data {field.label.toLowerCase()} yang aktif.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {relationOptions.map((opt) => {
+                                const optVal = Number(typeof opt === 'object' ? opt[valKey] : opt)
+                                const optLabel = typeof opt === 'object' ? (opt[lblKey] || optVal) : opt
+                                const optDesc = typeof opt === 'object' ? opt.deskripsi : null
+                                const isChecked = currentSelected.some((x) => Number(x) === optVal)
+
+                                return (
+                                  <label
+                                    key={optVal}
+                                    onClick={() => toggleOption(optVal)}
+                                    className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
+                                      isChecked
+                                        ? 'border-brand-500 bg-brand-50/70 dark:bg-brand-500/15 dark:border-brand-500 text-gray-900 dark:text-white shadow-xs ring-1 ring-brand-500/20'
+                                        : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-700 dark:text-gray-300'
+                                    } ${isFieldDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={isFieldDisabled}
+                                      onChange={() => {}}
+                                      className="size-4.5 rounded text-brand-600 focus:ring-brand-500 dark:bg-gray-800 dark:border-gray-700 mt-0.5 cursor-pointer"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-bold leading-snug">
+                                        {optLabel}
+                                      </p>
+                                      {optDesc && (
+                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
+                                          {optDesc}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </label>
+                                )
+                              })}
+                            </div>
                           )}
                         </div>
                       )
@@ -840,6 +1386,21 @@ function ResourceForm({
                         record={record}
                         onFileChange={handleFileChangeState}
                       />
+                    ) : field.type === 'month' ? (
+                      <MonthInputField
+                        key={`${field.name}-${record ? record[config.primaryKey] : 'new'}`}
+                        name={field.name}
+                        value={values[field.name] ?? (initialVal ?? '')}
+                        onChange={(newVal) => handleFieldChange(field.name, newVal)}
+                        disabled={isFieldDisabled}
+                        required={field.required && !isFieldDisabled}
+                        min={(() => {
+                          const now = new Date()
+                          const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                          const recordMonth = record?.[field.name]
+                          return recordMonth && recordMonth < currentMonthStr ? recordMonth : currentMonthStr
+                        })()}
+                      />
                     ) : (() => {
                       const isCreationDate = ['tgl_penugasan', 'tgl_lapor', 'tgl_followup', 'tgl_mulai'].includes(field.name)
                       const isTglPenugasan = field.name === 'tgl_penugasan'
@@ -861,9 +1422,24 @@ function ResourceForm({
                           calculatedVal = todayStr
                         }
                       } else if (isDeadline) {
-                        minDateAttr = tglPenugasanVal || todayStr
+                        const recordDeadlineStr = record?.deadline ? String(record.deadline).split('T')[0] : null
+                        const isOriginalDeadlinePast = recordDeadlineStr && recordDeadlineStr < todayStr
+                        // Jika deadline lama aslinya sudah lewat dan user belum mengubahnya,
+                        // izinkan nilai aslinya agar form tidak terblokir saat edit field lain.
+                        // Tetapi jika record baru, deadline asli >= todayStr, atau user memilih tanggal baru,
+                        // batas minimal kalender wajib todayStr.
+                        if (isOriginalDeadlinePast && values.deadline === recordDeadlineStr) {
+                          minDateAttr = recordDeadlineStr
+                        } else {
+                          minDateAttr = todayStr
+                        }
                       } else if (isTglSelesai) {
                         minDateAttr = todayStr
+                      } else if (field.type === 'month') {
+                        const now = new Date()
+                        const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                        const recordMonth = record?.[field.name]
+                        minDateAttr = recordMonth && recordMonth < currentMonthStr ? recordMonth : currentMonthStr
                       }
 
                       let displayVal = values[field.name] ?? (calculatedVal ?? '')
@@ -883,8 +1459,9 @@ function ResourceForm({
                           pattern={isNumericOnly ? '[0-9]*' : undefined}
                           maxLength={maxCharLength}
                           value={displayVal}
-                          min={minDateAttr}
-                          max={maxDateAttr}
+                          min={minDateAttr || (field.min !== undefined ? field.min : undefined)}
+                          max={maxDateAttr || (field.max !== undefined ? field.max : undefined)}
+                          step={field.step || (field.type === 'number' ? 'any' : undefined)}
                           autoComplete={
                             field.name === 'password' || field.type === 'password'
                               ? 'new-password'
@@ -969,7 +1546,7 @@ function ResourceForm({
         {config.key === 'pekerjaan' && record && (record.file_tugas_url || record.file_tugas_urls?.length || record.latest_reporting?.dokumen_bukti_url || record.latest_reporting?.dokumen_bukti_urls?.length || record.catatan_karyawan) && (
           <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-800/40 space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-orange-800 dark:text-orange-300">
-              📂 Berkas & Hasil Penyerahan Tugas Karyawan
+              Berkas & Hasil Penyerahan Tugas Karyawan
             </h4>
             {record.catatan_karyawan && (
               <p className="text-xs text-gray-700 dark:text-gray-300">
@@ -1015,15 +1592,15 @@ function ResourceForm({
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {isTaskCompleted || isReportCompleted ? (
                 <>
-                  🔒 <strong>Pekerjaan ini telah disetujui dan berstatus Selesai.</strong> Seluruh data telah dikunci secara permanen agar tidak merusak hasil pekerjaan yang telah tuntas.
+                  <strong>Pekerjaan ini telah disetujui dan berstatus Selesai.</strong> Seluruh data telah dikunci secara permanen agar tidak merusak hasil pekerjaan yang telah tuntas.
                 </>
               ) : isNonPicOperatorTask ? (
                 <>
-                  🔒 <strong>Bukan wewenang Anda.</strong> Hanya Operator PIC terkait yang berwenang mengedit pekerjaan ini.
+                  <strong>Bukan wewenang Anda.</strong> Hanya Operator PIC terkait yang berwenang mengedit pekerjaan ini.
                 </>
               ) : (
                 <>
-                  💡 Instruksi tugas dan status bersifat tetap. Untuk menyerahkan berkas & hasil kerja yang telah selesai, buat laporan pada menu <strong>Reporting</strong>.
+                  Instruksi tugas dan status bersifat tetap. Untuk menyerahkan berkas & hasil kerja yang telah selesai, buat laporan pada menu <strong>Reporting</strong>.
                 </>
               )}
             </p>
@@ -1037,7 +1614,7 @@ function ResourceForm({
           </div>
         ) : (
           <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
-            {record && (
+            {onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
@@ -1074,6 +1651,22 @@ function ResourceForm({
           </div>
         )}
       </form>
+
+      {/* Konfirmasi Hapus Draf Formulir */}
+      {showResetConfirm && (
+        <ConfirmModal
+          open={showResetConfirm}
+          title="Hapus Draf Formulir?"
+          message={`Apakah Anda yakin ingin menghapus seluruh draf isian formulir ${config.label} ini? Seluruh data yang telah diketik akan dikosongkan kembali.`}
+          confirmText="Ya, Kosongkan"
+          type="warning"
+          onConfirm={() => {
+            handleClearDraft()
+            setShowResetConfirm(false)
+          }}
+          onClose={() => setShowResetConfirm(false)}
+        />
+      )}
     </div>
   )
 }

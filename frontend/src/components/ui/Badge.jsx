@@ -20,7 +20,7 @@ export default function Badge({
       primary: 'bg-brand-50 text-brand-600 border border-brand-200/60 dark:bg-brand-500/15 dark:text-brand-400',
       success: 'bg-success-50 text-success-700 border border-success-200/60 dark:bg-success-500/15 dark:text-success-500',
       error: 'bg-error-50 text-error-700 border border-error-200/60 dark:bg-error-500/15 dark:text-error-500',
-      warning: 'bg-warning-50 text-warning-700 border border-warning-200/60 dark:bg-warning-500/15 dark:text-orange-400',
+      warning: 'bg-warning-50 text-warning-700 border border-warning-200/60 dark:bg-warning-500/15 dark:text-warning-400',
       info: 'bg-blue-light-50 text-blue-light-700 border border-blue-light-200/60 dark:bg-blue-light-500/15 dark:text-blue-light-500',
       light: 'bg-gray-100 text-gray-700 border border-gray-200/60 dark:bg-white/5 dark:text-white/80',
       dark: 'bg-gray-800 text-white border border-gray-700',

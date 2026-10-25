@@ -15,9 +15,14 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
   const sk = lead?.nomor_sk_kemenkumham || activeContract?.calon_klien?.nomor_sk_kemenkumham || '-'
   const izin = lead?.nomor_izin_usaha || activeContract?.calon_klien?.nomor_izin_usaha || '-'
 
-  const contractNo = activeContract?.no_kontrak || 'KTR/PPSA/DRAFT'
-  const projectScope = activeContract?.lingkup_kerja || 'Penyediaan Layanan Konsultansi dan Manajemen Sistem Informasi SIM-KK PPSA'
+  const contractNo = activeContract?.no_kontrak || 'KTR/ASCON/DRAFT'
+  const projectScope = activeContract?.lingkup_kerja || 'Penyediaan Layanan Konsultansi dan Manajemen Sistem Informasi SIM-KK'
   const projectValue = activeContract?.nilai_proyek ? Number(activeContract.nilai_proyek).toLocaleString('id-ID') : '0'
+  const rawCompanyName = lead?.nama_perusahaan || activeContract?.klien?.nama_perusahaan || activeContract?.calon_klien?.nama_perusahaan
+  const cleanCompanyName = rawCompanyName && rawCompanyName !== '-'
+    ? rawCompanyName.trim().replace(/[\\/:*?"<>|]+/g, '_')
+    : (directorName && directorName !== '-' ? directorName.trim().replace(/[\\/:*?"<>|]+/g, '_') : 'Klien')
+  const printDocTitle = `SIM-KK_${cleanCompanyName}`
 
   const { startDate, endDate, todayFormatted } = useMemo(() => {
     const now = new Date()
@@ -31,6 +36,9 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
   const isSigned = activeContract?.status === 'aktif'
 
   useEffect(() => {
+    const originalTitle = document.title
+    document.title = printDocTitle
+
     document.body.classList.add('contract-modal-open')
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -43,15 +51,17 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
     window.addEventListener('keydown', handleKeyDown)
 
     return () => {
+      document.title = originalTitle
       document.body.classList.remove('contract-modal-open')
       document.body.style.overflow = prevOverflow
       window.removeEventListener('keydown', handleKeyDown)
       const existingFrame = document.getElementById('contract-hidden-print-frame')
       if (existingFrame) existingFrame.remove()
     }
-  }, [onClose])
+  }, [onClose, printDocTitle])
 
   const handlePrint = () => {
+    document.title = printDocTitle
     const contractEl = document.getElementById('printable-contract-document')
     if (!contractEl) {
       window.print()
@@ -79,11 +89,11 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
       <html lang="id">
       <head>
         <meta charset="utf-8" />
-        <title>Surat Perjanjian Kontrak - ${contractNo}</title>
+        <title>${printDocTitle}</title>
         <style>
           @page {
             size: A4 portrait;
-            margin: 25mm 20mm 25mm 30mm;
+            margin: 20mm 20mm 20mm 25mm;
           }
           *, *::before, *::after {
             box-sizing: border-box;
@@ -98,7 +108,7 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
             background: #ffffff;
             color: #0f172a;
             font-family: 'Times New Roman', Times, serif;
-            font-size: 9.8pt;
+            font-size: 10pt;
             line-height: 1.42;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -110,20 +120,36 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
             padding: 0;
             overflow: visible;
           }
+          .contract-page {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            background: transparent !important;
+          }
+          .contract-page-2 {
+            page-break-before: always !important;
+            break-before: page !important;
+          }
+          .page-divider-badge, .no-print {
+            display: none !important;
+          }
           table {
             border-collapse: collapse;
             width: 100%;
           }
           td {
-            padding: 2px 0;
+            padding: 2.5px 0;
             vertical-align: top;
           }
           p {
-            margin: 0 0 5px 0;
+            margin: 0 0 6px 0;
           }
           .avoid-break {
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           ::-webkit-scrollbar {
             display: none !important;
@@ -177,7 +203,7 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
                 ? 'bg-success-50 text-success-700 border border-success-200'
                 : 'bg-warning-50 text-warning-700 border border-warning-200'
             }`}>
-              {isSigned ? '✓ Status: Kontrak Aktif' : 'Status: Draft Kontrak'}
+              {isSigned ? 'Status: Kontrak Aktif' : 'Status: Draft Kontrak'}
             </span>
             <button
               type="button"
@@ -199,194 +225,281 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '20px 28px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '8px',
+            padding: '16px',
+            backgroundColor: '#f1f5f9',
+            borderRadius: '12px',
             color: '#0f172a',
             fontFamily: "'Times New Roman', Times, serif",
-            lineHeight: '1.38',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+            lineHeight: '1.4',
           }}
         >
-          {/* KOP SURAT */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '2.5px double #0f172a', paddingBottom: '10px', marginBottom: '12px' }}>
-            <img
-              src="/images/logo/loading-logo.png"
-              alt="Logo SIM-KK"
-              style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                flexShrink: 0,
-              }}
-            />
-            <div style={{ flex: 1 }}>
-              <h2 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 800, color: '#0f172a', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                PUSAT PENGEMBANGAN SISTEM & APLIKASI (PPSA)
-              </h2>
-              <p style={{ margin: '2px 0', fontSize: '0.84rem', color: '#334155', fontWeight: 600 }}>
-                Layanan Terpadu Solusi Sistem Informasi, Tata Kelola & Konsultansi Manajemen
-              </p>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b' }}>
-                Gedung Graha PPSA Lt. 5, Jl. Rasuna Said Kav. 24, Jakarta Selatan | Telp: (021) 522-8901 | Email: legal@ppsa.co.id
+          {/* ==================== HALAMAN 1 ==================== */}
+          <div
+            className="contract-page contract-page-1"
+            style={{
+              backgroundColor: '#ffffff',
+              padding: '28px 32px 24px 32px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+              marginBottom: '16px',
+            }}
+          >
+            {/* KOP SURAT */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '2.5px double #0f172a', paddingBottom: '10px', marginBottom: '12px' }}>
+              <img
+                src="/images/logo/loading-logo.png"
+                alt="Logo SIM-KK"
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <h2 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 800, color: '#0f172a', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                  PT ASCON INOVASI DATA
+                </h2>
+                <p style={{ margin: '2px 0', fontSize: '0.84rem', color: '#334155', fontWeight: 600 }}>
+                  Layanan Terpadu Solusi Sistem Informasi, Tata Kelola &amp; Konsultansi Manajemen
+                </p>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b' }}>
+                  Jl. Hibrida XV No.15b, Sido Mulyo, Kec. Gading Cemp., Kota Bengkulu, Bengkulu 38229 | Telp: +62 821-7934-4263 | Email: admin@asconinovasidata.co.id
+                </p>
+              </div>
+            </div>
+
+            {/* DOKUMEN TITLE */}
+            <div style={{ textAlign: 'center', margin: '10px 0 12px 0' }}>
+              <h3 style={{ margin: 0, fontSize: '1.16rem', textDecoration: 'underline', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>
+                SURAT PERJANJIAN KERJA SAMA
+              </h3>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.88rem', fontWeight: 600, color: '#475569' }}>
+                Nomor: <span style={{ fontFamily: 'monospace', color: '#0f172a' }}>{contractNo}</span>
               </p>
             </div>
-          </div>
 
-          {/* DOKUMEN TITLE */}
-          <div style={{ textAlign: 'center', margin: '10px 0 12px 0' }}>
-            <h3 style={{ margin: 0, fontSize: '1.16rem', textDecoration: 'underline', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>
-              SURAT PERJANJIAN KERJA SAMA
-            </h3>
-            <p style={{ margin: '3px 0 0 0', fontSize: '0.88rem', fontWeight: 600, color: '#475569' }}>
-              Nomor: <span style={{ fontFamily: 'monospace', color: '#0f172a' }}>{contractNo}</span>
+            {/* OPENING CLAUSE */}
+            <p style={{ fontSize: '0.88rem', textAlign: 'justify', marginBottom: '10px', lineHeight: '1.45' }}>
+              Pada hari ini, tanggal <strong>{todayFormatted}</strong>, bertempat di Kantor PT Ascon Inovasi Data, kami yang bertanda tangan di bawah ini:
             </p>
-          </div>
 
-          {/* OPENING CLAUSE */}
-          <p style={{ fontSize: '0.88rem', textAlign: 'justify', marginBottom: '10px', lineHeight: '1.45' }}>
-            Pada hari ini, tanggal <strong>{todayFormatted}</strong>, bertempat di Kantor PPSA Jakarta, kami yang bertanda tangan di bawah ini:
-          </p>
-
-          {/* PIHAK PERTAMA & KEDUA */}
-          <div style={{ fontSize: '0.86rem', marginBottom: '12px', paddingLeft: '4px' }}>
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.88rem', marginBottom: '2px' }}>I. PIHAK PERTAMA (Penyedia Jasa):</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '2px', fontSize: '0.86rem', lineHeight: '1.4' }}>
-                <tbody>
-                  <tr>
-                    <td style={{ width: '155px', verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Nama Instansi</td>
-                    <td style={{ width: '12px', verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}><strong>SIM-KK PPSA (Pusat Pengembangan Sistem & Aplikasi)</strong></td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Alamat Kantor</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}>Gedung Graha PPSA Lt. 5, Jl. Rasuna Said Kav. 24, Jakarta Selatan</td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Kedudukan</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}>Penyedia Layanan Manajemen Sistem & Konsultansi Teknologi</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div>
-              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.88rem', marginBottom: '2px' }}>II. PIHAK KEDUA (Klien):</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '2px', fontSize: '0.86rem', lineHeight: '1.4' }}>
-                <tbody>
-                  <tr>
-                    <td style={{ width: '155px', verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Nama Perusahaan</td>
-                    <td style={{ width: '12px', verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}><strong>{companyName}</strong></td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Diwakili Oleh</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}><strong>{directorName}</strong> (selaku Direktur / Penanggung Jawab)</td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Alamat Perusahaan</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}>{address}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Kontak Person</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}>{contact}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Legalitas NIB & NPWP</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}>
-                      NIB: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{nib}</span> &nbsp;|&nbsp; 
-                      NPWP: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{npwp}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Akta, SK & Izin</td>
-                    <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
-                    <td style={{ padding: '2px 0' }}>Akta No. {akta} / SK: {sk} &nbsp;|&nbsp; Izin: {izin}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <p style={{ fontSize: '0.88rem', textAlign: 'justify', margin: '8px 0 10px 0', lineHeight: '1.45' }}>
-            Kedua belah pihak sepakat mengikatkan diri dalam Perjanjian Kerja Sama dengan ketentuan dan syarat-syarat sebagai berikut:
-          </p>
-
-          {/* PASAL-PASAL */}
-          <div style={{ fontSize: '0.86rem', marginBottom: '14px' }}>
-            <div style={{ marginBottom: '8px' }}>
-              <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 1: RUANG LINGKUP PEKERJAAN</strong>
-              <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
-                PIHAK PERTAMA bertindak sebagai pelaksana jasa teknis dan konsultansi yang berkewajiban merancang, membangun, mengimplementasikan, serta mengelola sistem informasi untuk PIHAK KEDUA, dengan spesifikasi lingkup kerja: <strong>{projectScope}</strong>.
-              </p>
-            </div>
-
-            <div style={{ marginBottom: '8px' }}>
-              <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 2: JANGKA WAKTU PERJANJIAN</strong>
-              <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
-                Perjanjian ini berlaku efektif terhitung sejak tanggal <strong>{startDate}</strong> sampai dengan tanggal <strong>{endDate}</strong>, dan dapat diperpanjang atas kesepakatan tertulis kedua belah pihak.
-              </p>
-            </div>
-
-            <div style={{ marginBottom: '8px' }}>
-              <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 3: NILAI KONTRAK & PEMBAYARAN</strong>
-              <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
-                Nilai total kesepakatan kerja sama yang disetujui para pihak adalah sebesar <strong>Rp {projectValue}</strong> (belum termasuk pajak dan biaya operasional tambahan jika disepakati terpisah).
-              </p>
-            </div>
-
-            <div style={{ marginBottom: '8px' }}>
-              <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 4: REGISTRASI KLIEN AKTIF OTOMATIS</strong>
-              <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
-                Melalui perjanjian ini, PIHAK KEDUA secara otomatis dan resmi terdaftar dalam basis data sistem SIM-KK PPSA sebagai <strong>Klien Aktif</strong>, dan berhak mendapatkan hak akses modul pekerjaan, pemantauan timeline, dan laporan kinerja secara berkala.
-              </p>
-            </div>
-
-            <div>
-              <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 5: PENUTUP</strong>
-              <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
-                Surat Perjanjian ini dibuat dalam 2 (dua) rangkap bermeterai cukup dan masing-masing memiliki kekuatan hukum yang sah dan mengikat kedua belah pihak sejak ditandatangani.
-              </p>
-            </div>
-          </div>
-
-          {/* SIGNATURE SECTION */}
-          <div className="avoid-break" style={{ marginTop: '22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '36px', textAlign: 'center', fontSize: '0.88rem' }}>
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontWeight: 700 }}>PIHAK PERTAMA</p>
-              <p style={{ margin: '0 0 6px 0', color: '#64748b' }}>SIM-KK PPSA</p>
-              <div style={{ height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '0.74rem', color: '#94a3b8', border: '1px dashed #cbd5e1', padding: '6px 14px', borderRadius: '4px' }}>
-                  (Tanda Tangan & Cap Lembaga)
-                </span>
+            {/* PIHAK PERTAMA & KEDUA */}
+            <div style={{ fontSize: '0.86rem', marginBottom: '12px', paddingLeft: '4px' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.88rem', marginBottom: '2px' }}>I. PIHAK PERTAMA (Penyedia Jasa):</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '2px', fontSize: '0.86rem', lineHeight: '1.4' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: '155px', verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Nama Instansi</td>
+                      <td style={{ width: '12px', verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}><strong>PT Ascon Inovasi Data</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Alamat Kantor</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}>Jl. Hibrida XV No.15b, Sido Mulyo, Kec. Gading Cemp., Kota Bengkulu, Bengkulu 38229</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Kedudukan</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}>Penyedia Layanan Manajemen Sistem &amp; Konsultansi Teknologi</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <p style={{ margin: '0', fontWeight: 700, textDecoration: 'underline', fontSize: '0.88rem' }}>
-                Direktur Eksekutif PPSA
-              </p>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>Pusat Pengembangan Sistem & Aplikasi</p>
+
+              <div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.88rem', marginBottom: '2px' }}>II. PIHAK KEDUA (Klien):</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '2px', fontSize: '0.86rem', lineHeight: '1.4' }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: '155px', verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Nama Perusahaan</td>
+                      <td style={{ width: '12px', verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}><strong>{companyName}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Diwakili Oleh</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}><strong>{directorName}</strong> (selaku Direktur / Penanggung Jawab)</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Alamat Perusahaan</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}>{address}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Kontak Person</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}>{contact}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Legalitas NIB &amp; NPWP</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}>
+                        NIB: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{nib}</span> &nbsp;|&nbsp; 
+                        NPWP: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{npwp}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ verticalAlign: 'top', color: '#475569', padding: '2px 0' }}>Akta, SK &amp; Izin</td>
+                      <td style={{ verticalAlign: 'top', padding: '2px 0' }}>:</td>
+                      <td style={{ padding: '2px 0' }}>Akta No. {akta} / SK: {sk} &nbsp;|&nbsp; Izin: {izin}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontWeight: 700 }}>PIHAK KEDUA</p>
-              <p style={{ margin: '0 0 6px 0', color: '#64748b' }}>{companyName}</p>
-              <div style={{ height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '0.74rem', color: '#94a3b8', border: '1px dashed #cbd5e1', padding: '6px 14px', borderRadius: '4px' }}>
-                  (Meterai Rp 10.000 & Tanda Tangan)
-                </span>
+            <p style={{ fontSize: '0.88rem', textAlign: 'justify', margin: '8px 0 10px 0', lineHeight: '1.45' }}>
+              Kedua belah pihak sepakat mengikatkan diri dalam Perjanjian Kerja Sama dengan ketentuan dan syarat-syarat sebagai berikut:
+            </p>
+
+            {/* PASAL 1 & 2 */}
+            <div style={{ fontSize: '0.86rem', marginBottom: '16px' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 1: RUANG LINGKUP PEKERJAAN &amp; PAKET LAYANAN</strong>
+                <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
+                  PIHAK PERTAMA bertindak sebagai pelaksana jasa teknis dan konsultansi yang berkewajiban merancang, membangun, mengimplementasikan, serta mengelola pekerjaan untuk PIHAK KEDUA, dengan rincian lingkup kerja: <strong>{projectScope}</strong>.
+                </p>
+                {activeContract?.layanan && activeContract.layanan.length > 0 && (
+                  <div style={{ marginTop: '5px', fontSize: '0.84rem' }}>
+                    <span>Daftar Paket Layanan Resmi yang Disepakati:</span>
+                    <ul style={{ margin: '3px 0 0 18px', padding: 0, listStyleType: 'disc' }}>
+                      {activeContract.layanan.map((l) => (
+                        <li key={l.id_layanan} style={{ marginBottom: '2px' }}>
+                          <strong>{l.nama_layanan}</strong> {l.deskripsi ? `— ${l.deskripsi}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              <p style={{ margin: '0', fontWeight: 700, textDecoration: 'underline', fontSize: '0.88rem' }}>
-                {directorName}
+
+              <div>
+                <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 2: JANGKA WAKTU PERJANJIAN</strong>
+                <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
+                  Perjanjian ini berlaku efektif terhitung sejak tanggal <strong>{startDate}</strong> sampai dengan tanggal <strong>{endDate}</strong>, dan dapat diperpanjang atas kesepakatan tertulis kedua belah pihak.
+                </p>
+              </div>
+            </div>
+
+            {/* FOOTER HALAMAN 1 */}
+            <div style={{ marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic' }}>
+              <span>Surat Perjanjian Kerja Sama — PT Ascon Inovasi Data &amp; {companyName}</span>
+              <span>Halaman 1 dari 2</span>
+            </div>
+          </div>
+
+          {/* PEMISAH HALAMAN CETAK (HANYA DITAMPILKAN DI PREVIEW LAYAR) */}
+          <div className="page-divider-badge no-print" style={{ margin: '14px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ height: '1px', backgroundColor: '#cbd5e1', flex: 1 }} />
+            <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#475569', backgroundColor: '#e2e8f0', padding: '4px 12px', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              📄 Batas Halaman Cetak (Awal Halaman 2)
+            </span>
+            <div style={{ height: '1px', backgroundColor: '#cbd5e1', flex: 1 }} />
+          </div>
+
+          {/* ==================== HALAMAN 2 ==================== */}
+          <div
+            className="contract-page contract-page-2"
+            style={{
+              backgroundColor: '#ffffff',
+              padding: '28px 32px 24px 32px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            {/* MINI HEADER HALAMAN 2 */}
+            <div style={{ paddingBottom: '8px', marginBottom: '14px', borderBottom: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+              <span>Lanjutan Surat Perjanjian Kerja Sama No: <strong style={{ color: '#0f172a' }}>{contractNo}</strong></span>
+              <span>PT Ascon Inovasi Data &amp; {companyName}</span>
+            </div>
+
+            {/* PASAL 3, 4, 5, 6 */}
+            <div style={{ fontSize: '0.86rem', marginBottom: '14px' }}>
+              <div style={{ marginBottom: '10px' }}>
+                <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 3: NILAI KONTRAK &amp; KETENTUAN PEMBAYARAN</strong>
+                <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
+                  1. Nilai total kesepakatan kerja sama yang disetujui para pihak adalah sebesar <strong>Rp {projectValue}</strong> (belum termasuk Pajak Pertambahan Nilai dan biaya operasional teknis tambahan yang disepakati terpisah).
+                </p>
+                <p style={{ margin: '4px 0 0 0', textAlign: 'justify', lineHeight: '1.42' }}>
+                  2. Pembayaran dilakukan melalui transfer perbankan ke rekening resmi <strong>PT Ascon Inovasi Data</strong> sesuai kesepakatan termin atau dokumen tagihan resmi (invoice) yang diterbitkan oleh PIHAK PERTAMA.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '10px' }}>
+                <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 4: HAK, KEWAJIBAN &amp; KERAHASIAAN INFORMASI</strong>
+                <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
+                  1. Melalui perjanjian ini, PIHAK KEDUA secara otomatis dan resmi terdaftar dalam basis data sistem SIM-KK sebagai <strong>Klien Aktif</strong>, serta berhak mendapatkan hak akses modul pekerjaan, pemantauan timeline, dan laporan kinerja secara berkala.
+                </p>
+                <p style={{ margin: '4px 0 0 0', textAlign: 'justify', lineHeight: '1.42' }}>
+                  2. Kedua belah pihak berkewajiban menjaga kerahasiaan seluruh data operasional, dokumen teknis, dan informasi rahasia yang diperoleh selama pelaksanaan kerja sama (<em>Non-Disclosure Commitment</em>).
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '10px' }}>
+                <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 5: PENYELESAIAN PERSELISIHAN &amp; FORCE MAJEURE</strong>
+                <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
+                  1. Apabila terjadi perbedaan penafsiran atau perselisihan dalam pelaksanaan perjanjian ini, para pihak sepakat untuk menyelesaikannya secara musyawarah untuk mufakat.
+                </p>
+                <p style={{ margin: '4px 0 0 0', textAlign: 'justify', lineHeight: '1.42' }}>
+                  2. Hal-hal yang timbul di luar kemampuan para pihak (keadaan kahar / <em>force majeure</em>) seperti bencana alam, huru-hara, atau regulasi pemerintah yang berdampak langsung akan diselesaikan secara musyawarah mufakat.
+                </p>
+              </div>
+
+              <div>
+                <strong style={{ display: 'block', textAlign: 'center', marginBottom: '2px', fontSize: '0.88rem' }}>Pasal 6: KETENTUAN PENUTUP</strong>
+                <p style={{ margin: 0, textAlign: 'justify', lineHeight: '1.42' }}>
+                  Surat Perjanjian ini dibuat dalam 2 (dua) rangkap asli bermeterai cukup dan masing-masing pihak memegang 1 (satu) rangkap yang memiliki kekuatan hukum pembuktian yang sama dan sah sejak tanggal ditandatangani oleh kedua belah pihak.
+                </p>
+              </div>
+            </div>
+
+            {/* PENGESAHAN DOKUMEN & TANDA TANGAN */}
+            <div className="avoid-break" style={{ marginTop: '20px' }}>
+              <p style={{ textAlign: 'right', fontSize: '0.84rem', margin: '0 0 10px 0', color: '#334155' }}>
+                Bengkulu, {todayFormatted}
               </p>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>Direktur / Penanggung Jawab</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '36px', textAlign: 'center', fontSize: '0.88rem' }}>
+                <div>
+                  <p style={{ margin: '0 0 2px 0', fontWeight: 700 }}>PIHAK PERTAMA</p>
+                  <p style={{ margin: '0 0 6px 0', color: '#64748b' }}>PT Ascon Inovasi Data</p>
+                  <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', border: '1px dashed #cbd5e1', padding: '6px 14px', borderRadius: '4px' }}>
+                      (Tanda Tangan &amp; Cap Perusahaan)
+                    </span>
+                  </div>
+                  <p style={{ margin: '0', fontWeight: 700, textDecoration: 'underline', fontSize: '0.88rem' }}>
+                    Direktur PT Ascon Inovasi Data
+                  </p>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>PT Ascon Inovasi Data</p>
+                </div>
+
+                <div>
+                  <p style={{ margin: '0 0 2px 0', fontWeight: 700 }}>PIHAK KEDUA</p>
+                  <p style={{ margin: '0 0 6px 0', color: '#64748b' }}>{companyName}</p>
+                  <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', border: '1px dashed #cbd5e1', padding: '6px 14px', borderRadius: '4px' }}>
+                      (Meterai Rp 10.000 &amp; Tanda Tangan)
+                    </span>
+                  </div>
+                  <p style={{ margin: '0', fontWeight: 700, textDecoration: 'underline', fontSize: '0.88rem' }}>
+                    {directorName}
+                  </p>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>Direktur / Penanggung Jawab</p>
+                </div>
+              </div>
+            </div>
+
+            {/* FOOTER HALAMAN 2 */}
+            <div style={{ marginTop: '22px', paddingTop: '10px', borderTop: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic' }}>
+              <span>Surat Perjanjian Kerja Sama — PT Ascon Inovasi Data &amp; {companyName}</span>
+              <span>Halaman 2 dari 2</span>
             </div>
           </div>
         </div>
@@ -404,7 +517,10 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
               onClick={handlePrint}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-sm font-semibold text-white shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer"
             >
-              <span>🖨️</span> Cetak / Simpan PDF
+              <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              <span>Cetak / Simpan PDF</span>
             </button>
 
             <button

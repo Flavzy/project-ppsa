@@ -17,6 +17,7 @@ class KontrakResource extends JsonResource
         return [
             'id_kontrak' => $this->id_kontrak,
             'id_calon_klien' => $this->id_calon_klien,
+            'operator_pic_id' => $this->operator_pic_id,
             'no_kontrak' => $this->no_kontrak,
             'jenis_dokumen' => $this->jenis_dokumen,
             'no_spk' => $this->no_spk,
@@ -30,6 +31,10 @@ class KontrakResource extends JsonResource
             'ditandatangani_pada' => $this->ditandatangani_pada?->toDateString(),
             'reviewed_by' => $this->reviewed_by,
             'reviewed_at' => $this->reviewed_at?->toDateTimeString(),
+            'layanan' => LayananResource::collection($this->whenLoaded('layanan')),
+            'layanan_ids' => $this->relationLoaded('layanan')
+                ? $this->layanan->pluck('id_layanan')->values()->all()
+                : ($this->resource->exists ? $this->layanan()->pluck('layanan.id_layanan')->values()->all() : []),
             'calon_klien' => new CalonKlienResource($this->whenLoaded('calonKlien')),
             'klien' => new KlienResource($this->whenLoaded('klien')),
             'reviewer' => new UserResource($this->whenLoaded('reviewer')),

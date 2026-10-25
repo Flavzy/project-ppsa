@@ -51,6 +51,7 @@ class CalonKlien extends Model
         'nilai_estimasi',
         'catatan',
         'status_prospek',
+        'layanan_ids',
         'tgl_followup',
         'nomor_nib',
         'nomor_npwp',
@@ -63,6 +64,11 @@ class CalonKlien extends Model
         'file_sk_kemenkumham',
         'file_izin_usaha',
         'file_dokumen_pendukung',
+    ];
+
+    protected $casts = [
+        'layanan_ids' => 'array',
+        'tgl_followup' => 'date',
     ];
 
     /**

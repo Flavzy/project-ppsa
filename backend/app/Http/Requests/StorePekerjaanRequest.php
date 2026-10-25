@@ -22,6 +22,18 @@ class StorePekerjaanRequest extends FormRequest
 
         return [
             'id_klien' => ['required', 'integer', 'exists:klien,id_klien'],
+            'id_layanan' => ['nullable', 'integer', 'exists:layanan,id_layanan'],
+            'id_master_pekerjaan' => ['nullable', 'integer', 'exists:master_pekerjaan,id_master_pekerjaan'],
+            'periode_bulan' => [
+                'nullable',
+                'string',
+                'max:20',
+                function ($attribute, $value, $fail) {
+                    if (!empty($value) && $value < now()->format('Y-m')) {
+                        $fail('Bulan pengerjaan tidak boleh sebelum bulan ini.');
+                    }
+                },
+            ],
             'id_pic' => [
                 'required',
                 'integer',

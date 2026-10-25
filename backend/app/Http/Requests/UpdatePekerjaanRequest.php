@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Pekerjaan;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,10 +20,25 @@ class UpdatePekerjaanRequest extends FormRequest
     public function rules(): array
     {
         $pekerjaan = $this->route('pekerjaan');
-        $tglPenugasan = $this->input('tgl_penugasan', $pekerjaan?->tgl_penugasan?->toDateString());
+        if (!($pekerjaan instanceof Pekerjaan) && $pekerjaan) {
+            $pekerjaan = Pekerjaan::find($pekerjaan);
+        }
+        $tglPenugasan = $this->input('tgl_penugasan', $pekerjaan?->tgl_penugasan ? \Carbon\Carbon::parse($pekerjaan->tgl_penugasan)->toDateString() : null);
 
         return [
             'id_klien' => ['sometimes', 'required', 'integer', 'exists:klien,id_klien'],
+            'id_layanan' => ['nullable', 'integer', 'exists:layanan,id_layanan'],
+            'id_master_pekerjaan' => ['nullable', 'integer', 'exists:master_pekerjaan,id_master_pekerjaan'],
+            'periode_bulan' => [
+                'nullable',
+                'string',
+                'max:20',
+                function ($attribute, $value, $fail) use ($pekerjaan) {
+                    if (!empty($value) && $value !== $pekerjaan?->periode_bulan && $value < now()->format('Y-m')) {
+                        $fail('Bulan pengerjaan tidak boleh sebelum bulan ini.');
+                    }
+                },
+            ],
             'id_pic' => [
                 'sometimes',
                 'required',
@@ -53,12 +69,21 @@ class UpdatePekerjaanRequest extends FormRequest
             'lampiran_instruksi_existing.*' => ['nullable', 'string'],
             'lampiran_instruksi_existing_present' => ['nullable', 'string'],
             'tgl_penugasan' => ['sometimes', 'nullable', 'date'],
-            'deadline' => array_filter([
+            'deadline' => [
                 'sometimes',
                 'required',
                 'date',
-                $tglPenugasan ? 'after_or_equal:' . $tglPenugasan : null,
-            ]),
+                function ($attribute, $value, $fail) use ($pekerjaan, $tglPenugasan) {
+                    $today = now()->toDateString();
+                    $originalDeadline = $pekerjaan?->deadline ? \Carbon\Carbon::parse($pekerjaan->deadline)->toDateString() : null;
+                    if ($value !== $originalDeadline && $value < $today) {
+                        $fail('Batas waktu (deadline) tidak boleh sebelum hari ini.');
+                    }
+                    if ($tglPenugasan && $value < $tglPenugasan) {
+                        $fail('Tanggal batas waktu deadline tidak boleh sebelum tanggal memasukkan tugas.');
+                    }
+                },
+            ],
             'prioritas' => ['nullable', 'string', 'max:255'],
             'progress_persen' => ['nullable', 'integer', 'min:0', 'max:100'],
             'status' => ['sometimes', 'required', 'string', 'max:255'],

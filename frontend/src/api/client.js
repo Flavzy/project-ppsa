@@ -70,6 +70,18 @@ async function parseResponse(response, isLoginRequest) {
     const error = new Error(message)
     error.status = response.status
     error.errors = payload.errors || {}
+    if (payload.retry_after !== undefined) {
+      error.retryAfter = Number(payload.retry_after)
+    }
+    if (payload.lockout_stage !== undefined) {
+      error.lockoutStage = Number(payload.lockout_stage)
+    }
+    if (payload.remaining_attempts !== undefined) {
+      error.remainingAttempts = Number(payload.remaining_attempts)
+    }
+    if (payload.failed_attempts !== undefined) {
+      error.failedAttempts = Number(payload.failed_attempts)
+    }
     throw error
   }
 
@@ -156,7 +168,7 @@ export async function apiRequest(path, options = {}) {
 export function loginApi(email, password) {
   return apiRequest('auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, username: email, password }),
     skipAuth: true,
   })
 }

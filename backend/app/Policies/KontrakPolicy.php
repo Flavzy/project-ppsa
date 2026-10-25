@@ -24,7 +24,16 @@ class KontrakPolicy
 
     public function update(User $user, Kontrak $kontrak): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
+        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
+            return true;
+        }
+
+        if (in_array($user->role, ['operator', 'sales'], true)) {
+            $operatorPicId = $kontrak->operator_pic_id;
+            return $operatorPicId !== null && (int) $operatorPicId === (int) $user->id_user;
+        }
+
+        return false;
     }
 
     public function delete(User $user, Kontrak $kontrak): bool

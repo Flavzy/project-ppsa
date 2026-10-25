@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreKontrakRequest;
 use App\Http\Requests\UpdateKontrakRequest;
 use App\Http\Resources\KontrakResource;
+use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Helpers\FileUploadHelper;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,7 @@ class KontrakController extends Controller
         Gate::authorize('viewAny', Kontrak::class);
 
         $kontrak = Kontrak::query()
-            ->with(['calonKlien', 'klien', 'reviewer'])
+            ->with(['calonKlien', 'klien', 'reviewer', 'layanan'])
             ->orderByDesc('id_kontrak')
             ->get();
 
@@ -32,8 +33,33 @@ class KontrakController extends Controller
         Gate::authorize('create', Kontrak::class);
 
         $data = $this->preparePayload($request);
-        $kontrak = Kontrak::create($data)
-            ->load(['calonKlien', 'klien', 'reviewer']);
+        $kontrak = Kontrak::create($data);
+
+        if ($request->has('layanan_ids')) {
+            $layananIds = $request->input('layanan_ids') ?: [];
+            $kontrak->layanan()->sync($layananIds);
+
+            if ($kontrak->klien) {
+                $layananNames = $kontrak->layanan()->pluck('nama_layanan')->implode(', ');
+                if ($layananNames) {
+                    $kontrak->klien->update(['layanan' => $layananNames]);
+                }
+            }
+        }
+
+        $calonKlien = $kontrak->calonKlien;
+        if ($calonKlien && !$kontrak->klien()->exists()) {
+            $layananNames = $kontrak->layanan()->pluck('nama_layanan')->implode(', ') ?: 'Layanan Terpadu SIM-KK';
+            Klien::create([
+                'id_kontrak' => $kontrak->id_kontrak,
+                'nama_perusahaan' => $calonKlien->nama_perusahaan,
+                'alamat' => !empty($calonKlien->alamat_perusahaan) ? $calonKlien->alamat_perusahaan : 'Alamat terlampir',
+                'kontak' => !empty($calonKlien->kontak_person) ? $calonKlien->kontak_person : ($calonKlien->kontak ?: '-'),
+                'layanan' => $layananNames,
+            ]);
+        }
+
+        $kontrak->load(['calonKlien', 'klien', 'reviewer', 'layanan']);
 
         return (new KontrakResource($kontrak))
             ->response()
@@ -44,7 +70,7 @@ class KontrakController extends Controller
     {
         Gate::authorize('view', $kontrak);
 
-        return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer']));
+        return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer', 'layanan']));
     }
 
     public function update(UpdateKontrakRequest $request, Kontrak $kontrak): KontrakResource
@@ -53,7 +79,19 @@ class KontrakController extends Controller
 
         $kontrak->update($this->preparePayload($request));
 
-        return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer']));
+        if ($request->has('layanan_ids')) {
+            $layananIds = $request->input('layanan_ids') ?: [];
+            $kontrak->layanan()->sync($layananIds);
+
+            if ($kontrak->klien) {
+                $layananNames = $kontrak->layanan()->pluck('nama_layanan')->implode(', ');
+                if ($layananNames) {
+                    $kontrak->klien->update(['layanan' => $layananNames]);
+                }
+            }
+        }
+
+        return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer', 'layanan']));
     }
 
     public function destroy(Kontrak $kontrak): Response

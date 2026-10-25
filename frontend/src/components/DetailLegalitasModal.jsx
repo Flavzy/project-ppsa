@@ -147,7 +147,7 @@ export default function DetailLegalitasModal({ record, onClose }) {
                             href={item.fileUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-[220px]"
+                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200/80 dark:bg-brand-500/15 dark:text-brand-300 dark:border-brand-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-[220px]"
                             title={`Buka / Unduh ${fileName}`}
                           >
                             <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -187,7 +187,7 @@ export default function DetailLegalitasModal({ record, onClose }) {
                               href={doc.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 dark:bg-indigo-500/15 dark:text-indigo-300 dark:border-indigo-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-[220px]"
+                              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200/80 dark:bg-brand-500/15 dark:text-brand-300 dark:border-brand-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer max-w-[220px]"
                               title={`Buka / Unduh ${docName}`}
                             >
                               <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

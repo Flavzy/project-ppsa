@@ -41,6 +41,14 @@ export function convertLead(idCalonKlien, payload) {
   })
 }
 
+export function batchCreatePekerjaan(payload) {
+  const isFormData = payload instanceof FormData
+  return apiRequest('pekerjaan/batch', {
+    method: 'POST',
+    body: isFormData ? payload : JSON.stringify(payload),
+  })
+}
+
 export function startPekerjaan(idPekerjaan) {
   return apiRequest(`pekerjaan/${idPekerjaan}/start`, {
     method: 'POST',

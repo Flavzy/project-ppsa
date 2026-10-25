@@ -19,11 +19,19 @@ import ApproveTaskModal from './ApproveTaskModal'
 import PromptModal from './PromptModal'
 import ResourceForm from './ResourceForm'
 import ResourceTable from './ResourceTable'
+import BatchTaskAssignmentCard from './BatchTaskAssignmentCard'
 import ToastNotification from './ToastNotification'
 import LoadingSpinner from './common/LoadingSpinner'
 import { clearFormDraft } from '../utils/formDraft'
 
-function ResourceDashboard({ config, resourceConfigs, supportResources, onNavigate }) {
+function ResourceDashboard({
+  config,
+  resourceConfigs,
+  supportResources,
+  onNavigate,
+  initialNavParams,
+  onClearNavParams,
+}) {
   const { user } = useAuth()
   const cachedRecords = getCachedApiData(config.endpoint)
   const [records, setRecords] = useState(() => (Array.isArray(cachedRecords) ? cachedRecords : []))
@@ -38,6 +46,17 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
   const [viewingLegalitas, setViewingLegalitas] = useState(null)
   const [viewingContract, setViewingContract] = useState(null)
   const [formVersion, setFormVersion] = useState(0)
+  const [taskMode, setTaskMode] = useState('batch') // 'batch' (dari template layanan) | 'custom' (manual)
+  const [isFormOpen, setIsFormOpen] = useState(() => {
+    if (config.key === 'pekerjaan') {
+      if (initialNavParams) return true
+      try {
+        const stored = sessionStorage.getItem('target_batch_assignment')
+        if (stored) return true
+      } catch {}
+    }
+    return false
+  })
 
   // Custom modal dialogs to replace browser confirm/prompt
   const [confirmDialog, setConfirmDialog] = useState({
@@ -73,6 +92,18 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
     severity: 'success',
   })
 
+  const handleCloseToast = useCallback(() => {
+    setToast((prev) => ({ ...prev, open: false }))
+  }, [])
+
+  useEffect(() => {
+    if (!successMessage) return
+    const timer = setTimeout(() => {
+      setSuccessMessage('')
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [successMessage])
+
   const canCreate = config.canCreate ? config.canCreate.includes(user?.role) : true
   const canEdit = config.canEdit ? config.canEdit.includes(user?.role) : true
   const canDelete = config.canDelete ? config.canDelete.includes(user?.role) : true
@@ -83,10 +114,23 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
       .map((field) => field.optionsResource)
     const allResources = [...resourceConfigs, ...supportResources]
 
-    return relationKeys
+    const extraKeys = config.key === 'pekerjaan' ? ['layanan', 'kontrak', 'klien', 'users', 'masterPekerjaan'] : []
+    const combinedKeys = Array.from(new Set([...relationKeys, ...extraKeys]))
+
+    return combinedKeys
       .map((key) => allResources.find((resource) => resource.key === key))
       .filter(Boolean)
-  }, [config.fields, resourceConfigs, supportResources])
+  }, [config.fields, config.key, resourceConfigs, supportResources])
+
+  const karyawanEmployees = useMemo(
+    () => (options.users || []).filter((u) => u.role === 'karyawan'),
+    [options.users]
+  )
+
+  const activeServices = useMemo(
+    () => (options.layanan || []).filter((l) => Boolean(l.is_active)),
+    [options.layanan]
+  )
 
   const loadOptionsSafely = useCallback(async () => {
     const entries = await Promise.all(
@@ -106,6 +150,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
     invalidateApiCache()
     setLoading(true)
     setError('')
+    let fetchErr = null
     try {
       const [resourceRecords, optionMap] = await Promise.all([
         listResource(config.endpoint),
@@ -115,10 +160,13 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
       setRecords(resourceRecords)
       setOptions(optionMap)
     } catch (requestError) {
-      setError(requestError.message)
-      setToast({ open: true, message: requestError.message, severity: 'error' })
+      fetchErr = requestError
     } finally {
       setLoading(false)
+    }
+    if (fetchErr) {
+      setError(fetchErr.message)
+      setToast({ open: true, message: fetchErr.message, severity: 'error' })
     }
   }, [config.endpoint, loadOptionsSafely])
 
@@ -126,6 +174,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
     let ignore = false
 
     async function fetchRecords() {
+      let fetchErr = null
       try {
         const [resourceRecords, optionMap] = await Promise.all([
           listResource(config.endpoint),
@@ -138,28 +187,60 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         }
       } catch (requestError) {
         if (!ignore) {
-          setError(requestError.message)
-          setToast({ open: true, message: requestError.message, severity: 'error' })
+          fetchErr = requestError
         }
       } finally {
         if (!ignore) {
           setLoading(false)
         }
       }
+      if (!ignore && fetchErr) {
+        setError(fetchErr.message)
+        setToast({ open: true, message: fetchErr.message, severity: 'error' })
+      }
     }
 
-    fetchRecords()
+      fetchRecords()
 
-    return () => {
-      ignore = true
+      return () => {
+        ignore = true
+      }
+    }, [config.endpoint, config.key])
+
+  useEffect(() => {
+    if (config.key === 'pekerjaan') {
+      if (initialNavParams) {
+        setIsFormOpen(true)
+        setTaskMode('batch')
+        setEditingRecord(null)
+        return
+      }
+      try {
+        const stored = sessionStorage.getItem('target_batch_assignment')
+        if (stored) {
+          setIsFormOpen(true)
+          setTaskMode('batch')
+          setEditingRecord(null)
+          return
+        }
+      } catch {}
     }
-  }, [config.endpoint, loadOptionsSafely])
+    setIsFormOpen(false)
+    setEditingRecord(null)
+  }, [config.key, initialNavParams])
 
   async function handleSubmit(payload) {
-    if (config.key === 'pekerjaan' && ['operator', 'sales'].includes(user?.role) && editingRecord) {
-      const opPicId = editingRecord.operator_pic_id ?? editingRecord.klien?.kontrak?.calon_klien?.id_user ?? editingRecord.klien?.kontrak?.calonKlien?.id_user
+    if (['pekerjaan', 'kontrak', 'klien'].includes(config.key) && ['operator', 'sales'].includes(user?.role) && editingRecord) {
+      const opPicId =
+        editingRecord.operator_pic_id ??
+        editingRecord.calon_klien?.id_user ??
+        editingRecord.calonKlien?.id_user ??
+        editingRecord.kontrak?.calon_klien?.id_user ??
+        editingRecord.kontrak?.calonKlien?.id_user ??
+        editingRecord.klien?.kontrak?.calon_klien?.id_user ??
+        editingRecord.klien?.kontrak?.calonKlien?.id_user
       if (opPicId != null && Number(opPicId) !== Number(user?.id_user)) {
-        const errorMsg = 'Anda bukan Operator PIC untuk pekerjaan ini sehingga tidak berwenang mengubah data.'
+        const errorMsg = 'Anda bukan Operator PIC untuk data ini sehingga tidak berwenang mengubah data.'
         setError(errorMsg)
         setToast({ open: true, message: errorMsg, severity: 'error' })
         return
@@ -186,19 +267,19 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         successMsg = `Data ${config.label} berhasil ditambahkan.`
       }
 
-      setSuccessMessage(successMsg)
-      setToast({ open: true, message: successMsg, severity: 'success' })
-      setEditingRecord(null)
-      // Bersihkan draf form setelah konfirmasi selesai / simpan berhasil
+      // Bersihkan draf form dan muat ulang data terlebih dahulu sebelum menampilkan notifikasi
       clearFormDraft(config.key, user?.id_user)
-      setFormVersion((v) => v + 1)
       await reload()
+      setEditingRecord(null)
+      setIsFormOpen(false)
+      setFormVersion((v) => v + 1)
+      setSaving(false)
+      setToast({ open: true, message: successMsg, severity: 'success' })
     } catch (requestError) {
+      setSaving(false)
+      setValidationErrors(requestError.errors || {})
       setError(requestError.message)
       setToast({ open: true, message: requestError.message, severity: 'error' })
-      setValidationErrors(requestError.errors || {})
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -219,14 +300,45 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         try {
           await deleteResource(config.endpoint, record[config.primaryKey])
           const msg = `Data ${config.label} berhasil dihapus.`
+          await reload()
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'info' })
-          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
-          await reload()
         } catch (requestError) {
+          setConfirmDialog((prev) => ({ ...prev, loading: false }))
           setError(requestError.message)
           setToast({ open: true, message: requestError.message, severity: 'error' })
+        }
+      },
+    })
+  }
+
+  function handleBulkDelete(ids, onComplete) {
+    if (!ids || !ids.length) return
+
+    setConfirmDialog({
+      open: true,
+      title: `Hapus ${ids.length} Data ${config.label}`,
+      message: `Apakah Anda yakin ingin menghapus ${ids.length} data ${config.label} terpilih sekaligus? Tindakan ini tidak dapat dibatalkan.`,
+      confirmText: `Ya, Hapus (${ids.length})`,
+      type: 'danger',
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, loading: true }))
+        setError('')
+        setSuccessMessage('')
+
+        try {
+          await Promise.all(ids.map((id) => deleteResource(config.endpoint, id)))
+          const msg = `Berhasil menghapus ${ids.length} data ${config.label}.`
+          onComplete?.()
+          await reload()
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
+          setSuccessMessage(msg)
+          setToast({ open: true, message: msg, severity: 'info' })
+        } catch (requestError) {
           setConfirmDialog((prev) => ({ ...prev, loading: false }))
+          setError(requestError.message)
+          setToast({ open: true, message: requestError.message, severity: 'error' })
         }
       },
     })
@@ -256,6 +368,9 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
       const msg = `Pekerjaan "${jobTitle}" berhasil disetujui (Status: Selesai)${
         hasRating ? ' dan nilai kinerja karyawan telah dicatat' : ''
       }.`
+      await reload()
+      setApprovingRecord(null)
+      setApprovingLoading(false)
       setSuccessMessage(msg)
       setToast({
         open: true,
@@ -268,13 +383,10 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
             }
           : null,
       })
-      setApprovingRecord(null)
-      await reload()
     } catch (err) {
+      setApprovingLoading(false)
       setError(err.message || 'Gagal menyetujui pekerjaan.')
       setToast({ open: true, message: err.message || 'Gagal menyetujui pekerjaan.', severity: 'error' })
-    } finally {
-      setApprovingLoading(false)
     }
   }
 
@@ -311,14 +423,14 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         try {
           await rejectPekerjaan(targetPekerjaanId, { catatan_review: note })
           const msg = `Pekerjaan "${jobTitle}" dikembalikan kepada karyawan untuk revisi.`
+          await reload()
+          setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'warning' })
-          setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
-          await reload()
         } catch (err) {
+          setPromptDialog((prev) => ({ ...prev, loading: false }))
           setError(err.message || 'Gagal meminta revisi pekerjaan.')
           setToast({ open: true, message: err.message || 'Gagal meminta revisi pekerjaan.', severity: 'error' })
-          setPromptDialog((prev) => ({ ...prev, loading: false }))
         }
       },
     })
@@ -332,8 +444,6 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         ditandatangani_pada: today,
       })
       const msg = `Kontrak ${contract.no_kontrak} berhasil ditandatangani dan berstatus Aktif!`
-      setSuccessMessage(msg)
-      setToast({ open: true, message: msg, severity: 'success' })
       setViewingContract((prev) =>
         prev
           ? {
@@ -347,6 +457,8 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
           : null,
       )
       await reload()
+      setSuccessMessage(msg)
+      setToast({ open: true, message: msg, severity: 'success' })
     } catch (err) {
       setError(err.message || 'Gagal menandatangani kontrak.')
       setToast({ open: true, message: err.message || 'Gagal menandatangani kontrak.', severity: 'error' })
@@ -369,14 +481,41 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         try {
           await startPekerjaan(record.id_pekerjaan)
           const msg = `Tugas "${record.judul}" berhasil dimulai (Status: Dalam Pengerjaan).`
+          await reload()
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'success' })
-          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
-          await reload()
         } catch (err) {
+          setConfirmDialog((prev) => ({ ...prev, loading: false }))
           setError(err.message || 'Gagal memulai pengerjaan tugas.')
           setToast({ open: true, message: err.message || 'Gagal memulai pengerjaan tugas.', severity: 'error' })
-          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+        }
+      },
+    })
+  }
+
+  const isDirectCreateAllowed = canCreate && !['kontrak', 'klien'].includes(config.key)
+  const shouldShowForm = Boolean(editingRecord) || (isDirectCreateAllowed && isFormOpen)
+
+  const handleRequestReload = () => {
+    setConfirmDialog({
+      open: true,
+      title: 'Segarkan Data dari Server?',
+      message: `Apakah Anda ingin menyinkronkan ulang data ${config.label} langsung dari server? Seluruh data pada tabel akan diperbarui ke versi terkini.`,
+      confirmText: 'Ya, Segarkan',
+      type: 'info',
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, loading: true }))
+        try {
+          await reload()
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
+          setToast({
+            open: true,
+            message: `Data ${config.label} berhasil disinkronkan dari server.`,
+            severity: 'success',
+          })
+        } catch {
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
         }
       },
     })
@@ -414,32 +553,62 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
               : `Kelola dan pantau data ${config.label.toLowerCase()} secara komprehensif.`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={reload}
-          disabled={loading}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-2xs transition-all active:scale-95 self-start sm:self-auto cursor-pointer disabled:opacity-50"
-        >
-          {loading ? (
-            <LoadingSpinner size="xs" text="" />
-          ) : (
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          {/* Tombol Tambah Data Baru (Hanya saat melihat daftar tabel) */}
+          {!shouldShowForm && isDirectCreateAllowed && (
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(true)}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer shadow-xs"
+            >
+              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>
+                {config.key === 'calonKlien'
+                  ? 'Tambah Calon Klien'
+                  : config.key === 'pekerjaan'
+                  ? 'Buat Penugasan Baru'
+                  : config.key === 'users'
+                  ? 'Tambah Pengguna Baru'
+                  : config.key === 'reporting'
+                  ? 'Buat Laporan Baru'
+                  : config.key === 'masterPekerjaan'
+                  ? 'Tambah Template Pekerjaan'
+                  : config.key === 'kinerjaKaryawan'
+                  ? 'Beri Penilaian Kinerja'
+                  : config.key === 'layanan'
+                  ? 'Tambah Layanan Baru'
+                  : `Tambah ${config.label} Baru`}
+              </span>
+            </button>
           )}
-          <span>{loading ? 'Menyegarkan...' : 'Refresh Data'}</span>
-        </button>
+
+          {/* Tombol Refresh Data dengan Dialog Konfirmasi (Hanya saat melihat daftar tabel) */}
+          {!shouldShowForm && (
+            <button
+              type="button"
+              onClick={handleRequestReload}
+              disabled={loading}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              title="Sinkronkan ulang data dari server"
+            >
+              {loading ? (
+                <LoadingSpinner size="xs" text="" />
+              ) : (
+                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              <span>{loading ? 'Menyegarkan...' : 'Refresh Data'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
         <div className="p-4 rounded-2xl border border-error-200 bg-error-50 text-error-700 dark:border-error-800 dark:bg-error-500/10 dark:text-error-400 text-sm font-medium">
           {error}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-4 rounded-2xl border border-success-200 bg-success-50 text-success-700 dark:border-success-800 dark:bg-success-500/10 dark:text-success-400 text-sm font-medium">
-          {successMessage}
         </div>
       )}
 
@@ -479,8 +648,8 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
 
       {/* Callout Panduan untuk Modul Pekerjaan bagi Pimpinan / Admin */}
       {config.key === 'pekerjaan' && ['admin', 'pimpinan'].includes(user?.role) && !editingRecord && (
-        <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/60 dark:bg-indigo-500/10 flex items-start sm:items-center gap-3.5 shadow-xs">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+        <div className="p-4 rounded-2xl border border-brand-200 bg-brand-50/70 dark:border-brand-900/60 dark:bg-brand-500/10 flex items-start sm:items-center gap-3.5 shadow-xs">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
             <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
@@ -511,49 +680,123 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         </div>
       )}
 
-      {/* Form disembunyikan jika role tidak berhak membuat data baru (kecuali saat mode edit), serta untuk modul kontrak dan klien */}
-      {(canCreate || editingRecord) && !((config.key === 'kontrak' || config.key === 'klien') && !editingRecord) && (
+      {/* Khusus Modul Pekerjaan saat Mode Penugasan Baru: Tab Penugasan Batch vs Custom */}
+      {config.key === 'pekerjaan' && shouldShowForm && !editingRecord && canCreate && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-1.5 rounded-2xl bg-gray-100/80 dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 max-w-xl">
+          <button
+            type="button"
+            onClick={() => setTaskMode('batch')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              taskMode === 'batch'
+                ? 'bg-white dark:bg-gray-900 text-brand-600 dark:text-brand-400 shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+            }`}
+          >
+            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span>Penugasan dari Layanan (Batch)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTaskMode('custom')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              taskMode === 'custom'
+                ? 'bg-white dark:bg-gray-900 text-brand-600 dark:text-brand-400 shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+            }`}
+          >
+            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Pekerjaan Kustom / Manual</span>
+          </button>
+        </div>
+      )}
+
+      {/* Render Batch Task Card jika pekerjaan & mode batch */}
+      {config.key === 'pekerjaan' && shouldShowForm && !editingRecord && canCreate && taskMode === 'batch' && (
+        <BatchTaskAssignmentCard
+          initialTarget={initialNavParams}
+          clients={options.klien || []}
+          contracts={options.kontrak || []}
+          services={activeServices}
+          employees={karyawanEmployees}
+          onCancel={() => {
+            setIsFormOpen(false)
+            setEditingRecord(null)
+            onClearNavParams?.()
+            try { sessionStorage.removeItem('target_batch_assignment') } catch {}
+          }}
+          onSuccess={async (msg) => {
+            setToast({ open: true, message: msg, severity: 'success' })
+            setIsFormOpen(false)
+            onClearNavParams?.()
+            try { sessionStorage.removeItem('target_batch_assignment') } catch {}
+            await reload()
+          }}
+        />
+      )}
+
+      {/* Form ditampilkan saat mode tambah baru dibuka atau sedang mengedit data */}
+      {shouldShowForm &&
+        !((config.key === 'kontrak' || config.key === 'klien') && !editingRecord) &&
+        !(config.key === 'pekerjaan' && !editingRecord && taskMode === 'batch') && (
         <ResourceForm
           key={editingRecord ? editingRecord[config.primaryKey] : `${config.key}_v${formVersion}`}
           config={config}
           record={editingRecord}
+          existingRecords={records}
           options={options}
           saving={saving}
           errors={validationErrors}
           currentUser={user}
           canCreate={['kontrak', 'klien'].includes(config.key) ? false : canCreate}
           canEdit={canEdit}
-          onCancel={() => setEditingRecord(null)}
+          onCancel={() => {
+            setEditingRecord(null)
+            setIsFormOpen(false)
+          }}
           onSubmit={handleSubmit}
         />
       )}
 
-      <ResourceTable
-        config={config}
-        records={records}
-        loading={loading}
-        canCreate={['kontrak', 'klien'].includes(config.key) ? false : canCreate}
-        canEdit={canEdit}
-        canDelete={canDelete}
-        user={user}
-        onEdit={setEditingRecord}
-        onDelete={handleDelete}
-        onConvert={setConvertingLead}
-        onViewLegalitas={setViewingLegalitas}
-        onViewContract={setViewingContract}
-        onApproveTask={config.key === 'reporting' ? handleApproveTask : undefined}
-        onRejectTask={config.key === 'reporting' ? handleRejectTask : undefined}
-        onStartTask={config.key === 'pekerjaan' ? handleStartTask : undefined}
-      />
+      {/* Daftar Tabel Data: Disembunyikan saat formulir tambah/edit sedang terbuka (Focus Mode) dengan tetap mempertahankan filter & halaman */}
+      <div className={shouldShowForm ? 'hidden' : 'block'}>
+        <ResourceTable
+          config={config}
+          records={records}
+          loading={loading}
+          canCreate={['kontrak', 'klien'].includes(config.key) ? false : canCreate}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          user={user}
+          onOpenCreate={() => setIsFormOpen(true)}
+          onEdit={(rec) => {
+            setEditingRecord(rec)
+            setIsFormOpen(true)
+          }}
+          onDelete={handleDelete}
+          onBulkDelete={handleBulkDelete}
+          onConvert={setConvertingLead}
+          onViewLegalitas={setViewingLegalitas}
+          onViewContract={setViewingContract}
+          onApproveTask={config.key === 'reporting' ? handleApproveTask : undefined}
+          onRejectTask={config.key === 'reporting' ? handleRejectTask : undefined}
+          onStartTask={config.key === 'pekerjaan' ? handleStartTask : undefined}
+        />
+      </div>
 
       {convertingLead && (
         <ConvertLeadModal
           lead={convertingLead}
           onClose={() => setConvertingLead(null)}
-          onSuccess={(msg) => {
+          onSuccess={async (msg) => {
+            await reload()
+            setConvertingLead(null)
             setSuccessMessage(msg)
             setToast({ open: true, message: msg, severity: 'success' })
-            reload()
           }}
         />
       )}
@@ -617,7 +860,7 @@ function ResourceDashboard({ config, resourceConfigs, supportResources, onNaviga
         message={toast.message}
         severity={toast.severity}
         action={toast.action}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        onClose={handleCloseToast}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export default function ToastNotification({
   open,
@@ -6,16 +6,21 @@ export default function ToastNotification({
   severity = 'success', // 'success', 'error', 'info', 'warning'
   action = null,
   onClose,
-  duration = 4000,
+  duration = 3500,
 }) {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!open) return
-    const effectiveDuration = action ? Math.max(duration, 7000) : duration
+    const effectiveDuration = action ? Math.max(duration, 6000) : (duration || 3500)
     const timer = setTimeout(() => {
-      onClose?.()
+      if (typeof onCloseRef.current === 'function') {
+        onCloseRef.current()
+      }
     }, effectiveDuration)
     return () => clearTimeout(timer)
-  }, [open, duration, action, onClose])
+  }, [open, duration, Boolean(action)])
 
   if (!open) return null
 

@@ -19,7 +19,7 @@ class KlienController extends Controller
         Gate::authorize('viewAny', Klien::class);
 
         $klien = Klien::query()
-            ->with('kontrak')
+            ->with('kontrak.calonKlien')
             ->orderByDesc('id_klien')
             ->get();
 
@@ -31,7 +31,7 @@ class KlienController extends Controller
         Gate::authorize('create', Klien::class);
 
         $klien = Klien::create($request->validated())
-            ->load('kontrak');
+            ->load('kontrak.calonKlien');
 
         return (new KlienResource($klien))
             ->response()
@@ -42,7 +42,7 @@ class KlienController extends Controller
     {
         Gate::authorize('view', $klien);
 
-        return new KlienResource($klien->load('kontrak'));
+        return new KlienResource($klien->load('kontrak.calonKlien'));
     }
 
     public function update(UpdateKlienRequest $request, Klien $klien): KlienResource
@@ -51,7 +51,7 @@ class KlienController extends Controller
 
         $klien->update($request->validated());
 
-        return new KlienResource($klien->load('kontrak'));
+        return new KlienResource($klien->load('kontrak.calonKlien'));
     }
 
     public function destroy(Klien $klien): Response

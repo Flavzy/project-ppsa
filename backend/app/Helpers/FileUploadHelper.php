@@ -22,11 +22,18 @@ class FileUploadHelper
     {
         $originalClientName = $file->getClientOriginalName();
         $nameOnly = pathinfo($originalClientName, PATHINFO_FILENAME);
-        $extension = $file->getClientOriginalExtension() ?: pathinfo($originalClientName, PATHINFO_EXTENSION);
+        $extension = strtolower($file->getClientOriginalExtension() ?: pathinfo($originalClientName, PATHINFO_EXTENSION));
+
+        // Block dangerous executable/script extensions in public storage
+        $forbiddenExtensions = ['php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'sh', 'bat', 'cmd', 'exe', 'cgi', 'pl', 'htaccess'];
+        if (in_array($extension, $forbiddenExtensions, true)) {
+            $extension = 'txt';
+        }
 
         // Sanitize filename for filesystem compatibility while preserving alphanumeric, spaces, dashes, dots
         $safeNameOnly = preg_replace('~[\\\\/:*?"<>|]~', '_', $nameOnly);
-        $safeNameOnly = trim($safeNameOnly);
+        $safeNameOnly = str_replace('..', '_', $safeNameOnly);
+        $safeNameOnly = trim($safeNameOnly, " .\t\n\r\0\x0B");
         if ($safeNameOnly === '') {
             $safeNameOnly = 'dokumen';
         }

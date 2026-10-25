@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getDashboardSummary } from '../api/resources'
 import { getCachedApiData } from '../api/client'
 import { useAuth } from '../auth/useAuth'
@@ -135,10 +135,11 @@ function WelcomeBannerWidget({ user }) {
   )
 }
 
-// Subcomponent: Status Breakdown Card
+// Subcomponent: Status Breakdown Card dengan Hover Tooltip Interaktif
 function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total' }) {
   const entries = Object.entries(data || {})
   const total = entries.reduce((sum, [, count]) => sum + Number(count || 0), 0)
+  const [hoveredKey, setHoveredKey] = useState(null)
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 flex flex-col justify-between">
@@ -162,31 +163,95 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
             Belum ada data status untuk ditampilkan
           </div>
         ) : (
-          <div className="mt-5 space-y-4">
-            {entries.map(([key, count]) => {
-              const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
-              const percentage = total > 0 ? Math.round((Number(count) / total) * 100) : 0
-
-              return (
-                <div key={key}>
-                  <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
-                    <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                      <span className={`size-2 rounded-full ${config.color}`} />
-                      {config.label}
-                    </span>
-                    <span className="text-gray-900 dark:text-white font-bold">
-                      {count} <span className="font-normal text-gray-400">({percentage}%)</span>
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${config.color} transition-all duration-500`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+          <div className="mt-4">
+            {/* Visual Segmented Distribution Bar dengan Hover Tooltip Interaktif */}
+            {total > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                  <span>Distribusi Status Interaktif</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">Arahkan kursor ke grafik</span>
                 </div>
-              )
-            })}
+                <div className="h-4.5 w-full rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 flex gap-1 overflow-visible relative">
+                  {entries.map(([key, count]) => {
+                    const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
+                    const percentage = total > 0 ? (Number(count) / total) * 100 : 0
+                    if (percentage === 0 && Number(count) === 0) return null
+                    const isHovered = hoveredKey === key
+
+                    return (
+                      <div
+                        key={key}
+                        onMouseEnter={() => setHoveredKey(key)}
+                        onMouseLeave={() => setHoveredKey(null)}
+                        className={`h-full rounded-lg ${config.color} transition-all duration-200 cursor-pointer relative ${
+                          isHovered
+                            ? 'scale-y-125 brightness-110 shadow-sm z-20'
+                            : hoveredKey
+                            ? 'opacity-35'
+                            : 'opacity-100'
+                        }`}
+                        style={{ width: `${Math.max(percentage, 2.5)}%` }}
+                      >
+                        {/* Hover Tooltip Popover */}
+                        {isHovered && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                            <div className="bg-gray-900/95 dark:bg-gray-800/95 backdrop-blur-xs text-white text-xs rounded-xl py-1.5 px-3 shadow-xl border border-gray-700/60 dark:border-gray-600/60 flex items-center gap-2">
+                              <span className={`size-2.5 rounded-full ${config.color}`} />
+                              <span className="font-semibold">{config.label}:</span>
+                              <span className="font-bold text-amber-300">{count}</span>
+                              <span className="text-gray-300 text-[11px]">({Math.round(percentage)}%)</span>
+                            </div>
+                            <div className="size-2 bg-gray-900 dark:bg-gray-800 rotate-45 mx-auto -mt-1 border-r border-b border-gray-700/60 dark:border-gray-600/60" />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* List Rincian Status dengan Hover Highlight Interaktif */}
+            <div className="space-y-2">
+              {entries.map(([key, count]) => {
+                const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
+                const percentage = total > 0 ? Math.round((Number(count) / total) * 100) : 0
+                const isHovered = hoveredKey === key
+
+                return (
+                  <div
+                    key={key}
+                    onMouseEnter={() => setHoveredKey(key)}
+                    onMouseLeave={() => setHoveredKey(null)}
+                    className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
+                      isHovered
+                        ? 'bg-brand-50/70 dark:bg-brand-500/15 ring-1 ring-brand-500/25 shadow-2xs scale-[1.01]'
+                        : hoveredKey
+                        ? 'opacity-40'
+                        : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
+                      <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <span className={`size-2.5 rounded-full ${config.color} ${isHovered ? 'ring-2 ring-brand-500/40' : ''}`} />
+                        <span className={isHovered ? 'font-bold text-gray-900 dark:text-white' : ''}>
+                          {config.label}
+                        </span>
+                      </span>
+                      <span className={`text-gray-900 dark:text-white font-bold transition-transform ${isHovered ? 'scale-105 text-brand-600 dark:text-brand-400' : ''}`}>
+                        {count} <span className="font-normal text-gray-400">({percentage}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${config.color} transition-all duration-500 ${isHovered ? 'brightness-110 shadow-xs' : ''}`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -280,6 +345,236 @@ function LeaderboardTable({ employees }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+// Subcomponent: Monthly Task Reminder Widget for Pimpinan & Operator
+function MonthlyTaskReminderWidget({ reminders = [], onNavigate }) {
+  const currentMonthFormatted = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date())
+  const uniqueClientsCount = new Set(reminders.map((r) => r.id_klien)).size
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Group reminders by (id_klien + id_layanan) agar tidak terjadi repetisi baris kembar
+  const groupedReminders = useMemo(() => {
+    const groups = {}
+    reminders.forEach((r) => {
+      const key = `${r.id_klien}_${r.id_layanan}`
+      if (!groups[key]) {
+        groups[key] = {
+          id_klien: r.id_klien,
+          nama_perusahaan: r.nama_perusahaan,
+          no_kontrak: r.no_kontrak,
+          id_layanan: r.id_layanan,
+          nama_layanan: r.nama_layanan,
+          periode_bulan: r.periode_bulan,
+          tasks: [],
+        }
+      }
+      groups[key].tasks.push(r)
+    })
+    return Object.values(groups)
+  }, [reminders])
+
+  // Tugaskan Seluruh Paket Layanan Sekaligus (Hanya tugas yang belum ditugaskan di paket ini)
+  const handleAssignGroup = (group) => {
+    const targetJobIds = group.tasks.map((t) => Number(t.id_master_pekerjaan))
+    const payload = {
+      id_klien: group.id_klien,
+      id_layanan: group.id_layanan,
+      target_job_ids: targetJobIds, // Hanya tugas yang tertera di paket ini!
+      id_master_pekerjaan: null,
+      nama_pekerjaan: null,
+      periode_bulan: group.periode_bulan,
+    }
+    try {
+      sessionStorage.setItem('target_batch_assignment', JSON.stringify(payload))
+    } catch {
+      // Ignore sessionStorage errors
+    }
+    if (typeof onNavigate === 'function') {
+      onNavigate('pekerjaan', payload)
+    }
+  }
+
+  // Tugaskan Satuan Pekerjaan Tertentu
+  const handleAssignSingle = (task) => {
+    const payload = {
+      id_klien: task.id_klien,
+      id_layanan: task.id_layanan,
+      target_job_ids: [Number(task.id_master_pekerjaan)],
+      id_master_pekerjaan: task.id_master_pekerjaan,
+      nama_pekerjaan: task.nama_pekerjaan,
+      periode_bulan: task.periode_bulan,
+    }
+    try {
+      sessionStorage.setItem('target_batch_assignment', JSON.stringify(payload))
+    } catch {
+      // Ignore sessionStorage errors
+    }
+    if (typeof onNavigate === 'function') {
+      onNavigate('pekerjaan', payload)
+    }
+  }
+
+  if (reminders.length === 0) {
+    return (
+      <div className="rounded-3xl border border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-r from-emerald-50/60 via-white to-white dark:from-emerald-950/20 dark:via-gray-900 dark:to-gray-900 p-5 sm:p-6 shadow-xs mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-xs">
+              <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  Pengingat Penugasan Rutin Bulanan
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                  {currentMonthFormatted}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Semua tugas rutin bulanan dari kontrak aktif untuk periode <strong>{currentMonthFormatted}</strong> sudah berhasil ditugaskan ke karyawan. Operasional berjalan lancar!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-3xl border border-brand-200 dark:border-brand-900/60 bg-gradient-to-b from-brand-50/30 via-white to-white dark:from-brand-950/20 dark:via-gray-900 dark:to-gray-900 p-4 sm:p-5 shadow-xs mb-6 transition-all">
+      {/* 1. Header Strip Ringkas (Usulan 1: Selalu Tampak Ramping ~55px, Tidak Menutupi Dasbor) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-xs">
+            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
+                Pengingat Penugasan Rutin Bulanan
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                {reminders.length} Tugas Belum Ditugaskan
+              </span>
+              <span className="hidden md:inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-300">
+                Periode: {currentMonthFormatted}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate">
+              Ada <strong>{reminders.length} pekerjaan rutin bulanan</strong> dari <strong>{uniqueClientsCount} perusahaan klien</strong> yang belum dibuatkan penugasannya ke karyawan.
+            </p>
+          </div>
+        </div>
+
+        {/* Tombol Toggle Buka / Tutup Rincian Tugas */}
+        <button
+          type="button"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shrink-0 self-start sm:self-auto ${
+            isExpanded
+              ? 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+              : 'bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white shadow-theme-xs shadow-brand-500/20'
+          }`}
+        >
+          <span>{isExpanded ? 'Sembunyikan Rincian' : `Buka Rincian Tugas (${reminders.length})`}</span>
+          <svg
+            className={`size-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 2. Daftar Rincian Paket Layanan (Hanya Tampil Saat isExpanded = true) */}
+      {isExpanded && (
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3.5 max-h-[460px] overflow-y-auto pr-1 animate-fade-in">
+          {groupedReminders.map((group) => (
+            <div
+              key={`${group.id_klien}_${group.id_layanan}`}
+              className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 shadow-2xs hover:shadow-xs transition-all"
+            >
+              {/* Header: Klien, Paket Layanan & Tombol Penugasan Sekaligus */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-gray-700/50">
+                <div className="flex items-center gap-3">
+                  <div className="size-9 rounded-xl bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-bold flex items-center justify-center text-sm shrink-0 shadow-2xs">
+                    {group.nama_perusahaan ? group.nama_perusahaan.charAt(0).toUpperCase() : 'K'}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                        {group.nama_perusahaan}
+                      </h4>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 border border-brand-200/60 dark:border-brand-800/60">
+                        <span className="size-1.5 rounded-full bg-brand-500" />
+                        {group.nama_layanan}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                      Kontrak: {group.no_kontrak || '-'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action: Tugaskan Seluruh Paket Layanan Ini */}
+                <button
+                  type="button"
+                  onClick={() => handleAssignGroup(group)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white text-xs font-bold shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer self-start sm:self-auto shrink-0"
+                  title={`Tugaskan seluruh ${group.tasks.length} pekerjaan paket ini untuk ${group.nama_perusahaan}`}
+                >
+                  <span>Tugaskan Paket Ini ({group.tasks.length} Tugas)</span>
+                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* List Tugas dalam Paket Ini */}
+              <div className="mt-3 divide-y divide-gray-100/80 dark:divide-gray-700/40">
+                {group.tasks.map((task) => (
+                  <div key={task.id_master_pekerjaan} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-start gap-2.5">
+                      <span className="size-1.5 rounded-full bg-amber-500 mt-2 shrink-0" />
+                      <div>
+                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                          {task.nama_pekerjaan}
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Estimasi pengerjaan: <strong>{task.estimasi_hari || 7} hari kalender</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tombol Tugaskan Satuan */}
+                    <button
+                      type="button"
+                      onClick={() => handleAssignSingle(task)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/30 transition-colors self-end sm:self-auto cursor-pointer"
+                      title={`Hanya tugaskan pekerjaan ${task.nama_pekerjaan}`}
+                    >
+                      <span>Tugaskan Satuan</span>
+                      <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -675,7 +970,7 @@ function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], onNavig
 
   return (
     <>
-      {/* ⚠️ Alert Banner: Tugas Perlu Segera Direvisi */}
+      {/* Alert Banner: Tugas Perlu Segera Direvisi */}
       {revisionTasks.length > 0 && (
         <div className="relative overflow-hidden rounded-3xl border-2 border-amber-400 bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 p-5 sm:p-6 shadow-md shadow-amber-500/10 dark:border-amber-600/70 dark:from-amber-950/40 dark:via-amber-900/25 dark:to-amber-950/30 mb-6">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -742,7 +1037,7 @@ function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], onNavig
                   {/* Catatan Perbaikan dari Pimpinan */}
                   <div className="mt-2 p-2.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 text-xs">
                     <span className="font-bold text-amber-900 dark:text-amber-300">
-                      💬 Catatan Perbaikan dari Pimpinan:
+                      Catatan Perbaikan dari Pimpinan:
                     </span>{' '}
                     <span className="text-gray-800 dark:text-gray-200 font-medium italic">
                       "{task.catatan_review || 'Mohon periksa kembali berkas tugas dan sesuaikan sesuai instruksi pimpinan.'}"
@@ -1014,7 +1309,15 @@ export default function DashboardView({ onNavigate }) {
       {/* 1. Welcome Banner Widget */}
       <WelcomeBannerWidget user={user} />
 
-      {/* 2. Role-Based Dashboard View */}
+      {/* 2. Pengingat Penugasan Rutin Bulanan (Khusus Pimpinan & Operator) */}
+      {['admin', 'pimpinan', 'operator', 'sales'].includes(user?.role) && (
+        <MonthlyTaskReminderWidget
+          reminders={summary?.monthly_reminders || []}
+          onNavigate={onNavigate}
+        />
+      )}
+
+      {/* 3. Role-Based Dashboard View */}
       {['admin', 'pimpinan'].includes(user?.role) && (
         <AdminDashboardView
           totals={totals}

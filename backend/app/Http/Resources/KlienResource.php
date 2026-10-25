@@ -17,6 +17,7 @@ class KlienResource extends JsonResource
         return [
             'id_klien' => $this->id_klien,
             'id_kontrak' => $this->id_kontrak,
+            'operator_pic_id' => $this->operator_pic_id,
             'nama_perusahaan' => $this->nama_perusahaan,
             'alamat' => $this->alamat,
             'kontak' => $this->kontak,

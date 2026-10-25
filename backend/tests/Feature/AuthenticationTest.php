@@ -208,4 +208,23 @@ class AuthenticationTest extends TestCase
 
         $this->assertNotEquals($spoofedUser->id_user, $response->json('user.id_user'));
     }
+
+    public function test_plain_username_can_login(): void
+    {
+        $user = User::factory()->create([
+            'nama' => 'Budi Santoso',
+            'email' => 'budi_santoso',
+            'password' => Hash::make('password123'),
+            'role' => 'pimpinan',
+        ]);
+
+        $response = $this->postJson('/api/auth/login', [
+            'username' => 'budi_santoso',
+            'password' => 'password123',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('user.email', 'budi_santoso')
+            ->assertJsonPath('user.role', 'pimpinan');
+    }
 }

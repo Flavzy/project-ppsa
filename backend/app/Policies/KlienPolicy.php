@@ -24,7 +24,16 @@ class KlienPolicy
 
     public function update(User $user, Klien $klien): bool
     {
-        return in_array($user->role, ['admin', 'pimpinan', 'operator', 'sales'], true);
+        if (in_array($user->role, ['admin', 'pimpinan'], true)) {
+            return true;
+        }
+
+        if (in_array($user->role, ['operator', 'sales'], true)) {
+            $operatorPicId = $klien->operator_pic_id;
+            return $operatorPicId !== null && (int) $operatorPicId === (int) $user->id_user;
+        }
+
+        return false;
     }
 
     public function delete(User $user, Klien $klien): bool

@@ -48,11 +48,6 @@ class User extends Authenticatable
         return $this->hasMany(Pekerjaan::class, 'id_pic', 'id_user');
     }
 
-    public function leadInteractions(): HasMany
-    {
-        return $this->hasMany(LeadInteraction::class, 'id_user', 'id_user');
-    }
-
     public function performanceReviews(): HasMany
     {
         return $this->hasMany(PerformanceReview::class, 'id_user', 'id_user');

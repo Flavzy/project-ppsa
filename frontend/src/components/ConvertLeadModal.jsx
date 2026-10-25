@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import LoadingSpinner from './common/LoadingSpinner'
-import { convertLead } from '../api/resources'
+import { convertLead, listResource } from '../api/resources'
 
 export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
   const draftKey = `ppsa_draft_convert_${lead?.id_calon_klien}`
@@ -23,18 +23,51 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
   const [alamat, setAlamat] = useState(() => savedDraft?.alamat || lead?.alamat_perusahaan || 'Gedung Bisnis Center, Jakarta')
   const [layanan, setLayanan] = useState(() => savedDraft?.layanan || 'Implementasi & Konsultansi Sistem')
   const [nilaiProyek, setNilaiProyek] = useState(() => (savedDraft?.nilaiProyek !== undefined ? savedDraft.nilaiProyek : (lead?.nilai_estimasi || '')))
+  const [layananList, setLayananList] = useState([])
+  const [selectedLayananIds, setSelectedLayananIds] = useState(() => {
+    if (savedDraft?.selectedLayananIds && savedDraft.selectedLayananIds.length > 0) {
+      return savedDraft.selectedLayananIds
+    }
+    if (Array.isArray(lead?.layanan_ids) && lead.layanan_ids.length > 0) {
+      return lead.layanan_ids.map(Number)
+    }
+    return []
+  })
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Ambil daftar master layanan aktif
+  useEffect(() => {
+    let isMounted = true
+    listResource('layanan')
+      .then((data) => {
+        if (!isMounted) return
+        const list = Array.isArray(data) ? data.filter((l) => Boolean(l.is_active)) : []
+        setLayananList(list)
+        if (selectedLayananIds.length === 0 && list.length > 0 && !savedDraft?.selectedLayananIds) {
+          if (Array.isArray(lead?.layanan_ids) && lead.layanan_ids.length > 0) {
+            setSelectedLayananIds(lead.layanan_ids.map(Number))
+          } else {
+            const activeIds = list.filter((l) => l.is_active).map((l) => l.id_layanan)
+            if (activeIds.length > 0) {
+              setSelectedLayananIds(activeIds.slice(0, 2))
+            }
+          }
+        }
+      })
+      .catch(() => {})
+    return () => { isMounted = false }
+  }, [])
+
   // Simpan draf konversi otomatis ke localStorage
   useEffect(() => {
     if (!lead) return
-    const draft = { noKontrak, jenisDokumen, tglMulai, tglSelesai, alamat, layanan, nilaiProyek }
+    const draft = { noKontrak, jenisDokumen, tglMulai, tglSelesai, alamat, layanan, nilaiProyek, selectedLayananIds }
     try {
       localStorage.setItem(`ppsa_draft_convert_${lead.id_calon_klien}`, JSON.stringify(draft))
     } catch {}
-  }, [lead, noKontrak, jenisDokumen, tglMulai, tglSelesai, alamat, layanan, nilaiProyek])
+  }, [lead, noKontrak, jenisDokumen, tglMulai, tglSelesai, alamat, layanan, nilaiProyek, selectedLayananIds])
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -68,6 +101,7 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
         alamat: alamat,
         layanan: layanan,
         nilai_proyek: nilaiProyek ? Number(nilaiProyek) : undefined,
+        layanan_ids: selectedLayananIds,
       })
 
       // Bersihkan draf konversi saat berhasil
@@ -75,8 +109,8 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
         localStorage.removeItem(`ppsa_draft_convert_${lead.id_calon_klien}`)
       } catch {}
 
-      onSuccess(`Calon klien "${lead.nama_perusahaan}" berhasil dikonversi menjadi Kontrak & Klien aktif!`)
-      onClose()
+      await onSuccess?.(`Calon klien "${lead.nama_perusahaan}" berhasil dikonversi menjadi Kontrak & Klien aktif!`)
+      onClose?.()
     } catch (err) {
       setError(err.message || 'Gagal mengonversi calon klien.')
     } finally {
@@ -204,9 +238,64 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
             />
           </div>
 
+          {/* Pemilihan Master Layanan yang Dicakup */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
-              Ruang Lingkup Layanan <span className="text-error-500">*</span>
+              Paket Layanan yang Disepakati
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              Centang layanan yang dipesan oleh klien untuk menghubungkan paket pekerjaan secara otomatis.
+            </p>
+            {layananList.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Memuat katalog layanan...</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-1 pr-2">
+                {layananList.map((item) => {
+                  const isChecked = selectedLayananIds.includes(item.id_layanan)
+                  return (
+                    <label
+                      key={item.id_layanan}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                        isChecked
+                          ? 'border-brand-500 bg-brand-50/70 dark:bg-brand-500/15 dark:border-brand-500 font-semibold text-gray-900 dark:text-white ring-1 ring-brand-500/20'
+                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={submitting}
+                        onChange={() => {
+                          const next = isChecked
+                            ? selectedLayananIds.filter((id) => id !== item.id_layanan)
+                            : [...selectedLayananIds, item.id_layanan]
+                          setSelectedLayananIds(next)
+                          // Jika pengguna belum mengubah teks layanan secara custom, bantu update ringkasannya
+                          const names = layananList.filter((l) => next.includes(l.id_layanan)).map((l) => l.nama_layanan)
+                          if (names.length > 0) {
+                            setLayanan(names.join(', '))
+                          }
+                        }}
+                        className="size-4 rounded text-brand-600 focus:ring-brand-500 mt-0.5 cursor-pointer"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span className="block">{item.nama_layanan}</span>
+                        {item.deskripsi && (
+                          <span className="block text-[11px] text-gray-500 dark:text-gray-400 font-normal line-clamp-1 mt-0.5">
+                            {item.deskripsi}
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
+              Ringkasan Ruang Lingkup Layanan <span className="text-error-500">*</span>
             </label>
             <input
               type="text"

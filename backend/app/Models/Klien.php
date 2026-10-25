@@ -28,6 +28,15 @@ class Klien extends Model
         'layanan',
     ];
 
+    protected $appends = [
+        'operator_pic_id',
+    ];
+
+    public function getOperatorPicIdAttribute(): ?int
+    {
+        return $this->kontrak?->calonKlien?->id_user ? (int) $this->kontrak->calonKlien->id_user : null;
+    }
+
     public function kontrak(): BelongsTo
     {
         return $this->belongsTo(Kontrak::class, 'id_kontrak', 'id_kontrak');

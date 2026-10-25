@@ -5,7 +5,9 @@ use App\Http\Controllers\Api\CalonKlienController;
 use App\Http\Controllers\Api\DashboardSummaryController;
 use App\Http\Controllers\Api\KlienController;
 use App\Http\Controllers\Api\KontrakController;
+use App\Http\Controllers\Api\LayananController;
 use App\Http\Controllers\Api\LeadConversionController;
+use App\Http\Controllers\Api\MasterPekerjaanController;
 use App\Http\Controllers\Api\PekerjaanController;
 use App\Http\Controllers\Api\PekerjaanWorkflowController;
 use App\Http\Controllers\Api\PerformanceReviewController;
@@ -73,7 +75,34 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->middleware('role:admin,pimpinan')
         ->name('pekerjaan.reject');
 
+    // Master Layanan (Katalog Layanan):
+    // mutate (store, update, destroy) strictly restricted to admin, pimpinan
+    // index, show accessible to all authenticated roles
+    Route::post('layanan', [LayananController::class, 'store'])
+        ->middleware('role:admin,pimpinan')->name('layanan.store');
+    Route::match(['put', 'patch'], 'layanan/{layanan}', [LayananController::class, 'update'])
+        ->middleware('role:admin,pimpinan')->name('layanan.update');
+    Route::delete('layanan/{layanan}', [LayananController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')->name('layanan.destroy');
+    Route::get('layanan', [LayananController::class, 'index'])->name('layanan.index');
+    Route::get('layanan/{layanan}', [LayananController::class, 'show'])->name('layanan.show');
+
+    // Master Pekerjaan (Template Pekerjaan):
+    // mutate (store, update, destroy) strictly restricted to admin, pimpinan
+    // index, show accessible to all authenticated roles
+    Route::post('master-pekerjaan', [MasterPekerjaanController::class, 'store'])
+        ->middleware('role:admin,pimpinan')->name('master-pekerjaan.store');
+    Route::match(['put', 'patch'], 'master-pekerjaan/{masterPekerjaan}', [MasterPekerjaanController::class, 'update'])
+        ->middleware('role:admin,pimpinan')->name('master-pekerjaan.update');
+    Route::delete('master-pekerjaan/{masterPekerjaan}', [MasterPekerjaanController::class, 'destroy'])
+        ->middleware('role:admin,pimpinan')->name('master-pekerjaan.destroy');
+    Route::get('master-pekerjaan', [MasterPekerjaanController::class, 'index'])->name('master-pekerjaan.index');
+    Route::get('master-pekerjaan/{masterPekerjaan}', [MasterPekerjaanController::class, 'show'])->name('master-pekerjaan.show');
+
     // Pekerjaan:
+    // batch assignment endpoint
+    Route::post('pekerjaan/batch', [PekerjaanController::class, 'batchStore'])
+        ->middleware('role:admin,pimpinan,operator')->name('pekerjaan.batch');
     // store accessible to admin,pimpinan,operator (to assign client PIC)
     // destroy restricted to admin,pimpinan
     // index, show, update accessible to admin,pimpinan,karyawan,operator

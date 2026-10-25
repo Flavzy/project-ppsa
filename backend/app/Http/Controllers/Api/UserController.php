@@ -60,9 +60,9 @@ class UserController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if ($user->calonKlien()->exists() || $user->pekerjaan()->exists() || $user->leadInteractions()->exists()) {
+        if ($user->calonKlien()->exists() || $user->pekerjaan()->exists() || $user->performanceReviews()->exists()) {
             return response()->json([
-                'message' => 'Akun tidak dapat dihapus karena masih terhubung dengan data Calon Klien, Tugas Pekerjaan, atau Riwayat Interaksi. Ubah penugasan PIC terlebih dahulu.',
+                'message' => 'Akun tidak dapat dihapus karena masih terhubung dengan data Calon Klien, Tugas Pekerjaan, atau Penilaian Kinerja. Ubah penugasan PIC terlebih dahulu.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 

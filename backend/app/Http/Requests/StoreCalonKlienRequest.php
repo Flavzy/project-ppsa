@@ -36,6 +36,8 @@ class StoreCalonKlienRequest extends FormRequest
             'catatan' => ['nullable', 'string'],
             'status_prospek' => ['nullable', 'string', 'max:255'],
             'tgl_followup' => ['nullable', 'date', 'after_or_equal:today', 'before_or_equal:today'],
+            'layanan_ids' => ['nullable', 'array'],
+            'layanan_ids.*' => ['integer', 'exists:layanan,id_layanan'],
 
             // Nomor Legalitas
             'nomor_nib' => ['nullable', 'string', 'max:255'],
@@ -49,6 +51,7 @@ class StoreCalonKlienRequest extends FormRequest
             'file_npwp' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'file_akta_pendirian' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'file_sk_kemenkumham' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'file_izin_usaha' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'file_dokumen_pendukung' => [
                 'nullable',
                 function ($attribute, $value, $fail) {

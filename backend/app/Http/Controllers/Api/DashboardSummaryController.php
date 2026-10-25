@@ -53,6 +53,9 @@ class DashboardSummaryController extends Controller
                     COUNT(*) as total_tasks,
                     SUM(CASE WHEN deadline < ? AND status NOT IN ('completed', 'approved') THEN 1 ELSE 0 END) as overdue_tasks,
                     SUM(CASE WHEN status IN ('completed', 'approved') THEN 1 ELSE 0 END) as completed_tasks,
+                    SUM(CASE WHEN status = 'baru' THEN 1 ELSE 0 END) as new_tasks,
+                    SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_tasks,
+                    SUM(CASE WHEN status NOT IN ('completed', 'approved') THEN 1 ELSE 0 END) as active_tasks,
                     SUM(CASE WHEN status IN ('revision_needed', 'revision') THEN 1 ELSE 0 END) as revision_tasks
                 ", [$today])
                 ->first();
@@ -63,6 +66,9 @@ class DashboardSummaryController extends Controller
                         'tasks' => (int) ($taskAggregates?->total_tasks ?? 0),
                         'overdue_tasks' => (int) ($taskAggregates?->overdue_tasks ?? 0),
                         'completed_tasks' => (int) ($taskAggregates?->completed_tasks ?? 0),
+                        'new_tasks' => (int) ($taskAggregates?->new_tasks ?? 0),
+                        'in_progress_tasks' => (int) ($taskAggregates?->in_progress_tasks ?? 0),
+                        'active_tasks' => (int) ($taskAggregates?->active_tasks ?? 0),
                         'revision_tasks' => (int) ($taskAggregates?->revision_tasks ?? 0),
                         'average_performance_score' => round((float) PerformanceReview::where('id_user', $user->id_user)->avg('final_score'), 2),
                     ],
@@ -103,6 +109,7 @@ class DashboardSummaryController extends Controller
                 ->count();
 
             $activeClients = Klien::count();
+            $monthlyReminders = $this->getMonthlyReminders($user);
 
             return response()->json([
                 'data' => [
@@ -117,10 +124,12 @@ class DashboardSummaryController extends Controller
                         'submitted_tasks' => $submittedTasks,
                         'overdue_tasks' => $overdueTasks,
                         'completed_tasks' => $completedTasks,
+                        'pending_monthly_tasks' => count($monthlyReminders),
                     ],
                     'lead_by_status' => $leadByStatus,
                     'contract_by_status' => $contractByStatus,
                     'work_by_status' => $workByStatus,
+                    'monthly_reminders' => $monthlyReminders,
                 ],
             ]);
         }
@@ -167,6 +176,7 @@ class DashboardSummaryController extends Controller
             ->count();
 
         $activeClients = Klien::count();
+        $monthlyReminders = $this->getMonthlyReminders($user);
 
         return response()->json([
             'data' => [
@@ -179,13 +189,116 @@ class DashboardSummaryController extends Controller
                     'tasks' => $workTotal,
                     'overdue_tasks' => $overdueTasks,
                     'completed_tasks' => $completedTasks,
+                    'pending_monthly_tasks' => count($monthlyReminders),
                     'average_performance_score' => round((float) PerformanceReview::avg('final_score'), 2),
                 ],
                 'lead_by_status' => $leadByStatus,
                 'contract_by_status' => $contractByStatus,
                 'work_by_status' => $workByStatus,
                 'employee_scores' => $employeeScores,
+                'monthly_reminders' => $monthlyReminders,
             ],
         ]);
+    }
+
+    /**
+     * Ambil daftar tugas bulanan dari kontrak aktif yang belum ditugaskan untuk bulan ini.
+     *
+     * @param \App\Models\User $user
+     * @return array<int, array<string, mixed>>
+     */
+    protected function getMonthlyReminders($user): array
+    {
+        $currentMonth = now()->format('Y-m');
+
+        // Ambil seluruh klien yang memiliki kontrak berstatus 'aktif'
+        $clientsQuery = Klien::query()
+            ->whereHas('kontrak', function ($q) {
+                $q->where('status', 'aktif');
+            })
+            ->with([
+                'kontrak' => function ($q) {
+                    $q->with([
+                        'layanan.masterPekerjaan' => function ($mq) {
+                            $mq->where('is_active', true)
+                               ->where('sifat_periode', 'bulanan');
+                        },
+                        'calonKlien',
+                    ]);
+                },
+                'pekerjaan' => function ($q) use ($currentMonth) {
+                    $q->where('periode_bulan', $currentMonth);
+                },
+            ]);
+
+        // Jika role operator / sales: hanya tampilkan klien milik operator PIC tersebut
+        if (in_array($user->role, ['operator', 'sales'], true)) {
+            $clientsQuery->whereHas('kontrak.calonKlien', function ($q) use ($user) {
+                $q->where('id_user', $user->id_user);
+            });
+        }
+
+        $clients = $clientsQuery->get();
+
+        $allActiveServices = null;
+        $reminders = [];
+
+        foreach ($clients as $client) {
+            $kontrak = $client->kontrak;
+            if (!$kontrak) {
+                continue;
+            }
+
+            // Dapatkan layanan dari kontrak
+            $services = $kontrak->layanan;
+            if ($services->isEmpty()) {
+                if ($allActiveServices === null) {
+                    $allActiveServices = \App\Models\Layanan::where('is_active', true)
+                        ->with(['masterPekerjaan' => function ($q) {
+                            $q->where('is_active', true)->where('sifat_periode', 'bulanan');
+                        }])
+                        ->get();
+                }
+                $services = $allActiveServices;
+            }
+
+            $existingJobs = $client->pekerjaan;
+
+            foreach ($services as $layanan) {
+                $monthlyTemplates = $layanan->masterPekerjaan
+                    ->where('is_active', true)
+                    ->where('sifat_periode', 'bulanan');
+
+                foreach ($monthlyTemplates as $template) {
+                    $alreadyAssigned = $existingJobs->contains(function ($job) use ($template, $layanan) {
+                        if ($job->id_master_pekerjaan && (int) $job->id_master_pekerjaan === (int) $template->id_master_pekerjaan) {
+                            return true;
+                        }
+                        if ((int) $job->id_layanan === (int) $layanan->id_layanan &&
+                            stripos($job->judul, $template->nama_pekerjaan) !== false) {
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (!$alreadyAssigned) {
+                        $reminders[] = [
+                            'id_klien' => (int) $client->id_klien,
+                            'nama_perusahaan' => $client->nama_perusahaan,
+                            'id_kontrak' => (int) $kontrak->id_kontrak,
+                            'no_kontrak' => $kontrak->no_kontrak,
+                            'id_layanan' => (int) $layanan->id_layanan,
+                            'nama_layanan' => $layanan->nama_layanan,
+                            'id_master_pekerjaan' => (int) $template->id_master_pekerjaan,
+                            'nama_pekerjaan' => $template->nama_pekerjaan,
+                            'estimasi_hari' => (int) ($template->estimasi_hari ?: 7),
+                            'periode_bulan' => $currentMonth,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $reminders;
     }
 }

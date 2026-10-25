@@ -34,6 +34,11 @@ class CalonKlienResource extends JsonResource
             'catatan' => $this->catatan,
             'status_prospek' => $this->status_prospek,
             'tgl_followup' => $this->tgl_followup?->toDateString(),
+            'layanan_ids' => (!empty($this->layanan_ids) && is_array($this->layanan_ids))
+                ? array_values(array_map('intval', $this->layanan_ids))
+                : ($this->relationLoaded('kontrak') && $this->kontrak && $this->kontrak->relationLoaded('layanan')
+                    ? $this->kontrak->layanan->pluck('id_layanan')->values()->all()
+                    : []),
 
             // Nomor Legalitas
             'nomor_nib' => $this->nomor_nib,

@@ -564,4 +564,101 @@ class OwnershipSecurityTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['data' => ['totals', 'lead_by_status', 'contract_by_status', 'work_by_status', 'employee_scores']]);
     }
+
+    public function test_pimpinan_can_delete_unused_user_without_error(): void
+    {
+        $pimpinan = User::factory()->create(['role' => 'pimpinan']);
+        $unusedOperator = User::factory()->create(['role' => 'operator']);
+
+        Sanctum::actingAs($pimpinan);
+        $this->deleteJson("/api/users/{$unusedOperator->id_user}")
+            ->assertNoContent();
+
+        $this->assertDatabaseMissing('users', ['id_user' => $unusedOperator->id_user]);
+    }
+
+    public function test_operator_pic_can_update_own_kontrak_and_klien_but_other_operator_cannot(): void
+    {
+        $operatorA = User::factory()->create(['role' => 'operator']);
+        $operatorB = User::factory()->create(['role' => 'operator']);
+
+        $leadA = CalonKlien::factory()->deal()->create(['id_user' => $operatorA->id_user]);
+        $kontrakA = Kontrak::factory()->create(['id_calon_klien' => $leadA->id_calon_klien]);
+        $klienA = Klien::factory()->create(['id_kontrak' => $kontrakA->id_kontrak]);
+
+        // Operator A (PIC) can update own Kontrak and Klien
+        Sanctum::actingAs($operatorA);
+        $this->putJson("/api/kontrak/{$kontrakA->id_kontrak}", [
+            'status' => 'aktif',
+        ])->assertOk()->assertJsonPath('data.status', 'aktif');
+
+        $this->putJson("/api/klien/{$klienA->id_klien}", [
+            'layanan' => 'Layanan Resmi PIC',
+        ])->assertOk()->assertJsonPath('data.layanan', 'Layanan Resmi PIC');
+
+        // Operator B (Non-PIC) is forbidden from updating Operator A's Kontrak and Klien
+        Sanctum::actingAs($operatorB);
+        $this->putJson("/api/kontrak/{$kontrakA->id_kontrak}", [
+            'status' => 'batal',
+        ])->assertForbidden();
+
+        $this->putJson("/api/klien/{$klienA->id_klien}", [
+            'layanan' => 'Layanan Dibajak Operator Lain',
+        ])->assertForbidden();
+    }
+
+    public function test_operator_cannot_spoof_id_user_on_calon_klien_store_or_update(): void
+    {
+        $operatorA = User::factory()->create(['role' => 'operator']);
+        $operatorB = User::factory()->create(['role' => 'operator']);
+
+        Sanctum::actingAs($operatorA);
+
+        // Attempt to spoof id_user to Operator B on store
+        $storeRes = $this->postJson('/api/calon-klien', [
+            'id_user' => $operatorB->id_user,
+            'nama_perusahaan' => 'PT Anti Spoof',
+            'kontak_person' => '081234567890',
+            'tgl_followup' => now()->toDateString(),
+        ]);
+
+        $storeRes->assertCreated()
+            ->assertJsonPath('data.id_user', $operatorA->id_user);
+
+        $leadId = $storeRes->json('data.id_calon_klien');
+
+        // Attempt to spoof id_user to Operator B on update
+        $updateRes = $this->putJson("/api/calon-klien/{$leadId}", [
+            'id_user' => $operatorB->id_user,
+            'nama_perusahaan' => 'PT Anti Spoof Updated',
+        ]);
+
+        $updateRes->assertOk()
+            ->assertJsonPath('data.id_user', $operatorA->id_user);
+    }
+
+    public function test_file_izin_usaha_validation_and_file_upload_helper_sanitization(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $operator = User::factory()->create(['role' => 'operator']);
+        Sanctum::actingAs($operator);
+
+        // 1. file_izin_usaha rejects invalid mime (.exe)
+        $badFile = \Illuminate\Http\UploadedFile::fake()->create('malware.exe', 100);
+        $this->postJson('/api/calon-klien', [
+            'nama_perusahaan' => 'PT Uji Izin Usaha',
+            'file_izin_usaha' => $badFile,
+        ])->assertStatus(422)->assertJsonValidationErrors(['file_izin_usaha']);
+
+        // 2. FileUploadHelper neutralizes .php extension and '..' traversal while keeping normal names intact
+        $phpFile = \Illuminate\Http\UploadedFile::fake()->create('..shell.php', 10);
+        $storedPhpPath = \App\Helpers\FileUploadHelper::storeWithOriginalName($phpFile, 'test_sec', 'public');
+        $this->assertStringEndsWith('.txt', $storedPhpPath);
+        $this->assertStringNotContainsString('..', $storedPhpPath);
+
+        $normalFile = \Illuminate\Http\UploadedFile::fake()->create('fherta_ganteng.pdf', 50);
+        $storedNormalPath = \App\Helpers\FileUploadHelper::storeWithOriginalName($normalFile, 'test_sec', 'public');
+        $this->assertEquals('test_sec/fherta_ganteng.pdf', $storedNormalPath);
+    }
 }
+

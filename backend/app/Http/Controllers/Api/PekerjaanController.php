@@ -10,10 +10,13 @@ use App\Models\Pekerjaan;
 use App\Models\Reporting;
 use App\Helpers\FileUploadHelper;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class PekerjaanController extends Controller
 {
@@ -22,7 +25,7 @@ class PekerjaanController extends Controller
         Gate::authorize('viewAny', Pekerjaan::class);
 
         $query = Pekerjaan::query()
-            ->with(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting']);
+            ->with(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']);
 
         if (request()->user()->role === 'karyawan') {
             $query->where('id_pic', request()->user()->id_user);
@@ -62,18 +65,111 @@ class PekerjaanController extends Controller
         }
 
         $pekerjaan = Pekerjaan::create($data)
-            ->load(['klien.kontrak.calonKlien', 'pic', 'latestReporting']);
+            ->load(['klien.kontrak.calonKlien', 'pic', 'latestReporting', 'layanan', 'masterPekerjaan']);
 
         return (new PekerjaanResource($pekerjaan))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
+    public function batchStore(Request $request): JsonResponse
+    {
+        Gate::authorize('create', Pekerjaan::class);
+
+        $validated = $request->validate([
+            'id_klien' => ['required', 'integer', 'exists:klien,id_klien'],
+            'id_layanan' => ['nullable', 'integer', 'exists:layanan,id_layanan'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.judul' => ['required', 'string', 'max:255'],
+            'items.*.id_pic' => [
+                'required',
+                'integer',
+                Rule::exists('users', 'id_user')->where(fn ($query) => $query->where('role', 'karyawan')),
+            ],
+            'items.*.deadline' => ['required', 'date', 'after_or_equal:today'],
+            'items.*.id_master_pekerjaan' => ['nullable', 'integer', 'exists:master_pekerjaan,id_master_pekerjaan'],
+            'items.*.deskripsi' => ['nullable', 'string'],
+            'items.*.periode_bulan' => [
+                'nullable',
+                'string',
+                'max:20',
+                function ($attribute, $value, $fail) {
+                    if (!empty($value) && $value < now()->format('Y-m')) {
+                        $fail('Bulan pengerjaan tidak boleh sebelum bulan ini.');
+                    }
+                },
+            ],
+            'items.*.prioritas' => ['nullable', 'string', 'max:255'],
+            'items.*.lampiran_instruksi' => ['nullable'],
+            'items.*.lampiran_instruksi.*' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,zip,rar,doc,docx,xls,xlsx', 'max:15360'],
+        ], [
+            'items.*.id_pic.exists' => 'Penanggung jawab (PIC) harus merupakan pengguna dengan peran Karyawan.',
+            'items.*.deadline.after_or_equal' => 'Batas waktu (deadline) tidak boleh sebelum hari ini.',
+        ]);
+
+        $createdPekerjaan = DB::transaction(function () use ($validated, $request) {
+            $created = [];
+            $today = now()->toDateString();
+
+            foreach ($validated['items'] as $index => $item) {
+                $lampiranInstruksi = null;
+                $fileInput = $request->file("items.{$index}.lampiran_instruksi")
+                    ?? $request->file("lampiran_instruksi_{$index}")
+                    ?? null;
+
+                if ($fileInput) {
+                    $files = is_array($fileInput) ? $fileInput : [$fileInput];
+                    $storedList = [];
+                    foreach ($files as $f) {
+                        if ($f instanceof \Illuminate\Http\UploadedFile) {
+                            $storedList[] = [
+                                'path' => FileUploadHelper::storeWithOriginalName($f, 'panduan_tugas', 'public'),
+                                'name' => $f->getClientOriginalName(),
+                            ];
+                        }
+                    }
+                    $lampiranInstruksi = !empty($storedList) ? json_encode($storedList) : null;
+                }
+
+                $pekerjaan = Pekerjaan::create([
+                    'id_klien' => $validated['id_klien'],
+                    'id_layanan' => $validated['id_layanan'] ?? null,
+                    'id_master_pekerjaan' => $item['id_master_pekerjaan'] ?? null,
+                    'id_pic' => $item['id_pic'],
+                    'judul' => $item['judul'],
+                    'deskripsi' => $item['deskripsi'] ?? null,
+                    'lampiran_instruksi' => $lampiranInstruksi,
+                    'tgl_penugasan' => $today,
+                    'deadline' => $item['deadline'],
+                    'periode_bulan' => $item['periode_bulan'] ?? null,
+                    'prioritas' => $item['prioritas'] ?? 'sedang',
+                    'progress_persen' => 0,
+                    'status' => 'baru',
+                    'tgl_selesai' => null,
+                ]);
+
+                $created[] = $pekerjaan;
+            }
+
+            return $created;
+        });
+
+        $ids = array_map(fn ($p) => $p->id_pekerjaan, $createdPekerjaan);
+        $fullRecords = Pekerjaan::whereIn('id_pekerjaan', $ids)
+            ->with(['klien.kontrak.calonKlien', 'pic', 'latestReporting', 'layanan', 'masterPekerjaan'])
+            ->get();
+
+        return response()->json([
+            'message' => count($fullRecords) . ' pekerjaan berhasil ditugaskan sekaligus.',
+            'data' => PekerjaanResource::collection($fullRecords),
+        ], Response::HTTP_CREATED);
+    }
+
     public function show(Pekerjaan $pekerjaan): PekerjaanResource
     {
         Gate::authorize('view', $pekerjaan);
 
-        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting']));
+        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']));
     }
 
     public function update(UpdatePekerjaanRequest $request, Pekerjaan $pekerjaan): PekerjaanResource
@@ -185,7 +281,7 @@ class PekerjaanController extends Controller
 
         $pekerjaan->update($data);
 
-        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'pic']));
+        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']));
     }
 
     public function destroy(Pekerjaan $pekerjaan): Response

@@ -210,7 +210,7 @@ export default function ApproveTaskModal({
                   className="size-4.5 rounded-md border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
                 />
                 <span className="text-sm font-bold text-gray-900 dark:text-white">
-                  💡 Beri Nilai Kinerja Karyawan Sekaligus
+                  Beri Nilai Kinerja Karyawan Sekaligus
                 </span>
               </label>
               <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-500/20 text-brand-700 dark:text-brand-300">

@@ -37,6 +37,13 @@ class CalonKlienController extends Controller
             ->orderByDesc('id_calon_klien')
             ->get();
 
+        foreach ($calonKlien as $ck) {
+            if ($ck->status_prospek === 'deal' && ! $ck->kontrak) {
+                $this->autoGenerateKontrakAndKlien($ck);
+                $ck->load('kontrak.klien');
+            }
+        }
+
         return CalonKlienResource::collection($calonKlien);
     }
 
@@ -46,7 +53,7 @@ class CalonKlienController extends Controller
 
         $data = $request->validated();
 
-        if (empty($data['id_user'])) {
+        if (in_array($request->user()->role, ['operator', 'sales'], true) || empty($data['id_user'])) {
             $data['id_user'] = $request->user()->id_user;
         }
 
@@ -103,6 +110,10 @@ class CalonKlienController extends Controller
         Gate::authorize('update', $calonKlien);
 
         $data = $request->validated();
+
+        if (in_array($request->user()->role, ['operator', 'sales'], true)) {
+            $data['id_user'] = $calonKlien->id_user;
+        }
 
         // Sync kontak and kontak_person
         if (!empty($data['kontak_person']) && empty($data['kontak'])) {
@@ -254,14 +265,25 @@ class CalonKlienController extends Controller
                 ]);
             }
 
+            $layananIds = $calonKlien->layanan_ids ?: request()->input('layanan_ids');
+            if (is_array($layananIds) && count($layananIds) > 0) {
+                $kontrak->layanan()->sync($layananIds);
+            }
+
             if (!$kontrak->klien()->exists()) {
+                $layananStr = $kontrak->layanan()->pluck('nama_layanan')->implode(', ') ?: 'Layanan Konsultansi & Manajemen PPSA';
                 Klien::create([
                     'id_kontrak' => $kontrak->id_kontrak,
                     'nama_perusahaan' => $calonKlien->nama_perusahaan,
                     'alamat' => !empty($calonKlien->alamat_perusahaan) ? $calonKlien->alamat_perusahaan : 'Alamat terlampir',
                     'kontak' => !empty($calonKlien->kontak_person) ? $calonKlien->kontak_person : ($calonKlien->kontak ?: '-'),
-                    'layanan' => 'Layanan Konsultansi & Manajemen PPSA',
+                    'layanan' => $layananStr,
                 ]);
+            } elseif (is_array($layananIds) && count($layananIds) > 0) {
+                $layananStr = $kontrak->layanan()->pluck('nama_layanan')->implode(', ');
+                if ($layananStr) {
+                    $kontrak->klien()->update(['layanan' => $layananStr]);
+                }
             }
         });
     }

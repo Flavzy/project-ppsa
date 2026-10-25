@@ -377,7 +377,7 @@ class EndToEndIntegrationTest extends TestCase
             'id_klien' => $idKlien,
             'id_pic' => $karyawan->id_user,
             'judul' => 'Setup dan Konfigurasi Database',
-            'deadline' => '2026-10-15',
+            'deadline' => now()->addDays(7)->toDateString(),
             'prioritas' => 'high',
             'progress_persen' => 0,
             'status' => 'in_progress',
@@ -542,4 +542,103 @@ class EndToEndIntegrationTest extends TestCase
         // 403: Authenticated but unauthorized role for endpoint
         $this->withToken($salesToken)->getJson('/api/pekerjaan')->assertForbidden();
     }
+
+    /**
+     * TC-AUTH-06: Progressive Login Lockout (5x failures -> 30s -> 3m -> 30m -> 30m)
+     */
+    public function test_tc_auth_06_progressive_login_lockout(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+
+        User::factory()->create([
+            'email' => 'lockout.test@example.com',
+            'password' => Hash::make('correctPassword123'),
+            'role' => 'operator',
+        ]);
+
+        // Stage 1: 4 failed attempts return 401, 5th returns 429 (30 seconds)
+        for ($i = 1; $i <= 4; $i++) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'lockout.test@example.com',
+                'password' => 'wrongPassword',
+            ])->assertStatus(401)
+                ->assertJsonPath('remaining_attempts', 5 - $i);
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'lockout.test@example.com',
+            'password' => 'wrongPassword',
+        ])->assertStatus(429)
+            ->assertJsonPath('retry_after', 30)
+            ->assertJsonPath('lockout_stage', 1);
+
+        // Even with correct password during the 30s block, still 429
+        $this->postJson('/api/auth/login', [
+            'email' => 'lockout.test@example.com',
+            'password' => 'correctPassword123',
+        ])->assertStatus(429);
+
+        // Fast-forward 31 seconds -> Stage 1 lockout expires
+        $this->travel(31)->seconds();
+
+        // Stage 2: 5 more consecutive failures -> 3 minutes (180 seconds)
+        for ($i = 1; $i <= 4; $i++) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'lockout.test@example.com',
+                'password' => 'wrongPassword',
+            ])->assertStatus(401);
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'lockout.test@example.com',
+            'password' => 'wrongPassword',
+        ])->assertStatus(429)
+            ->assertJsonPath('retry_after', 180)
+            ->assertJsonPath('lockout_stage', 2);
+
+        // Fast-forward 181 seconds -> Stage 2 lockout expires
+        $this->travel(181)->seconds();
+
+        // Stage 3: 5 more consecutive failures -> 30 minutes (1800 seconds)
+        for ($i = 1; $i <= 4; $i++) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'lockout.test@example.com',
+                'password' => 'wrongPassword',
+            ])->assertStatus(401);
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'lockout.test@example.com',
+            'password' => 'wrongPassword',
+        ])->assertStatus(429)
+            ->assertJsonPath('retry_after', 1800)
+            ->assertJsonPath('lockout_stage', 3);
+
+        // Fast-forward 1801 seconds -> Stage 3 lockout expires
+        $this->travel(1801)->seconds();
+
+        // Stage 4 ("dan seterusnya"): 5 more consecutive failures -> 30 minutes (1800 seconds)
+        for ($i = 1; $i <= 4; $i++) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'lockout.test@example.com',
+                'password' => 'wrongPassword',
+            ])->assertStatus(401);
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'lockout.test@example.com',
+            'password' => 'wrongPassword',
+        ])->assertStatus(429)
+            ->assertJsonPath('retry_after', 1800)
+            ->assertJsonPath('lockout_stage', 4);
+
+        // Fast-forward 1801 seconds -> Login with correct password succeeds and resets lockout
+        $this->travel(1801)->seconds();
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'lockout.test@example.com',
+            'password' => 'correctPassword123',
+        ])->assertOk();
+    }
 }
+

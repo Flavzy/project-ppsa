@@ -24,11 +24,14 @@ class Pekerjaan extends Model
      */
     protected $fillable = [
         'id_klien',
+        'id_layanan',
+        'id_master_pekerjaan',
         'id_pic',
         'judul',
         'deskripsi',
         'lampiran_instruksi',
         'tgl_penugasan',
+        'periode_bulan',
         'deadline',
         'prioritas',
         'progress_persen',
@@ -58,6 +61,16 @@ class Pekerjaan extends Model
     public function pic(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_pic', 'id_user');
+    }
+
+    public function layanan(): BelongsTo
+    {
+        return $this->belongsTo(Layanan::class, 'id_layanan', 'id_layanan');
+    }
+
+    public function masterPekerjaan(): BelongsTo
+    {
+        return $this->belongsTo(MasterPekerjaan::class, 'id_master_pekerjaan', 'id_master_pekerjaan');
     }
 
     public function reporting(): HasMany

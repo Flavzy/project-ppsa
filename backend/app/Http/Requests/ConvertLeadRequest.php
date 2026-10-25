@@ -28,6 +28,8 @@ class ConvertLeadRequest extends FormRequest
             'lingkup_kerja' => ['nullable', 'string'],
             'alamat' => ['required', 'string'],
             'layanan' => ['required', 'string', 'max:255'],
+            'layanan_ids' => ['nullable', 'array'],
+            'layanan_ids.*' => ['integer', 'exists:layanan,id_layanan'],
         ];
     }
 }

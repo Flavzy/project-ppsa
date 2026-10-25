@@ -34,13 +34,13 @@ export default function DeadlineBadge({
     if (diffDays > 0) {
       badge = (
         <Badge size="sm" color="error" className="font-semibold text-[11px] animate-pulse">
-          🚨 Lewat {diffDays} hr
+          Lewat {diffDays} hr
         </Badge>
       )
     } else if (diffDays === 0) {
       badge = (
         <Badge size="sm" color="warning" className="font-semibold text-[11px]">
-          ⏳ Hari Ini
+          Hari Ini
         </Badge>
       )
     } else {
@@ -48,7 +48,7 @@ export default function DeadlineBadge({
       if (remainingDays <= 2) {
         badge = (
           <Badge size="sm" color="warning" className="text-[11px]">
-            ⏳ Sisa {remainingDays} hr
+            Sisa {remainingDays} hr
           </Badge>
         )
       } else {

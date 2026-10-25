@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { useAuth } from '../auth/useAuth'
 import { resourceConfigs, supportResources } from '../config/resources'
+import { getDashboardSummary } from '../api/resources'
 import ConfirmModal from './ConfirmModal'
 import DashboardView from './DashboardView'
 import ResourceDashboard from './ResourceDashboard'
@@ -61,6 +62,18 @@ function NavIcon({ type, className = '' }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       )
+    case 'layanan':
+      return (
+        <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      )
+    case 'masterPekerjaan':
+      return (
+        <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+      )
     default:
       return (
         <svg className={iconClasses} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -86,6 +99,12 @@ export default function ProtectedShell() {
 
   // Active resource selection state
   const [activeKey, setActiveKey] = useState('dashboard')
+  const [navParams, setNavParams] = useState(null)
+
+  const handleNavigate = useCallback((key, params = null) => {
+    setNavParams(params)
+    setActiveKey(key)
+  }, [])
 
   const isDashboardActive = activeKey === 'dashboard'
   const isResourceActive = allowedResources.some((r) => r.key === activeKey)
@@ -95,6 +114,243 @@ export default function ProtectedShell() {
     if (currentActiveKey === 'dashboard') return null
     return allowedResources.find((resource) => resource.key === currentActiveKey) || allowedResources[0]
   }, [allowedResources, currentActiveKey])
+
+  // Dark Mode Toggle State & Persistence
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('theme')
+      if (saved) return saved === 'dark'
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark')
+      try { localStorage.setItem('theme', 'dark') } catch {}
+    } else {
+      document.documentElement.classList.remove('dark')
+      try { localStorage.setItem('theme', 'light') } catch {}
+    }
+  }, [isDarkMode])
+
+  // Notification Center State & Data
+  const [notifications, setNotifications] = useState([])
+  const [isNotifOpen, setIsNotifOpen] = useState(false)
+  const notifRef = useRef(null)
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await getDashboardSummary()
+      const data = res?.data || res || {}
+      const notifs = []
+      const todayStr = new Date().toISOString().split('T')[0]
+
+      // 1. Pengingat Tugas Rutin Bulanan (Role Pimpinan, Admin, Operator, Sales)
+      const monthlyReminders = data.monthly_reminders || []
+      if (monthlyReminders.length > 0 && ['admin', 'pimpinan', 'operator', 'sales'].includes(user?.role)) {
+        notifs.push({
+          category: 'Penugasan Rutin',
+          title: `${monthlyReminders.length} Paket Rutin Belum Ditugaskan`,
+          description: `Terdapat ${monthlyReminders.length} paket pekerjaan bulanan kontrak aktif bulan ini yang siap ditugaskan ke karyawan.`,
+          count: monthlyReminders.length,
+          dotColor: 'bg-amber-500',
+          onClick: () => {
+            handleNavigate('dashboard')
+            setIsNotifOpen(false)
+          },
+        })
+      }
+
+      // 2. Notifikasi Khusus Karyawan (Role Karyawan)
+      if (user?.role === 'karyawan') {
+        const recentTasks = data.recent_tasks || []
+
+        // 2a. Tugas Perlu Revisi dari Pimpinan (Prioritas Utama)
+        const revisionTasks = recentTasks.filter((t) => ['revision_needed', 'revision'].includes(t.status))
+        const revisionCount = revisionTasks.length > 0 ? revisionTasks.length : Number(data.totals?.revision_tasks || data.work_by_status?.revision_needed || data.work_by_status?.revision || 0)
+        if (revisionCount > 0) {
+          if (revisionTasks.length === 1) {
+            const task = revisionTasks[0]
+            notifs.push({
+              category: 'Perlu Revisi',
+              title: `Perbaikan: ${task.judul}`,
+              description: `Pimpinan meminta revisi: "${task.catatan_review || 'Mohon tinjau catatan instruksi dan unggah perbaikan.'}"`,
+              count: 1,
+              dotColor: 'bg-amber-500',
+              onClick: () => {
+                handleNavigate('reporting')
+                setIsNotifOpen(false)
+              },
+            })
+          } else {
+            notifs.push({
+              category: 'Perlu Revisi',
+              title: `${revisionCount} Tugas Memerlukan Perbaikan`,
+              description: 'Pimpinan meminta revisi pada hasil pengerjaan tugas Anda.',
+              count: revisionCount,
+              dotColor: 'bg-amber-500',
+              onClick: () => {
+                handleNavigate('reporting')
+                setIsNotifOpen(false)
+              },
+            })
+          }
+        }
+
+        // 2b. Tugas Melewati Deadline (Overdue)
+        const overdueTasks = recentTasks.filter((t) =>
+          !['completed', 'approved', 'submitted', 'revision_needed', 'revision'].includes(t.status) &&
+          t.deadline && t.deadline < todayStr
+        )
+        const overdueCount = overdueTasks.length > 0 ? overdueTasks.length : Number(data.totals?.overdue_tasks || 0)
+        if (overdueCount > 0) {
+          notifs.push({
+            category: 'Tenggat Waktu',
+            title: `${overdueCount} Tugas Melewati Batas Waktu`,
+            description: 'Terdapat tugas Anda yang telah melewati batas waktu pengerjaan. Segera selesaikan dan laporkan.',
+            count: overdueCount,
+            dotColor: 'bg-error-500',
+            onClick: () => {
+              handleNavigate('pekerjaan')
+              setIsNotifOpen(false)
+            },
+          })
+        }
+
+        // 2c. Tugas Baru yang Ditugaskan (Status 'baru')
+        const newTasks = recentTasks.filter((t) =>
+          t.status === 'baru' && (!t.deadline || t.deadline >= todayStr)
+        )
+        const newCount = newTasks.length > 0 ? newTasks.length : Number(data.totals?.new_tasks || data.work_by_status?.baru || 0)
+        if (newCount > 0) {
+          if (newTasks.length === 1) {
+            const task = newTasks[0]
+            notifs.push({
+              category: 'Penugasan Baru',
+              title: `Tugas Baru: ${task.judul}`,
+              description: `Klien: ${task.klien || '-'} • Batas: ${task.deadline || '-'} • Siap untuk Anda kerjakan.`,
+              count: 1,
+              dotColor: 'bg-brand-500',
+              onClick: () => {
+                handleNavigate('pekerjaan')
+                setIsNotifOpen(false)
+              },
+            })
+          } else {
+            notifs.push({
+              category: 'Penugasan Baru',
+              title: `${newCount} Tugas Baru Ditugaskan`,
+              description: `Terdapat ${newCount} tugas baru yang telah ditugaskan kepada Anda dan siap dikerjakan.`,
+              count: newCount,
+              dotColor: 'bg-brand-500',
+              onClick: () => {
+                handleNavigate('pekerjaan')
+                setIsNotifOpen(false)
+              },
+            })
+          }
+        }
+
+        // 2d. Tugas Sedang Berjalan / Dalam Pengerjaan (Status 'in_progress')
+        const inProgressTasks = recentTasks.filter((t) =>
+          t.status === 'in_progress' && (!t.deadline || t.deadline >= todayStr)
+        )
+        const inProgCount = inProgressTasks.length > 0 ? inProgressTasks.length : Number(data.totals?.in_progress_tasks || data.work_by_status?.in_progress || 0)
+        if (inProgCount > 0) {
+          if (inProgressTasks.length === 1) {
+            const task = inProgressTasks[0]
+            notifs.push({
+              category: 'Dalam Pengerjaan',
+              title: `Sedang Dikerjakan: ${task.judul}`,
+              description: `Klien: ${task.klien || '-'} • Batas: ${task.deadline || '-'} • Laporkan jika telah selesai.`,
+              count: 1,
+              dotColor: 'bg-blue-light-500',
+              onClick: () => {
+                handleNavigate('pekerjaan')
+                setIsNotifOpen(false)
+              },
+            })
+          } else {
+            notifs.push({
+              category: 'Dalam Pengerjaan',
+              title: `${inProgCount} Tugas Sedang Berjalan`,
+              description: `Terdapat ${inProgCount} tugas aktif yang sedang Anda kerjakan.`,
+              count: inProgCount,
+              dotColor: 'bg-blue-light-500',
+              onClick: () => {
+                handleNavigate('pekerjaan')
+                setIsNotifOpen(false)
+              },
+            })
+          }
+        }
+      }
+
+      // 3. Tugas Melewati Deadline untuk Non-Karyawan (Pimpinan, Admin, Operator, Sales)
+      if (user?.role !== 'karyawan') {
+        const overdueTasks = Number(data.totals?.overdue_tasks || 0)
+        if (overdueTasks > 0) {
+          notifs.push({
+            category: 'Tenggat Waktu',
+            title: `${overdueTasks} Tugas Melewati Batas Waktu`,
+            description: 'Perlu peninjauan batas waktu atau percepatan penyelesaian tugas operasional.',
+            count: overdueTasks,
+            dotColor: 'bg-error-500',
+            onClick: () => {
+              handleNavigate('pekerjaan')
+              setIsNotifOpen(false)
+            },
+          })
+        }
+      }
+
+      // 4. Laporan Karyawan Menunggu Persetujuan Pimpinan
+      const submittedReports = Number(data.work_by_status?.submitted || 0)
+      if (submittedReports > 0 && ['admin', 'pimpinan'].includes(user?.role)) {
+        notifs.push({
+          category: 'Persetujuan Laporan',
+          title: `${submittedReports} Laporan Menunggu Ditinjau`,
+          description: 'Karyawan telah mengumpulkan bukti tugas dan menanti persetujuan pimpinan.',
+          count: submittedReports,
+          dotColor: 'bg-blue-light-500',
+          onClick: () => {
+            handleNavigate('reporting')
+            setIsNotifOpen(false)
+          },
+        })
+      }
+
+      setNotifications(notifs)
+    } catch {
+      // Ignore background summary loading error
+    }
+  }, [user?.id_user, user?.role, handleNavigate])
+
+  const totalNotifCount = useMemo(() => {
+    return notifications.reduce((sum, item) => sum + (item.count || 1), 0)
+  }, [notifications])
+
+  useEffect(() => {
+    loadNotifications()
+    const timer = setInterval(loadNotifications, 30000)
+    return () => clearInterval(timer)
+  }, [loadNotifications, currentActiveKey])
+
+  // Tutup panel notifikasi jika pengguna mengklik di luar area
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setIsNotifOpen(false)
+      }
+    }
+    if (isNotifOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isNotifOpen])
 
   async function handleConfirmLogout() {
     setLoggingOut(true)
@@ -126,6 +382,7 @@ export default function ProtectedShell() {
   const crmResources = allowedResources.filter((r) => ['calonKlien', 'kontrak'].includes(r.key))
   const operationsResources = allowedResources.filter((r) => ['klien', 'pekerjaan'].includes(r.key))
   const reportingResources = allowedResources.filter((r) => ['reporting', 'performanceReviews', 'kinerjaKaryawan'].includes(r.key))
+  const masterResources = allowedResources.filter((r) => ['layanan', 'masterPekerjaan'].includes(r.key))
   const adminResources = allowedResources.filter((r) => ['users'].includes(r.key))
 
   return (
@@ -178,13 +435,13 @@ export default function ProtectedShell() {
           <nav className="flex-1 space-y-4 px-3 py-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 dark:[&::-webkit-scrollbar-thumb]:bg-gray-800">
             {/* Menu Utama */}
             <div>
-              <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
                 Menu Utama
               </p>
               <button
                 type="button"
                 onClick={() => {
-                  setActiveKey('dashboard')
+                  handleNavigate('dashboard', null)
                   setIsMobileOpen(false)
                 }}
                 className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
@@ -204,7 +461,7 @@ export default function ProtectedShell() {
             {/* CRM & Sales */}
             {crmResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
                   CRM & Penjualan
                 </p>
                 <div className="space-y-0.5">
@@ -215,7 +472,7 @@ export default function ProtectedShell() {
                         key={res.key}
                         type="button"
                         onClick={() => {
-                          setActiveKey(res.key)
+                          handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
                         className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
@@ -239,7 +496,7 @@ export default function ProtectedShell() {
             {/* Operasional Proyek */}
             {operationsResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
                   {user?.role === 'karyawan' ? 'Tugas & Pekerjaan' : 'Operasional Proyek'}
                 </p>
                 <div className="space-y-0.5">
@@ -251,7 +508,7 @@ export default function ProtectedShell() {
                         key={res.key}
                         type="button"
                         onClick={() => {
-                          setActiveKey(res.key)
+                          handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
                         className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
@@ -275,7 +532,7 @@ export default function ProtectedShell() {
             {/* Laporan & Review */}
             {reportingResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
                   Laporan & Evaluasi
                 </p>
                 <div className="space-y-0.5">
@@ -290,7 +547,7 @@ export default function ProtectedShell() {
                         key={res.key}
                         type="button"
                         onClick={() => {
-                          setActiveKey(res.key)
+                          handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
                         className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
@@ -311,10 +568,45 @@ export default function ProtectedShell() {
               </div>
             )}
 
+            {/* Data Master - Khusus Pimpinan */}
+            {masterResources.length > 0 && user?.role === 'pimpinan' && (
+              <div>
+                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                  Data Master (Katalog)
+                </p>
+                <div className="space-y-0.5">
+                  {masterResources.map((res) => {
+                    const isActive = currentActiveKey === res.key
+                    return (
+                      <button
+                        key={res.key}
+                        type="button"
+                        onClick={() => {
+                          handleNavigate(res.key, null)
+                          setIsMobileOpen(false)
+                        }}
+                        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
+                            : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
+                        }`}
+                      >
+                        <NavIcon
+                          type={res.key}
+                          className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
+                        />
+                        <span className="truncate">{res.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Administrasi Akun */}
             {adminResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
                   Sistem & User
                 </p>
                 <div className="space-y-0.5">
@@ -325,7 +617,7 @@ export default function ProtectedShell() {
                         key={res.key}
                         type="button"
                         onClick={() => {
-                          setActiveKey(res.key)
+                          handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
                         className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
@@ -400,8 +692,115 @@ export default function ProtectedShell() {
             </div>
           </div>
 
-          {/* Right Header: Role Pill & Logout */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Right Header: Theme Toggle, Notifications, Role Pill & Logout */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Tombol Pengubah Mode Gelap (Dark Mode Toggle) */}
+            <button
+              type="button"
+              onClick={() => setIsDarkMode((prev) => !prev)}
+              className="flex size-9 items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-2xs transition-all active:scale-95 cursor-pointer"
+              title={isDarkMode ? 'Beralih ke Mode Terang (Light Mode)' : 'Beralih ke Mode Gelap (Dark Mode)'}
+              aria-label="Toggle dark mode"
+            >
+              {isDarkMode ? (
+                <svg className="size-4.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="size-4.5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+
+            {/* Pusat Notifikasi / Lonceng Notifikasi */}
+            <div className="relative" ref={notifRef}>
+              <button
+                type="button"
+                onClick={() => setIsNotifOpen((prev) => !prev)}
+                className={`relative flex size-9 items-center justify-center rounded-xl border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+                  isNotifOpen
+                    ? 'border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 dark:border-brand-600'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750'
+                }`}
+                title="Pusat Pemberitahuan & Pengingat"
+                aria-label="Buka notifikasi"
+              >
+                <svg className="size-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {totalNotifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex min-w-4.5 h-4.5 px-1 items-center justify-center rounded-full bg-error-500 text-[10px] font-black text-white ring-2 ring-white dark:ring-gray-900 animate-pulse">
+                    {totalNotifCount > 99 ? '99+' : totalNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown Popover Panel Notifikasi */}
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-2.5 w-80 sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl z-50 overflow-hidden animate-fade-in">
+                  <div className="flex items-center justify-between p-3.5 border-b border-gray-100 dark:border-gray-700/80 bg-gray-50/75 dark:bg-gray-900/60">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+                        Pemberitahuan
+                      </h4>
+                      {totalNotifCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error-100 text-error-700 dark:bg-error-500/20 dark:text-error-300">
+                          {totalNotifCount} Perlu Tindakan
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={loadNotifications}
+                      className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                    >
+                      Segarkan
+                    </button>
+                  </div>
+
+                  <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/50">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-gray-400 dark:text-gray-500">
+                        <div className="size-10 mx-auto mb-2 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                          <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <p className="font-semibold text-gray-700 dark:text-gray-300">Semua beres!</p>
+                        <p className="mt-0.5">Tidak ada tugas mendesak atau laporan tertunda saat ini.</p>
+                      </div>
+                    ) : (
+                      notifications.map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            item.onClick()
+                            setIsNotifOpen(false)
+                          }}
+                          className="w-full text-left p-3.5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors flex items-start gap-3 cursor-pointer group"
+                        >
+                          <span className={`size-2.5 mt-1 rounded-full shrink-0 ${item.dotColor || 'bg-brand-500'} group-hover:scale-125 transition-transform`} />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 block">
+                              {item.category}
+                            </span>
+                            <p className="text-xs font-bold text-gray-900 dark:text-white mt-0.5 leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                              {item.title}
+                            </p>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                              {item.description}
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Badge size="sm" color={roleBadgeColor} className="uppercase font-bold tracking-wide">
               {roleLabel}
             </Badge>
@@ -425,14 +824,16 @@ export default function ProtectedShell() {
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6 lg:p-7">
             {currentActiveKey === 'dashboard' ? (
-              <DashboardView onNavigate={(key) => setActiveKey(key)} />
+              <DashboardView onNavigate={handleNavigate} />
             ) : activeConfig ? (
               <ResourceDashboard
                 key={currentActiveKey}
                 config={activeConfig}
                 resourceConfigs={resourceConfigs}
                 supportResources={supportResources}
-                onNavigate={(key) => setActiveKey(key)}
+                onNavigate={handleNavigate}
+                initialNavParams={activeConfig.key === 'pekerjaan' ? navParams : null}
+                onClearNavParams={() => setNavParams(null)}
               />
             ) : (
               <div className="rounded-3xl border border-gray-200 bg-white p-8 text-center text-gray-500 dark:border-gray-800 dark:bg-gray-900">
