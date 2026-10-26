@@ -108,9 +108,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 dark:bg-gray-950 font-outfit">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-gray-50 dark:bg-gray-950 font-outfit">
       {/* Mobile Top Hero Banner (Illustration & Branding for Phone screens - Never Hidden) */}
-      <div className="lg:hidden relative bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 text-white px-5 py-7 text-center overflow-hidden border-b border-slate-800">
+      <div className="lg:hidden relative bg-gradient-to-br from-[#062317] via-[#091e15] to-[#04100b] text-white px-5 py-7 text-center overflow-hidden border-b border-emerald-950/80">
         <GridShape className="opacity-20 text-slate-500" />
         <div className="relative z-10 flex flex-col items-center">
           <div className="relative mb-4 w-28 h-28 flex items-center justify-center">
@@ -134,11 +134,11 @@ export default function LoginPage() {
 
       {/* Main Left: Sign In Form (Elevated Card Container in Dark & Light Mode) */}
       <div className="flex flex-1 flex-col justify-center items-center px-4 py-8 sm:px-8 lg:px-10 xl:px-14 bg-slate-50/70 dark:bg-gray-950/80 relative">
-        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-850 dark:bg-gray-800/80 border border-gray-200/90 dark:border-gray-700/80 p-6 sm:p-8 shadow-xl dark:shadow-2xl dark:shadow-black/60 backdrop-blur-xs transition-all">
+        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-800/80 border border-gray-200/90 dark:border-gray-700/80 p-6 sm:p-8 shadow-xl dark:shadow-2xl dark:shadow-black/60 backdrop-blur-xs transition-all">
           {/* Header */}
           <div className="mb-6">
             <div className="flex items-center gap-3.5 mb-2">
-              <div className="flex h-13 w-13 items-center justify-center rounded-2xl overflow-hidden shadow-md ring-2 ring-brand-500/25 bg-white dark:bg-gray-750 dark:bg-gray-700 shrink-0">
+              <div className="flex h-13 w-13 items-center justify-center rounded-2xl overflow-hidden shadow-md ring-2 ring-brand-500/25 bg-white dark:bg-gray-700 shrink-0">
                 <img
                   src="/images/logo/loading-logo.png"
                   alt="Logo SIM-KK"
@@ -320,7 +320,7 @@ export default function LoginPage() {
       </div>
 
       {/* Main Right: TailAdmin Brand & Illustration Panel (Desktop) */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-7/12 relative bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 text-white flex-col justify-center items-center p-12 overflow-hidden border-l border-slate-800/80">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-7/12 relative bg-gradient-to-br from-[#062317] via-[#091e15] to-[#04100b] text-white flex-col justify-center items-center p-12 overflow-hidden border-l border-emerald-950/80">
         <GridShape className="opacity-20 text-slate-500" />
 
         <div className="relative z-10 max-w-lg text-center">

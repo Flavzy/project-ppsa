@@ -451,9 +451,9 @@ export default function BatchTaskAssignmentCard({
               disabled={submitting}
               className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3.5 py-2.5 text-xs sm:text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             >
-              <option value="">-- Pilih Perusahaan Klien --</option>
+              <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">-- Pilih Perusahaan Klien --</option>
               {clients.map((k) => (
-                <option key={k.id_klien} value={k.id_klien}>
+                <option key={k.id_klien} value={k.id_klien} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                   {k.nama_perusahaan} {k.kontrak?.no_kontrak ? `(${k.kontrak.no_kontrak})` : ''}
                 </option>
               ))}
@@ -481,10 +481,10 @@ export default function BatchTaskAssignmentCard({
               className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3.5 py-2.5 text-xs sm:text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:opacity-50"
             >
               {availableServices.length === 0 ? (
-                <option value="">Tidak ada paket layanan terkait</option>
+                <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Tidak ada paket layanan terkait</option>
               ) : (
                 availableServices.map((s) => (
-                  <option key={s.id_layanan} value={s.id_layanan}>
+                  <option key={s.id_layanan} value={s.id_layanan} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                     {s.nama_layanan}
                   </option>
                 ))
@@ -631,9 +631,9 @@ export default function BatchTaskAssignmentCard({
                                 disabled={submitting}
                                 className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
                               >
-                                <option value="">-- Pilih Karyawan --</option>
+                                <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">-- Pilih Karyawan --</option>
                                 {employees.map((emp) => (
-                                  <option key={emp.id_user} value={String(emp.id_user)}>
+                                  <option key={emp.id_user} value={String(emp.id_user)} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                                     {emp.nama}
                                   </option>
                                 ))}

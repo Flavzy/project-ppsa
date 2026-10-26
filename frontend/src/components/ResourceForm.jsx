@@ -792,6 +792,39 @@ function ResourceForm({
     })
   }, [record, fileStates, config, currentUser, values])
 
+  // Group fields by section if section is specified
+  const sections = useMemo(() => {
+    const list = []
+    config.fields.forEach((field) => {
+      const sectionName = field.section || 'Informasi Utama'
+      let group = list.find((s) => s.title === sectionName)
+      if (!group) {
+        group = { title: sectionName, fields: [] }
+        list.push(group)
+      }
+      group.fields.push(field)
+    })
+    return list
+  }, [config.fields])
+
+  // State untuk sub-navigasi tab formulir (khusus form bertingkat / panjang seperti Calon Klien)
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0)
+
+  useEffect(() => {
+    setActiveSectionIndex(0)
+  }, [config?.key, record])
+
+  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit
+  useEffect(() => {
+    const errorKeys = Object.keys(clientErrors || {}).concat(Object.keys(errors || {}))
+    if (errorKeys.length > 0 && sections.length > 1) {
+      const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
+      if (targetIdx !== -1 && activeSectionIndex !== -1 && activeSectionIndex !== targetIdx) {
+        setActiveSectionIndex(targetIdx)
+      }
+    }
+  }, [clientErrors, errors, sections, activeSectionIndex])
+
   // If editing but cannot edit, or adding but cannot create, don't show the form
   if (record && !canEdit) {
     return null
@@ -917,36 +950,6 @@ function ResourceForm({
       onSubmit(payload)
     }
   }
-
-  // Group fields by section if section is specified
-  const sections = []
-  config.fields.forEach((field) => {
-    const sectionName = field.section || 'Informasi Utama'
-    let group = sections.find((s) => s.title === sectionName)
-    if (!group) {
-      group = { title: sectionName, fields: [] }
-      sections.push(group)
-    }
-    group.fields.push(field)
-  })
-
-  // State untuk sub-navigasi tab formulir (khusus form bertingkat / panjang seperti Calon Klien)
-  const [activeSectionIndex, setActiveSectionIndex] = useState(0)
-
-  useEffect(() => {
-    setActiveSectionIndex(0)
-  }, [config?.key, record])
-
-  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit
-  useEffect(() => {
-    const errorKeys = Object.keys(clientErrors || {}).concat(Object.keys(errors || {}))
-    if (errorKeys.length > 0 && sections.length > 1) {
-      const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
-      if (targetIdx !== -1 && activeSectionIndex !== -1 && activeSectionIndex !== targetIdx) {
-        setActiveSectionIndex(targetIdx)
-      }
-    }
-  }, [clientErrors, errors, sections, activeSectionIndex])
 
   const isTaskCompleted = config?.key === 'pekerjaan' && record && ['completed', 'approved'].includes(record.status)
   const isReportCompleted = config?.key === 'reporting' && record && (['approved', 'completed'].includes(record.status_laporan) || record.pekerjaan?.status === 'completed')
@@ -1259,15 +1262,15 @@ function ResourceForm({
                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
                             required={field.required && !isFieldDisabled}
                             disabled={isFieldDisabled}
-                            className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            <option value="">
+                            <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                               {selectOptions.length === 0 && config.key === 'kinerjaKaryawan' && field.name === 'id_pekerjaan'
                                 ? '-- Tidak ada tugas selesai & disetujui yang menunggu penilaian --'
                                 : `Pilih ${field.label}`}
                             </option>
                             {record && initialVal && !hasCurrent && (
-                              <option value={initialVal}>
+                              <option value={initialVal} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                                 {fallbackHumanName || `${field.label}`}
                               </option>
                             )}
@@ -1277,7 +1280,7 @@ function ResourceForm({
                                 ? field.formatOptionLabel(opt)
                                 : (typeof opt === 'object' ? (opt[lblKey] || opt[valKey] || opt) : opt)
                               return (
-                                <option key={optVal} value={optVal} disabled={Boolean(opt.__disabled)}>
+                                <option key={optVal} value={optVal} disabled={Boolean(opt.__disabled)} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                                   {opt.__displayLabel || optLabel}
                                 </option>
                               )
@@ -1554,12 +1557,13 @@ function ResourceForm({
               </p>
             )}
             {(() => {
+              const fallbackUrl = record.file_tugas_url || record.latest_reporting?.dokumen_bukti_url
               const taskFiles = record.file_tugas_urls && record.file_tugas_urls.length > 0
                 ? record.file_tugas_urls
                 : (record.latest_reporting?.dokumen_bukti_urls && record.latest_reporting.dokumen_bukti_urls.length > 0
                     ? record.latest_reporting.dokumen_bukti_urls
-                    : (record.file_tugas_url || record.latest_reporting?.dokumen_bukti_url
-                        ? [{ name: decodeURIComponent((record.file_tugas_url || record.latest_reporting?.dokumen_bukti_url).split('/').pop()) || 'Buka File Tugas Selesai', url: record.file_tugas_url || record.latest_reporting?.dokumen_bukti_url }]
+                    : (fallbackUrl
+                        ? [{ name: decodeURIComponent(fallbackUrl.split('/').pop() || '') || 'Buka File Tugas Selesai', url: fallbackUrl }]
                         : []))
 
               if (taskFiles.length === 0) return null

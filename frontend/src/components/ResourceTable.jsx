@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Badge from './ui/Badge'
 import LoadingSpinner from './common/LoadingSpinner'
 import DeadlineBadge from './common/DeadlineBadge'
@@ -532,6 +532,252 @@ function renderCellValue(column, record, onPreviewImage) {
   return <span className="text-gray-800 dark:text-gray-200">{String(value)}</span>
 }
 
+function ActionIcon({ type, className = 'size-3.5' }) {
+  switch (type) {
+    case 'pencil':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      )
+    case 'eye':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        </svg>
+      )
+    case 'play':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'check':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+      )
+    case 'refresh':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      )
+    case 'document':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      )
+    case 'printer':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        </svg>
+      )
+    case 'trash':
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      )
+    default:
+      return null
+  }
+}
+
+function resolveRowActions({
+  record,
+  config,
+  user,
+  canEdit,
+  canDelete,
+  onStartTask,
+  onApproveTask,
+  onRejectTask,
+  onViewLegalitas,
+  onViewContract,
+  onEdit,
+  onDelete,
+}) {
+  const isLeadOwner = !['operator', 'sales'].includes(user?.role) || Number(record.id_user) === Number(user?.id_user)
+  const isCalonKlien = config.key === 'calonKlien'
+  const isKontrak = config.key === 'kontrak'
+  const isReporting = config.key === 'reporting'
+  const isPekerjaan = config.key === 'pekerjaan'
+
+  const operatorPicId =
+    record.operator_pic_id ??
+    record.calon_klien?.id_user ??
+    record.calonKlien?.id_user ??
+    record.kontrak?.calon_klien?.id_user ??
+    record.kontrak?.calonKlien?.id_user ??
+    record.klien?.kontrak?.calon_klien?.id_user ??
+    record.klien?.kontrak?.calonKlien?.id_user
+  const isTaskOperatorOwner =
+    !['operator', 'sales'].includes(user?.role) ||
+    (operatorPicId != null && Number(operatorPicId) === Number(user?.id_user))
+
+  const isReportApproved =
+    isReporting &&
+    (['approved', 'completed'].includes(record.status_laporan) ||
+      ['approved', 'completed'].includes(record.pekerjaan?.status))
+  const isReportRevised =
+    isReporting &&
+    (['revision_needed', 'revision'].includes(record.status_laporan) ||
+      ['revision_needed', 'revision'].includes(record.pekerjaan?.status))
+  const isReportPending = isReporting && !isReportApproved && !isReportRevised
+
+  const canReviewTask = ['admin', 'pimpinan'].includes(user?.role) && isReporting && isReportPending
+  const canStartTask =
+    isPekerjaan &&
+    user?.role === 'karyawan' &&
+    record.status === 'baru' &&
+    Number(record.id_pic) === Number(user?.id_user)
+
+  const isTaskCompleted = isPekerjaan && ['completed', 'approved'].includes(record.status)
+  const isReportCompleted = isReportApproved
+  const isReadOnlyRow = isTaskCompleted || isReportCompleted || (isPekerjaan && user?.role === 'karyawan')
+
+  const canEditRow =
+    canEdit &&
+    (config.key !== 'calonKlien' || isLeadOwner) &&
+    (!['pekerjaan', 'kontrak', 'klien'].includes(config.key) || isTaskOperatorOwner || user?.role === 'karyawan')
+
+  // Status badges (indikator status non-interaktif)
+  const statusBadge = isReporting && isReportApproved
+    ? { type: 'approved', label: '✓ Selesai', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/60' }
+    : isReporting && isReportRevised
+    ? { type: 'revised', label: '↺ Revisi', className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-800/60' }
+    : (['pekerjaan', 'kontrak', 'klien'].includes(config.key) && ['operator', 'sales'].includes(user?.role) && !isTaskOperatorOwner)
+    ? { type: 'not_pic', label: 'Bukan PIC', title: 'Bukan wewenang Anda (Hanya Operator PIC terkait yang berwenang mengedit data ini)' }
+    : null
+
+  let primaryAction = null
+  const secondaryActions = []
+
+  // 1. Workflow: Start Task (Karyawan) -> Aksi Utama
+  if (canStartTask && onStartTask) {
+    primaryAction = {
+      key: 'start',
+      label: 'Mulai',
+      fullLabel: 'Mulai Kerjakan',
+      variant: 'primary',
+      icon: 'play',
+      onClick: () => onStartTask(record),
+      title: 'Mulai kerjakan tugas ini (Status berubah menjadi Dalam Pengerjaan)',
+    }
+  }
+
+  // 2. Workflow: Approve Task (Pimpinan) -> Aksi Utama
+  if (canReviewTask && onApproveTask) {
+    primaryAction = {
+      key: 'approve',
+      label: 'Setujui',
+      fullLabel: 'Setujui Laporan',
+      variant: 'success',
+      icon: 'check',
+      onClick: () => onApproveTask(record),
+      title: 'Setujui laporan tugas ini',
+    }
+  }
+
+  // 3. Workflow: Reject Task (Pimpinan) -> Aksi Pendukung (Masuk ke Dropdown '...')
+  if (canReviewTask && onRejectTask) {
+    secondaryActions.push({
+      key: 'reject',
+      label: 'Minta Revisi',
+      fullLabel: 'Minta Revisi',
+      icon: 'refresh',
+      color: 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10',
+      onClick: () => onRejectTask(record),
+      title: 'Minta revisi atas laporan tugas ini',
+    })
+  }
+
+  // 4. Edit / Detail Action
+  if (canEditRow) {
+    const editAction = {
+      key: 'edit',
+      label: isReadOnlyRow ? 'Detail' : 'Edit',
+      fullLabel: isReadOnlyRow ? 'Lihat Detail Data' : 'Edit Data',
+      variant: isReadOnlyRow ? 'neutral-ghost' : 'neutral',
+      icon: isReadOnlyRow ? 'eye' : 'pencil',
+      onClick: () => onEdit(record),
+      title: isTaskCompleted
+        ? 'Pekerjaan telah disetujui & selesai (Lihat Detail)'
+        : isReportCompleted
+        ? 'Laporan telah disetujui (Lihat Detail)'
+        : isPekerjaan && user?.role === 'karyawan'
+        ? 'Lihat detail instruksi pekerjaan'
+        : 'Edit data',
+    }
+
+    if (!primaryAction) {
+      primaryAction = editAction
+    } else {
+      secondaryActions.unshift(editAction)
+    }
+  }
+
+  // 5. Calon Klien: View Legalitas
+  if (isCalonKlien && onViewLegalitas) {
+    const legalitasAction = {
+      key: 'legalitas',
+      label: 'Legalitas',
+      fullLabel: 'Lihat Legalitas',
+      variant: 'info',
+      icon: 'document',
+      color: 'text-blue-light-700 dark:text-blue-light-400 hover:bg-blue-light-50 dark:hover:bg-blue-light-500/15',
+      onClick: () => onViewLegalitas(record),
+      title: 'Lihat nomor legalitas & berkas pendukung',
+    }
+    if (!primaryAction) {
+      primaryAction = legalitasAction
+    } else {
+      secondaryActions.push(legalitasAction)
+    }
+  }
+
+  // 6. Kontrak: Cetak Dokumen
+  if (isKontrak && onViewContract) {
+    const printAction = {
+      key: 'print',
+      label: 'Cetak',
+      fullLabel: 'Cetak Surat Kontrak',
+      variant: 'teal',
+      icon: 'printer',
+      color: 'text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-500/15',
+      onClick: () => onViewContract(record),
+      title: 'Buka surat perjanjian kontrak untuk dicetak',
+    }
+    if (!primaryAction) {
+      primaryAction = printAction
+    } else {
+      secondaryActions.push(printAction)
+    }
+  }
+
+  // 7. Delete action
+  if (canDelete) {
+    secondaryActions.push({
+      key: 'delete',
+      label: 'Hapus',
+      fullLabel: 'Hapus Data',
+      variant: 'danger',
+      icon: 'trash',
+      color: 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 border-t border-gray-100 dark:border-gray-700/60',
+      onClick: () => onDelete(record),
+      title: 'Hapus data ini',
+    })
+  }
+
+  return { primaryAction, secondaryActions, statusBadge }
+}
+
 function ResourceTable({
   config,
   records,
@@ -859,6 +1105,26 @@ function ResourceTable({
     )
   }
 
+  // Logika Menu Dropdown Tiga Titik (...) Aksi Tabel
+  const [activeDropdownId, setActiveDropdownId] = useState(null)
+  const actionMenuRef = useRef(null)
+
+  useEffect(() => {
+    function handlePointerDown(e) {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target)) {
+        setActiveDropdownId(null)
+      }
+    }
+    if (activeDropdownId !== null) {
+      document.addEventListener('pointerdown', handlePointerDown)
+      return () => document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [activeDropdownId])
+
+  useEffect(() => {
+    setActiveDropdownId(null)
+  }, [currentPage, pageSize, statusFilter, searchQuery])
+
   if (loading && records.length === 0) {
     return (
       <div className="rounded-3xl border border-gray-200 bg-white p-10 text-center shadow-xs dark:border-gray-800 dark:bg-gray-900">
@@ -984,7 +1250,7 @@ function ResourceTable({
                 className="pl-9 pr-8 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-hidden focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all shadow-2xs cursor-pointer appearance-none"
               >
                 {statusFilterOptions.map((opt) => (
-                  <option key={opt.key} value={opt.key}>
+                  <option key={opt.key} value={opt.key} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                     {opt.label} ({opt.count})
                   </option>
                 ))}
@@ -1064,7 +1330,7 @@ function ResourceTable({
 
           {/* 1. Tampilan Desktop Table (Layar md ke atas) dengan Sticky Header */}
           <div className="hidden md:block overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xs dark:border-gray-800 dark:bg-gray-900">
-            <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+            <div className="overflow-x-auto min-h-[260px] max-h-[70vh] overflow-y-auto">
               <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800 text-sm">
                 <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-xs border-b border-gray-200 dark:border-gray-700 shadow-2xs">
                   <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -1113,55 +1379,36 @@ function ResourceTable({
                       )
                     })}
                     {hasActions && (
-                      <th className="py-3.5 px-4 text-center whitespace-nowrap">
-                        {hasWorkflowActions ? 'Aksi & Alur Kerja' : 'Aksi'}
+                      <th className="py-3.5 px-4 text-center whitespace-nowrap w-28 sm:w-36">
+                        Aksi
                       </th>
                     )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {paginatedRecords.map((record) => {
-                    const isLeadOwner = !['operator', 'sales'].includes(user?.role) || Number(record.id_user) === Number(user?.id_user)
-                    const isCalonKlien = config.key === 'calonKlien'
-                    const isKontrak = config.key === 'kontrak'
-                    const operatorPicId =
-                      record.operator_pic_id ??
-                      record.calon_klien?.id_user ??
-                      record.calonKlien?.id_user ??
-                      record.kontrak?.calon_klien?.id_user ??
-                      record.kontrak?.calonKlien?.id_user ??
-                      record.klien?.kontrak?.calon_klien?.id_user ??
-                      record.klien?.kontrak?.calonKlien?.id_user
-                    const isTaskOperatorOwner = !['operator', 'sales'].includes(user?.role) || (operatorPicId != null && Number(operatorPicId) === Number(user?.id_user))
-
-                    const isReportApproved =
-                      isReporting &&
-                      (['approved', 'completed'].includes(record.status_laporan) ||
-                        ['approved', 'completed'].includes(record.pekerjaan?.status))
-                    const isReportRevised =
-                      isReporting &&
-                      (['revision_needed', 'revision'].includes(record.status_laporan) ||
-                        ['revision_needed', 'revision'].includes(record.pekerjaan?.status))
-                    const isReportPending = isReporting && !isReportApproved && !isReportRevised
-
-                    const canReviewTask =
-                      ['admin', 'pimpinan'].includes(user?.role) &&
-                      isReporting &&
-                      isReportPending
-                    const canStartTask =
-                      isPekerjaan &&
-                      user?.role === 'karyawan' &&
-                      record.status === 'baru' &&
-                      Number(record.id_pic) === Number(user?.id_user)
-                    const isTaskCompleted = isPekerjaan && ['completed', 'approved'].includes(record.status)
-                    const isReportCompleted = isReportApproved
-                    const isReadOnlyRow = isTaskCompleted || isReportCompleted || (isPekerjaan && user?.role === 'karyawan')
+                  {paginatedRecords.map((record, rowIndex) => {
+                    const rowKey = record[config.primaryKey]
+                    const rowDesktopDropdownId = `desktop-${rowKey}`
+                    const { primaryAction, secondaryActions, statusBadge } = resolveRowActions({
+                      record,
+                      config,
+                      user,
+                      canEdit,
+                      canDelete,
+                      onStartTask,
+                      onApproveTask,
+                      onRejectTask,
+                      onViewLegalitas,
+                      onViewContract,
+                      onEdit,
+                      onDelete,
+                    })
 
                     return (
                       <tr
-                        key={record[config.primaryKey]}
+                        key={rowKey}
                         className={`transition-colors hover:bg-gray-50/60 dark:hover:bg-gray-800/40 ${
-                          selectedIds.includes(record[config.primaryKey])
+                          selectedIds.includes(rowKey)
                             ? 'bg-brand-50/50 dark:bg-brand-500/15'
                             : ''
                         }`}
@@ -1170,8 +1417,8 @@ function ResourceTable({
                           <td className="py-3.5 px-3 w-10 text-center align-middle" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
-                              checked={selectedIds.includes(record[config.primaryKey])}
-                              onChange={() => handleToggleRow(record[config.primaryKey])}
+                              checked={selectedIds.includes(rowKey)}
+                              onChange={() => handleToggleRow(rowKey)}
                               className="size-4 rounded-md border-gray-300 dark:border-gray-600 text-brand-600 focus:ring-brand-500 cursor-pointer"
                             />
                           </td>
@@ -1182,147 +1429,99 @@ function ResourceTable({
                           </td>
                         ))}
                         {hasActions && (
-                          <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
+                          <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap relative">
                             <div className="inline-flex items-center justify-center gap-1.5 flex-nowrap">
-                              {/* Workflow: Start Task for Karyawan */}
-                              {canStartTask && onStartTask && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                  onClick={() => onStartTask(record)}
-                                  title="Mulai kerjakan tugas ini (Status berubah menjadi Dalam Pengerjaan)"
-                                >
-                                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <span>Mulai</span>
-                                </button>
-                              )}
-
-                              {/* Workflow: Approve Task */}
-                              {canReviewTask && onApproveTask && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                  onClick={() => onApproveTask(record)}
-                                  title="Setujui laporan tugas ini"
-                                >
-                                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  <span>Setujui</span>
-                                </button>
-                              )}
-
-                              {/* Workflow: Reject Task */}
-                              {canReviewTask && onRejectTask && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                  onClick={() => onRejectTask(record)}
-                                  title="Minta revisi atas laporan tugas ini"
-                                >
-                                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                  <span>Revisi</span>
-                                </button>
-                              )}
-
-                              {/* Keterangan Status Khusus Reporting */}
-                              {isReporting && isReportApproved && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/60 shadow-2xs whitespace-nowrap">
-                                  ✓ Selesai
-                                </span>
-                              )}
-                              {isReporting && isReportRevised && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-800/60 shadow-2xs whitespace-nowrap">
-                                  ↺ Revisi
-                                </span>
-                              )}
-
-                              {/* Keterangan Bukan PIC */}
-                              {['pekerjaan', 'kontrak', 'klien'].includes(config.key) && ['operator', 'sales'].includes(user?.role) && !isTaskOperatorOwner && (
+                              {/* Indikator Status Khusus */}
+                              {statusBadge && (
                                 <span
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 whitespace-nowrap"
-                                  title="Bukan wewenang Anda (Hanya Operator PIC terkait yang berwenang mengedit data ini)"
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border shadow-2xs whitespace-nowrap ${
+                                    statusBadge.className || 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                  }`}
+                                  title={statusBadge.title}
                                 >
-                                  Bukan PIC
+                                  {statusBadge.label}
                                 </span>
                               )}
 
-                              {/* Calon Klien: View Legalitas Modal */}
-                              {isCalonKlien && onViewLegalitas && (
+                              {/* Tombol Aksi Utama (Paling Sering Digunakan) */}
+                              {primaryAction && (
                                 <button
                                   type="button"
-                                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold bg-blue-light-50 hover:bg-blue-light-100 text-blue-light-700 border border-blue-light-200 dark:bg-blue-light-500/15 dark:text-blue-light-400 dark:border-blue-light-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                  onClick={() => onViewLegalitas(record)}
-                                  title="Lihat nomor legalitas & berkas pendukung"
+                                  onClick={primaryAction.onClick}
+                                  className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap ${
+                                    primaryAction.variant === 'primary'
+                                      ? 'bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white'
+                                      : primaryAction.variant === 'success'
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white'
+                                      : primaryAction.variant === 'info'
+                                      ? 'bg-blue-light-50 hover:bg-blue-light-100 text-blue-light-700 border border-blue-light-200 dark:bg-blue-light-500/15 dark:text-blue-light-400 dark:border-blue-light-800/60'
+                                      : primaryAction.variant === 'teal'
+                                      ? 'bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 dark:bg-teal-500/15 dark:text-teal-400 dark:border-teal-800/60'
+                                      : primaryAction.variant === 'neutral-ghost'
+                                      ? 'bg-gray-50 hover:bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                      : 'bg-white hover:bg-brand-50 text-gray-700 hover:text-brand-600 border border-gray-300 hover:border-brand-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-brand-500/15 dark:hover:text-brand-400 dark:hover:border-brand-500/40'
+                                  }`}
+                                  title={primaryAction.title}
                                 >
-                                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  <span>Legalitas</span>
+                                  <ActionIcon type={primaryAction.icon} className="size-3.5" />
+                                  <span>{primaryAction.label}</span>
                                 </button>
                               )}
 
-                              {/* View/Print Contract Document */}
-                              {isKontrak && onViewContract && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 dark:bg-teal-500/15 dark:text-teal-400 dark:border-teal-800/60 shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                  onClick={() => onViewContract(record)}
-                                  title="Buka surat perjanjian kontrak untuk dicetak"
+                              {/* Dropdown Menu Tiga Titik (...) untuk Aksi Pendukung */}
+                              {secondaryActions.length > 0 && (
+                                <div
+                                  className="relative inline-block text-left"
+                                  ref={activeDropdownId === rowDesktopDropdownId ? actionMenuRef : null}
                                 >
-                                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                  </svg>
-                                  <span>Cetak</span>
-                                </button>
-                              )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setActiveDropdownId(activeDropdownId === rowDesktopDropdownId ? null : rowDesktopDropdownId)
+                                    }}
+                                    className={`inline-flex items-center justify-center size-8 rounded-lg border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+                                      activeDropdownId === rowDesktopDropdownId
+                                        ? 'border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 dark:border-brand-500'
+                                        : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-750'
+                                    }`}
+                                    title="Aksi Lainnya"
+                                    aria-label="Aksi Lainnya"
+                                  >
+                                    <svg className="size-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM18 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                  </button>
 
-                              {/* Compact Edit / Detail Button */}
-                              {canEdit && (config.key !== 'calonKlien' || isLeadOwner) && (!['pekerjaan', 'kontrak', 'klien'].includes(config.key) || isTaskOperatorOwner || user?.role === 'karyawan') && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center justify-center size-8 rounded-lg text-gray-700 hover:text-brand-600 bg-white hover:bg-brand-50 border border-gray-300 hover:border-brand-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-brand-500/15 dark:hover:text-brand-400 dark:hover:border-brand-500/40 shadow-2xs transition-all active:scale-95 cursor-pointer"
-                                  onClick={() => onEdit(record)}
-                                  title={
-                                    isTaskCompleted
-                                      ? 'Pekerjaan telah disetujui & selesai (Lihat Detail)'
-                                      : isReportCompleted
-                                      ? 'Laporan telah disetujui (Lihat Detail)'
-                                      : isPekerjaan && user?.role === 'karyawan'
-                                      ? 'Lihat detail instruksi pekerjaan'
-                                      : 'Edit data'
-                                  }
-                                >
-                                  {isReadOnlyRow ? (
-                                    <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                  ) : (
-                                    <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
+                                  {activeDropdownId === rowDesktopDropdownId && (
+                                    <div
+                                      className={`absolute right-0 ${
+                                        rowIndex >= paginatedRecords.length - 2 && paginatedRecords.length > 2
+                                          ? 'bottom-full mb-1.5'
+                                          : 'top-full mt-1.5'
+                                      } w-44 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl z-50 py-1 animate-fade-in divide-y divide-gray-100 dark:divide-gray-700/60`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {secondaryActions.map((act) => (
+                                        <button
+                                          key={act.key}
+                                          type="button"
+                                          onClick={() => {
+                                            act.onClick()
+                                            setActiveDropdownId(null)
+                                          }}
+                                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-left transition-colors cursor-pointer ${
+                                            act.color || 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750'
+                                          }`}
+                                          title={act.title}
+                                        >
+                                          <ActionIcon type={act.icon} className="size-3.5 shrink-0" />
+                                          <span className="truncate">{act.fullLabel || act.label}</span>
+                                        </button>
+                                      ))}
+                                    </div>
                                   )}
-                                </button>
-                              )}
-
-                              {/* Compact Delete Button */}
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  className="inline-flex items-center justify-center size-8 rounded-lg text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 hover:border-rose-300 dark:bg-gray-800 dark:text-rose-400 dark:border-rose-900/60 dark:hover:bg-rose-500/10 shadow-2xs transition-all active:scale-95 cursor-pointer"
-                                  onClick={() => onDelete(record)}
-                                  title="Hapus data ini"
-                                >
-                                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
+                                </div>
                               )}
                             </div>
                           </td>
@@ -1335,60 +1534,40 @@ function ResourceTable({
             </div>
           </div>
 
-          {/* 2. Tampilan Mobile Card List (Layar < md ponsel pintar) */}
+          {/* 2. Tampilan Mobile Card List (Format Kartu Vertikal Ringkas di Layar < md Ponsel) */}
           <div className="md:hidden space-y-3">
             {paginatedRecords.map((record) => {
-              const isLeadOwner = !['operator', 'sales'].includes(user?.role) || Number(record.id_user) === Number(user?.id_user)
-              const isCalonKlien = config.key === 'calonKlien'
-              const isKontrak = config.key === 'kontrak'
-              const operatorPicId =
-                record.operator_pic_id ??
-                record.calon_klien?.id_user ??
-                record.calonKlien?.id_user ??
-                record.kontrak?.calon_klien?.id_user ??
-                record.kontrak?.calonKlien?.id_user ??
-                record.klien?.kontrak?.calon_klien?.id_user ??
-                record.klien?.kontrak?.calonKlien?.id_user
-              const isTaskOperatorOwner = !['operator', 'sales'].includes(user?.role) || (operatorPicId != null && Number(operatorPicId) === Number(user?.id_user))
-
-              const isReportApproved =
-                isReporting &&
-                (['approved', 'completed'].includes(record.status_laporan) ||
-                  ['approved', 'completed'].includes(record.pekerjaan?.status))
-              const isReportRevised =
-                isReporting &&
-                (['revision_needed', 'revision'].includes(record.status_laporan) ||
-                  ['revision_needed', 'revision'].includes(record.pekerjaan?.status))
-              const isReportPending = isReporting && !isReportApproved && !isReportRevised
-
-              const canReviewTask =
-                ['admin', 'pimpinan'].includes(user?.role) &&
-                isReporting &&
-                isReportPending
-              const canStartTask =
-                isPekerjaan &&
-                user?.role === 'karyawan' &&
-                record.status === 'baru' &&
-                Number(record.id_pic) === Number(user?.id_user)
-              const isTaskCompleted = isPekerjaan && ['completed', 'approved'].includes(record.status)
-              const isReportCompleted = isReportApproved
-              const isReadOnlyRow = isTaskCompleted || isReportCompleted || (isPekerjaan && user?.role === 'karyawan')
-
+              const rowKey = record[config.primaryKey]
+              const rowMobileDropdownId = `mobile-${rowKey}`
               const statusCol = config.columns.find((c) => ['status', 'status_prospek', 'is_active', 'status_laporan'].includes(c.key))
+              const { primaryAction, secondaryActions, statusBadge } = resolveRowActions({
+                record,
+                config,
+                user,
+                canEdit,
+                canDelete,
+                onStartTask,
+                onApproveTask,
+                onRejectTask,
+                onViewLegalitas,
+                onViewContract,
+                onEdit,
+                onDelete,
+              })
 
               return (
                 <div
-                  key={record[config.primaryKey]}
+                  key={rowKey}
                   className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xs space-y-3"
                 >
-                  {/* Card Header: Judul / Nama Utama + Status */}
+                  {/* Card Header: Judul / Nama Utama + Status Badge */}
                   <div className="flex items-start justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-2.5">
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
                       {canDelete && (
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(record[config.primaryKey])}
-                          onChange={() => handleToggleRow(record[config.primaryKey])}
+                          checked={selectedIds.includes(rowKey)}
+                          onChange={() => handleToggleRow(rowKey)}
                           className="mt-0.5 size-4 rounded-md border-gray-300 dark:border-gray-600 text-brand-600 focus:ring-brand-500 cursor-pointer shrink-0"
                         />
                       )}
@@ -1397,7 +1576,7 @@ function ResourceTable({
                           {config.label}
                         </span>
                         <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-0.5 truncate">
-                          {record[config.displayField] || record.nama_perusahaan || record.judul || record.nama || `Data #${record[config.primaryKey]}`}
+                          {record[config.displayField] || record.nama_perusahaan || record.judul || record.nama || `Data #${rowKey}`}
                         </h4>
                       </div>
                     </div>
@@ -1408,7 +1587,7 @@ function ResourceTable({
                     )}
                   </div>
 
-                  {/* Card Body: Rincian Data Penting */}
+                  {/* Card Body: Rincian Data Penting (2-Kolom Ringkas) */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {config.columns
                       .filter((c) => !['status', 'status_prospek', 'is_active', 'status_laporan', config.displayField].includes(c.key))
@@ -1425,71 +1604,91 @@ function ResourceTable({
                       ))}
                   </div>
 
-                  {/* Card Footer: Tombol Aksi Ramah Sentuhan Mobile */}
+                  {/* Card Footer: Tombol Aksi Utama + Menu Tiga Titik (...) Aksi Lainnya */}
                   {hasActions && (
-                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                      {canStartTask && onStartTask && (
+                    <div className="flex items-center gap-2 pt-2.5 border-t border-gray-100 dark:border-gray-800">
+                      {statusBadge && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${
+                            statusBadge.className || 'bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                          }`}
+                          title={statusBadge.title}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      )}
+
+                      {primaryAction && (
                         <button
                           type="button"
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-brand-600 active:bg-brand-700 text-white shadow-2xs cursor-pointer"
-                          onClick={() => onStartTask(record)}
+                          onClick={primaryAction.onClick}
+                          className={`flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold shadow-2xs transition-all active:scale-95 cursor-pointer ${
+                            primaryAction.variant === 'primary'
+                              ? 'bg-brand-600 active:bg-brand-700 text-white'
+                              : primaryAction.variant === 'success'
+                              ? 'bg-emerald-600 active:bg-emerald-700 text-white'
+                              : primaryAction.variant === 'info'
+                              ? 'bg-blue-light-50 text-blue-light-700 border border-blue-light-200 dark:bg-blue-light-500/15 dark:text-blue-light-400 dark:border-blue-light-800/60'
+                              : primaryAction.variant === 'teal'
+                              ? 'bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-500/15 dark:text-teal-400 dark:border-teal-800/60'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-750'
+                          }`}
+                          title={primaryAction.title}
                         >
-                          <span>Mulai Kerjakan</span>
+                          <ActionIcon type={primaryAction.icon} className="size-3.5" />
+                          <span>{primaryAction.fullLabel || primaryAction.label}</span>
                         </button>
                       )}
-                      {canReviewTask && onApproveTask && (
-                        <button
-                          type="button"
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-emerald-600 active:bg-emerald-700 text-white shadow-2xs cursor-pointer"
-                          onClick={() => onApproveTask(record)}
+
+                      {secondaryActions.length > 0 && (
+                        <div
+                          className="relative"
+                          ref={activeDropdownId === rowMobileDropdownId ? actionMenuRef : null}
                         >
-                          <span>Setujui</span>
-                        </button>
-                      )}
-                      {canReviewTask && onRejectTask && (
-                        <button
-                          type="button"
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 cursor-pointer"
-                          onClick={() => onRejectTask(record)}
-                        >
-                          <span>Revisi</span>
-                        </button>
-                      )}
-                      {isCalonKlien && onViewLegalitas && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl text-xs font-semibold bg-blue-light-50 text-blue-light-700 border border-blue-light-200 dark:bg-blue-light-500/15 dark:text-blue-light-400 cursor-pointer"
-                          onClick={() => onViewLegalitas(record)}
-                        >
-                          <span>Legalitas</span>
-                        </button>
-                      )}
-                      {isKontrak && onViewContract && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-500/15 dark:text-teal-400 cursor-pointer"
-                          onClick={() => onViewContract(record)}
-                        >
-                          <span>Cetak</span>
-                        </button>
-                      )}
-                      {canEdit && (config.key !== 'calonKlien' || isLeadOwner) && (!['pekerjaan', 'kontrak', 'klien'].includes(config.key) || isTaskOperatorOwner || user?.role === 'karyawan') && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl text-xs font-semibold bg-white text-gray-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 cursor-pointer"
-                          onClick={() => onEdit(record)}
-                        >
-                          <span>{isReadOnlyRow ? 'Detail' : 'Edit'}</span>
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl text-xs font-semibold bg-white text-rose-600 border border-rose-200 dark:bg-gray-800 dark:text-rose-400 dark:border-rose-900/60 cursor-pointer"
-                          onClick={() => onDelete(record)}
-                        >
-                          <span>Hapus</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setActiveDropdownId(activeDropdownId === rowMobileDropdownId ? null : rowMobileDropdownId)
+                            }}
+                            className={`inline-flex items-center justify-center size-9 rounded-xl border transition-all active:scale-95 cursor-pointer shadow-2xs ${
+                              activeDropdownId === rowMobileDropdownId
+                                ? 'border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 dark:border-brand-500'
+                                : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750'
+                            }`}
+                            title="Aksi Lainnya"
+                            aria-label="Aksi Lainnya"
+                          >
+                            <svg className="size-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM18 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                          </button>
+
+                          {activeDropdownId === rowMobileDropdownId && (
+                            <div
+                              className="absolute right-0 bottom-full mb-1.5 w-48 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl z-50 py-1 animate-fade-in divide-y divide-gray-100 dark:divide-gray-700/60"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {secondaryActions.map((act) => (
+                                <button
+                                  key={act.key}
+                                  type="button"
+                                  onClick={() => {
+                                    act.onClick()
+                                    setActiveDropdownId(null)
+                                  }}
+                                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-semibold text-left transition-colors cursor-pointer ${
+                                    act.color || 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750'
+                                  }`}
+                                  title={act.title}
+                                >
+                                  <ActionIcon type={act.icon} className="size-3.5 shrink-0" />
+                                  <span className="truncate">{act.fullLabel || act.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -1527,11 +1726,11 @@ function ResourceTable({
                     }}
                     className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-800 dark:text-gray-200 focus:outline-hidden focus:border-brand-500 cursor-pointer"
                   >
-                    <option value={10}>10 baris</option>
-                    <option value={25}>25 baris</option>
-                    <option value={50}>50 baris</option>
-                    <option value={100}>100 baris</option>
-                    <option value="all">Semua ({totalRecords})</option>
+                    <option value={10} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">10 baris</option>
+                    <option value={25} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">25 baris</option>
+                    <option value={50} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">50 baris</option>
+                    <option value={100} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">100 baris</option>
+                    <option value="all" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Semua ({totalRecords})</option>
                   </select>
                 </div>
 

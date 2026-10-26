@@ -64,19 +64,21 @@
   --color-blue-light-900: #0b4a6f;
   --color-blue-light-950: #062c41;
 
-  --color-gray-25: #fcfcfd;
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f2f4f7;
-  --color-gray-200: #e4e7ec;
-  --color-gray-300: #d0d5dd;
-  --color-gray-400: #98a2b3;
-  --color-gray-500: #667085;
-  --color-gray-600: #475467;
-  --color-gray-700: #344054;
-  --color-gray-800: #1d2939;
-  --color-gray-900: #101828;
-  --color-gray-950: #0c111d;
-  --color-gray-dark: #1a2231;
+  --color-gray-25: #fcfdfc;
+  --color-gray-50: #f8faf8;
+  --color-gray-100: #eff3f0;
+  --color-gray-200: #e0e7e1;
+  --color-gray-300: #c7d2c9;
+  --color-gray-400: #8fa092;
+  --color-gray-500: #5f7263;
+  --color-gray-600: #445447;
+  --color-gray-700: #22352b;
+  --color-gray-750: #172820;
+  --color-gray-800: #11221b;
+  --color-gray-850: #0d1a14;
+  --color-gray-900: #0a1712;
+  --color-gray-950: #050d09;
+  --color-gray-dark: #11221b;
 
   --color-orange-25: #fffaf5;
   --color-orange-50: #fff6ed;
@@ -91,18 +93,18 @@
   --color-orange-900: #7e2410;
   --color-orange-950: #511c10;
 
-  --color-success-25: #f6fef9;
-  --color-success-50: #ecfdf3;
-  --color-success-100: #d1fadf;
-  --color-success-200: #a6f4c5;
-  --color-success-300: #6ce9a6;
-  --color-success-400: #32d583;
-  --color-success-500: #12b76a;
-  --color-success-600: #039855;
-  --color-success-700: #027a48;
-  --color-success-800: #05603a;
-  --color-success-900: #054f31;
-  --color-success-950: #053321;
+  --color-success-25: #f4fbf7;
+  --color-success-50: #e8f7ee;
+  --color-success-100: #cbeddb;
+  --color-success-200: #9adcb8;
+  --color-success-300: #60c490;
+  --color-success-400: #2fa96c;
+  --color-success-500: #0e854e;
+  --color-success-600: #096c3e;
+  --color-success-700: #0b5733;
+  --color-success-800: #0d4733;
+  --color-success-900: #0a3a29;
+  --color-success-950: #052017;
 
   --color-error-25: #fffbfa;
   --color-error-50: #fef3f2;
@@ -133,10 +135,17 @@
 
 body {
   font-family: var(--font-outfit), sans-serif;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: #f8faf8;
+  color: #14221a;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+.dark body,
+:root.dark body,
+html.dark body {
+  background-color: #050d09;
+  color: #edf5f0;
 }
 
 #root {
@@ -151,6 +160,42 @@ input[type="password"]::-ms-clear {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+}
+
+/* Dark mode native select dropdown popup readability fix */
+select {
+  color-scheme: light;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.dark select,
+:root.dark select,
+html.dark select {
+  color-scheme: dark !important;
+}
+
+.dark select option,
+:root.dark select option,
+html.dark select option {
+  background-color: #11221b !important;
+  color: #f8fafc !important;
+}
+
+.dark select option:checked,
+:root.dark select option:checked,
+html.dark select option:checked {
+  background-color: #ea580c !important;
+  color: #ffffff !important;
+}
+
+.dark select option:disabled,
+:root.dark select option:disabled,
+html.dark select option:disabled {
+  color: #64748b !important;
 }
 
 @keyframes logo-breathe {

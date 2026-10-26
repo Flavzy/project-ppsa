@@ -184,11 +184,11 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
               onChange={(e) => setJenisDokumen(e.target.value)}
               required
               disabled={submitting}
-              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             >
-              <option value="kontrak">Kontrak</option>
-              <option value="spk">SPK (Surat Perintah Kerja)</option>
-              <option value="adendum">Adendum</option>
+              <option value="kontrak" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Kontrak</option>
+              <option value="spk" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">SPK (Surat Perintah Kerja)</option>
+              <option value="adendum" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Adendum</option>
             </select>
           </div>
 
