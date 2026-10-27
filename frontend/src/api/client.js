@@ -39,6 +39,72 @@ export function getCachedApiData(path) {
   return null
 }
 
+const FIELD_LABEL_MAP = {
+  nama_perusahaan: 'Nama Perusahaan',
+  nama_klien: 'Nama Klien',
+  nama_direktur: 'Nama Direktur',
+  alamat_perusahaan: 'Alamat Perusahaan',
+  kontak_person: 'Kontak Person',
+  kontak: 'Kontak',
+  email: 'Email',
+  id_user: 'Operator PIC',
+  status_prospek: 'Status Prospek',
+  layanan_ids: 'Layanan',
+  no_kontrak: 'Nomor Kontrak',
+  nilai_proyek: 'Nilai Kontrak',
+  tgl_mulai: 'Tanggal Mulai',
+  tgl_selesai: 'Tanggal Selesai',
+  status: 'Status',
+  id_calon_klien: 'Calon Klien',
+  id_kontrak: 'Kontrak',
+  id_klien: 'Klien',
+  id_pekerjaan: 'Pekerjaan',
+  id_pic: 'PIC Karyawan',
+  judul: 'Judul Pekerjaan',
+  deadline: 'Batas Waktu (Deadline)',
+  periode_bulan: 'Bulan Pengerjaan',
+  deskripsi: 'Instruksi / SOP Pekerjaan',
+  dokumen_bukti: 'Dokumen Bukti Laporan',
+  catatan: 'Catatan',
+  tgl_lapor: 'Tanggal Lapor',
+  quality_score: 'Skor Kualitas',
+  revision_count: 'Jumlah Revisi',
+  nama: 'Nama Lengkap',
+  password: 'Password',
+  role: 'Role',
+  nama_layanan: 'Nama Layanan',
+  nama_pekerjaan: 'Nama Pekerjaan',
+  sifat_periode: 'Sifat Periode',
+  estimasi_hari: 'Estimasi Hari',
+  template_instruksi: 'Template Instruksi',
+}
+
+export function localizeErrorMessage(msg) {
+  if (!msg || typeof msg !== 'string') return msg
+  let translated = msg
+  translated = translated.replace(/^The (.+?) field is required\.?$/i, (match, field) => {
+    const cleanKey = field.trim().toLowerCase().replace(/\s+/g, '_')
+    const label = FIELD_LABEL_MAP[cleanKey] || (field.charAt(0).toUpperCase() + field.slice(1))
+    return `${label} wajib diisi.`
+  })
+  translated = translated.replace(/^The (.+?) has already been taken\.?$/i, (match, field) => {
+    const cleanKey = field.trim().toLowerCase().replace(/\s+/g, '_')
+    const label = FIELD_LABEL_MAP[cleanKey] || (field.charAt(0).toUpperCase() + field.slice(1))
+    return `${label} sudah terdaftar.`
+  })
+  translated = translated.replace(/^The (.+?) must be a string\.?$/i, (match, field) => {
+    const cleanKey = field.trim().toLowerCase().replace(/\s+/g, '_')
+    const label = FIELD_LABEL_MAP[cleanKey] || (field.charAt(0).toUpperCase() + field.slice(1))
+    return `${label} harus berupa teks.`
+  })
+  translated = translated.replace(/^The (.+?) must be an? (integer|number|numeric)\.?$/i, (match, field) => {
+    const cleanKey = field.trim().toLowerCase().replace(/\s+/g, '_')
+    const label = FIELD_LABEL_MAP[cleanKey] || (field.charAt(0).toUpperCase() + field.slice(1))
+    return `${label} harus berupa angka.`
+  })
+  return translated
+}
+
 async function parseResponse(response, isLoginRequest) {
   if (response.status === 204) {
     return null
@@ -59,17 +125,26 @@ async function parseResponse(response, isLoginRequest) {
       }
     }
 
-    const message = payload.message || (
+    const rawMessage = payload.message || (
       response.status === 403
         ? 'Anda tidak memiliki akses untuk melakukan aksi ini.'
         : response.status === 401
           ? 'Session tidak valid atau telah berakhir.'
           : 'Request gagal diproses.'
     )
+    const message = localizeErrorMessage(rawMessage)
+
+    const rawErrors = payload.errors || {}
+    const localizedErrors = {}
+    for (const key of Object.keys(rawErrors)) {
+      localizedErrors[key] = Array.isArray(rawErrors[key])
+        ? rawErrors[key].map(localizeErrorMessage)
+        : rawErrors[key]
+    }
 
     const error = new Error(message)
     error.status = response.status
-    error.errors = payload.errors || {}
+    error.errors = localizedErrors
     if (payload.retry_after !== undefined) {
       error.retryAfter = Number(payload.retry_after)
     }

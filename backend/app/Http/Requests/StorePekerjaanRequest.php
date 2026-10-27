@@ -21,7 +21,17 @@ class StorePekerjaanRequest extends FormRequest
         $tglPenugasan = $this->input('tgl_penugasan') ?: now()->toDateString();
 
         return [
-            'id_klien' => ['required', 'integer', 'exists:klien,id_klien'],
+            'id_klien' => [
+                'required',
+                'integer',
+                'exists:klien,id_klien',
+                function ($attribute, $value, $fail) {
+                    $klien = \App\Models\Klien::with('kontrak')->find($value);
+                    if (!$klien || !$klien->kontrak || $klien->kontrak->status !== 'aktif') {
+                        $fail('Pekerjaan tidak dapat ditambahkan karena kontrak klien sedang nonaktif atau telah dibatalkan.');
+                    }
+                },
+            ],
             'id_layanan' => ['nullable', 'integer', 'exists:layanan,id_layanan'],
             'id_master_pekerjaan' => ['nullable', 'integer', 'exists:master_pekerjaan,id_master_pekerjaan'],
             'periode_bulan' => [

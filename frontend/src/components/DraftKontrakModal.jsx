@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 
 export default function DraftKontrakModal({ lead, contract, onClose }) {
@@ -34,6 +34,12 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
   }, [activeContract?.tgl_mulai, activeContract?.tgl_selesai])
 
   const isSigned = activeContract?.status === 'aktif'
+  const [zoomLevel, setZoomLevel] = useState(100)
+  const [isMobileReadMode, setIsMobileReadMode] = useState(false)
+
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 10, 160))
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 10, 70))
+  const handleResetZoom = () => setZoomLevel(100)
 
   useEffect(() => {
     const originalTitle = document.title
@@ -188,7 +194,7 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
       {/* Modal Dialog */}
       <div className="contract-modal-dialog relative w-full max-w-4xl rounded-3xl bg-white p-5 sm:p-7 shadow-2xl border border-gray-100 dark:border-gray-800 dark:bg-gray-900 transition-all z-10 max-h-[94vh] flex flex-col animate-fade-in">
         {/* Top Header Actions (Hidden in Print) */}
-        <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3 border-b border-gray-100 dark:border-gray-800">
+        <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 mb-3 border-b border-gray-100 dark:border-gray-800">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
               Dokumen Perjanjian Resmi
@@ -197,13 +203,63 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
               Surat Kontrak Kerja Sama
             </h3>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Zoom Controls & Mobile Read Mode Toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl text-xs font-medium">
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 70}
+                className="size-7 flex items-center justify-center rounded-lg text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors cursor-pointer"
+                title="Perkecil Teks (-)"
+              >
+                <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleResetZoom}
+                className="px-1.5 py-0.5 text-xs text-gray-700 dark:text-gray-200 hover:text-brand-600 font-semibold cursor-pointer"
+                title="Reset Ukuran (100%)"
+              >
+                {zoomLevel}%
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 160}
+                className="size-7 flex items-center justify-center rounded-lg text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors cursor-pointer"
+                title="Perbesar Teks (+)"
+              >
+                <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileReadMode(!isMobileReadMode)}
+              className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+                isMobileReadMode
+                  ? 'bg-brand-500 text-white border-brand-500 shadow-xs'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-transparent hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+              title="Tampilan Teks Mengalir (Mobile Read Mode)"
+            >
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              <span>{isMobileReadMode ? 'Standar' : 'Mode Baca'}</span>
+            </button>
+
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
               isSigned
                 ? 'bg-success-50 text-success-700 border border-success-200'
                 : 'bg-warning-50 text-warning-700 border border-warning-200'
             }`}>
-              {isSigned ? 'Status: Kontrak Aktif' : 'Status: Draft Kontrak'}
+              {isSigned ? 'Aktif' : 'Draft'}
             </span>
             <button
               type="button"
@@ -221,16 +277,17 @@ export default function DraftKontrakModal({ lead, contract, onClose }) {
         {/* Printable Contract Body */}
         <div
           id="printable-contract-document"
-          className="printable-contract"
+          className={`printable-contract ${isMobileReadMode ? 'mobile-read-mode' : ''}`}
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '16px',
+            padding: isMobileReadMode ? '12px 8px' : '16px',
             backgroundColor: '#f1f5f9',
             borderRadius: '12px',
             color: '#0f172a',
-            fontFamily: "'Times New Roman', Times, serif",
-            lineHeight: '1.4',
+            fontFamily: isMobileReadMode ? 'system-ui, -apple-system, sans-serif' : "'Times New Roman', Times, serif",
+            lineHeight: isMobileReadMode ? '1.6' : '1.4',
+            zoom: `${zoomLevel}%`,
           }}
         >
           {/* ==================== HALAMAN 1 ==================== */}

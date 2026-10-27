@@ -108,9 +108,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-gray-50 dark:bg-gray-950 font-outfit">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 dark:bg-gray-950 font-outfit">
       {/* Mobile Top Hero Banner (Illustration & Branding for Phone screens - Never Hidden) */}
-      <div className="lg:hidden relative bg-gradient-to-br from-[#062317] via-[#091e15] to-[#04100b] text-white px-5 py-7 text-center overflow-hidden border-b border-emerald-950/80">
+      <div className="lg:hidden relative bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 text-white px-5 py-7 text-center overflow-hidden border-b border-slate-800">
         <GridShape className="opacity-20 text-slate-500" />
         <div className="relative z-10 flex flex-col items-center">
           <div className="relative mb-4 w-28 h-28 flex items-center justify-center">
@@ -320,13 +320,13 @@ export default function LoginPage() {
       </div>
 
       {/* Main Right: TailAdmin Brand & Illustration Panel (Desktop) */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-7/12 relative bg-gradient-to-br from-[#062317] via-[#091e15] to-[#04100b] text-white flex-col justify-center items-center p-12 overflow-hidden border-l border-emerald-950/80">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-7/12 relative bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 text-white flex-col justify-center items-center p-12 overflow-hidden border-l border-slate-800/80">
         <GridShape className="opacity-20 text-slate-500" />
 
         <div className="relative z-10 max-w-lg text-center">
           <div className="relative mx-auto mb-8 w-48 h-48 xl:w-56 xl:h-56 flex items-center justify-center">
-            {/* Ambient corporate orange glow behind emblem */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-brand-500/40 via-amber-500/30 to-brand-600/20 blur-3xl transform scale-125 pointer-events-none" />
+            {/* Ambient corporate blue glow behind emblem */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-brand-500/40 via-blue-500/30 to-brand-600/20 blur-3xl transform scale-125 pointer-events-none" />
             {/* Elegant glassmorphic badge container with warm brand accent ring */}
             <div className="relative w-full h-full rounded-full p-3.5 bg-gradient-to-b from-white/10 to-white/5 border border-brand-500/30 shadow-2xl backdrop-blur-md flex items-center justify-center ring-1 ring-white/10">
               <img

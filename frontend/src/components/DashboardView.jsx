@@ -49,30 +49,30 @@ const ROLE_BADGE_CONFIG = {
 function MetricCard({ title, value, subtitle, icon, iconBg = 'bg-brand-50 text-brand-600 dark:bg-brand-500/15', alert = false, badgeText, badgeColor = 'primary' }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 transition-all shadow-xs hover:shadow-md ${
+      className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border p-3.5 sm:p-5 transition-all shadow-xs hover:shadow-md ${
         alert
           ? 'border-error-200 bg-error-25/40 dark:border-error-800 dark:bg-error-500/5'
           : 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900'
       }`}
     >
-      <div className="flex items-center justify-between">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${alert ? 'bg-error-50 text-error-600 dark:bg-error-500/15' : iconBg}`}>
+      <div className="flex items-center justify-between gap-1">
+        <div className={`flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-xl ${alert ? 'bg-error-50 text-error-600 dark:bg-error-500/15' : iconBg}`}>
           {icon}
         </div>
         {badgeText && (
-          <Badge size="sm" color={badgeColor}>
+          <Badge size="sm" color={badgeColor} className="text-[10px] sm:text-xs">
             {badgeText}
           </Badge>
         )}
       </div>
 
-      <div className="mt-3.5">
-        <span className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate block">{title}</span>
-        <h4 className={`mt-1 text-xl sm:text-2xl font-bold tracking-tight ${alert ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white'}`}>
+      <div className="mt-2.5 sm:mt-3.5">
+        <span className="text-[11px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate block">{title}</span>
+        <h4 className={`mt-0.5 sm:mt-1 text-lg sm:text-2xl font-bold tracking-tight ${alert ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white'}`}>
           {value}
         </h4>
         {subtitle && (
-          <p className={`mt-1 text-xs truncate ${alert ? 'text-error-500' : 'text-gray-400 dark:text-gray-500'}`}>
+          <p className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs truncate ${alert ? 'text-error-500' : 'text-gray-400 dark:text-gray-500'}`}>
             {subtitle}
           </p>
         )}
@@ -164,93 +164,119 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
           </div>
         ) : (
           <div className="mt-4">
-            {/* Visual Segmented Distribution Bar dengan Hover Tooltip Interaktif */}
-            {total > 0 && (
-              <div className="mb-5">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                  <span>Distribusi Status Interaktif</span>
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500">Arahkan kursor ke grafik</span>
-                </div>
-                <div className="h-4.5 w-full rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 flex gap-1 overflow-visible relative">
-                  {entries.map(([key, count]) => {
-                    const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
-                    const percentage = total > 0 ? (Number(count) / total) * 100 : 0
-                    if (percentage === 0 && Number(count) === 0) return null
-                    const isHovered = hoveredKey === key
-
-                    return (
-                      <div
-                        key={key}
-                        onMouseEnter={() => setHoveredKey(key)}
-                        onMouseLeave={() => setHoveredKey(null)}
-                        className={`h-full rounded-lg ${config.color} transition-all duration-200 cursor-pointer relative ${
-                          isHovered
-                            ? 'scale-y-125 brightness-110 shadow-sm z-20'
-                            : hoveredKey
-                            ? 'opacity-35'
-                            : 'opacity-100'
-                        }`}
-                        style={{ width: `${Math.max(percentage, 2.5)}%` }}
-                      >
-                        {/* Hover Tooltip Popover */}
-                        {isHovered && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
-                            <div className="bg-gray-900/95 dark:bg-gray-800/95 backdrop-blur-xs text-white text-xs rounded-xl py-1.5 px-3 shadow-xl border border-gray-700/60 dark:border-gray-600/60 flex items-center gap-2">
-                              <span className={`size-2.5 rounded-full ${config.color}`} />
-                              <span className="font-semibold">{config.label}:</span>
-                              <span className="font-bold text-amber-300">{count}</span>
-                              <span className="text-gray-300 text-[11px]">({Math.round(percentage)}%)</span>
-                            </div>
-                            <div className="size-2 bg-gray-900 dark:bg-gray-800 rotate-45 mx-auto -mt-1 border-r border-b border-gray-700/60 dark:border-gray-600/60" />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* List Rincian Status dengan Hover Highlight Interaktif */}
-            <div className="space-y-2">
+            {/* 1. Mode Kartu Metrik Ringkas Otomatis Khusus Layar Ponsel Sangat Kecil (< 360px) */}
+            <div className="max-[360px]:grid grid-cols-2 gap-2 hidden mb-1">
               {entries.map(([key, count]) => {
                 const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
                 const percentage = total > 0 ? Math.round((Number(count) / total) * 100) : 0
-                const isHovered = hoveredKey === key
-
                 return (
                   <div
-                    key={key}
-                    onMouseEnter={() => setHoveredKey(key)}
-                    onMouseLeave={() => setHoveredKey(null)}
-                    className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
-                      isHovered
-                        ? 'bg-brand-50/70 dark:bg-brand-500/15 ring-1 ring-brand-500/25 shadow-2xs scale-[1.01]'
-                        : hoveredKey
-                        ? 'opacity-40'
-                        : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
-                    }`}
+                    key={`compact-${key}`}
+                    className="p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50 flex flex-col justify-between"
                   >
-                    <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
-                      <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <span className={`size-2.5 rounded-full ${config.color} ${isHovered ? 'ring-2 ring-brand-500/40' : ''}`} />
-                        <span className={isHovered ? 'font-bold text-gray-900 dark:text-white' : ''}>
-                          {config.label}
-                        </span>
-                      </span>
-                      <span className={`text-gray-900 dark:text-white font-bold transition-transform ${isHovered ? 'scale-105 text-brand-600 dark:text-brand-400' : ''}`}>
-                        {count} <span className="font-normal text-gray-400">({percentage}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${config.color} transition-all duration-500 ${isHovered ? 'brightness-110 shadow-xs' : ''}`}
-                        style={{ width: `${percentage}%` }}
-                      />
+                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
+                      <span className={`size-2 rounded-full shrink-0 ${config.color}`} />
+                      <span className="truncate">{config.label}</span>
+                    </span>
+                    <div className="mt-1.5 flex items-baseline justify-between">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">{count}</span>
+                      <span className="text-[10px] font-medium text-gray-400">({percentage}%)</span>
                     </div>
                   </div>
                 )
               })}
+            </div>
+
+            {/* 2. Tampilan Normal Grafik Distribusi & Rincian Progress (Layar Ponsel Standar, Tablet & Desktop >= 360px) */}
+            <div className="max-[360px]:hidden">
+              {/* Visual Segmented Distribution Bar dengan Hover Tooltip Interaktif */}
+              {total > 0 && (
+                <div className="mb-5">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                    <span>Distribusi Status Interaktif</span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">Arahkan kursor ke grafik</span>
+                  </div>
+                  <div className="h-4.5 w-full rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 flex gap-1 overflow-visible relative">
+                    {entries.map(([key, count]) => {
+                      const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
+                      const percentage = total > 0 ? (Number(count) / total) * 100 : 0
+                      if (percentage === 0 && Number(count) === 0) return null
+                      const isHovered = hoveredKey === key
+
+                      return (
+                        <div
+                          key={key}
+                          onMouseEnter={() => setHoveredKey(key)}
+                          onMouseLeave={() => setHoveredKey(null)}
+                          className={`h-full rounded-lg ${config.color} transition-all duration-200 cursor-pointer relative ${
+                            isHovered
+                              ? 'scale-y-125 brightness-110 shadow-sm z-20'
+                              : hoveredKey
+                              ? 'opacity-35'
+                              : 'opacity-100'
+                          }`}
+                          style={{ width: `${Math.max(percentage, 2.5)}%` }}
+                        >
+                          {/* Hover Tooltip Popover */}
+                          {isHovered && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                              <div className="bg-gray-900/95 dark:bg-gray-800/95 backdrop-blur-xs text-white text-xs rounded-xl py-1.5 px-3 shadow-xl border border-gray-700/60 dark:border-gray-600/60 flex items-center gap-2">
+                                <span className={`size-2.5 rounded-full ${config.color}`} />
+                                <span className="font-semibold">{config.label}:</span>
+                                <span className="font-bold text-amber-300">{count}</span>
+                                <span className="text-gray-300 text-[11px]">({Math.round(percentage)}%)</span>
+                              </div>
+                              <div className="size-2 bg-gray-900 dark:bg-gray-800 rotate-45 mx-auto -mt-1 border-r border-b border-gray-700/60 dark:border-gray-600/60" />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* List Rincian Status dengan Hover Highlight Interaktif */}
+              <div className="space-y-2">
+                {entries.map(([key, count]) => {
+                  const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
+                  const percentage = total > 0 ? Math.round((Number(count) / total) * 100) : 0
+                  const isHovered = hoveredKey === key
+
+                  return (
+                    <div
+                      key={key}
+                      onMouseEnter={() => setHoveredKey(key)}
+                      onMouseLeave={() => setHoveredKey(null)}
+                      className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
+                        isHovered
+                          ? 'bg-brand-50/70 dark:bg-brand-500/15 ring-1 ring-brand-500/25 shadow-2xs scale-[1.01]'
+                          : hoveredKey
+                          ? 'opacity-40'
+                          : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
+                        <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <span className={`size-2.5 rounded-full ${config.color} ${isHovered ? 'ring-2 ring-brand-500/40' : ''}`} />
+                          <span className={isHovered ? 'font-bold text-gray-900 dark:text-white' : ''}>
+                            {config.label}
+                          </span>
+                        </span>
+                        <span className={`text-gray-900 dark:text-white font-bold transition-transform ${isHovered ? 'scale-105 text-brand-600 dark:text-brand-400' : ''}`}>
+                          {count} <span className="font-normal text-gray-400">({percentage}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${config.color} transition-all duration-500 ${isHovered ? 'brightness-110 shadow-xs' : ''}`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -583,7 +609,7 @@ function MonthlyTaskReminderWidget({ reminders = [], onNavigate }) {
 function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStatus, employeeScores }) {
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title="Total Calon Klien"
           value={totals.leads ?? 0}
@@ -705,7 +731,7 @@ function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStat
 function PimpinanDashboardView({ totals, workByStatus, leadByStatus, employeeScores }) {
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title="Total Kontrak Bisnis"
           value={totals.contracts ?? 0}
@@ -797,7 +823,7 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStat
           Ringkasan Pipeline CRM & Kontrak
         </h3>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title="Total Calon Klien"
           value={totals.leads ?? 0}
@@ -865,7 +891,7 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStat
           Ringkasan Operasional Tugas & Pekerjaan
         </h3>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title="Total Pekerjaan"
           value={totals.tasks ?? 0}
@@ -1065,7 +1091,7 @@ function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], onNavig
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title="Total Tugas Saya"
           value={totals.tasks ?? 0}

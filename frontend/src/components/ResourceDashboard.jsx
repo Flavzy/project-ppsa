@@ -159,6 +159,7 @@ function ResourceDashboard({
 
       setRecords(resourceRecords)
       setOptions(optionMap)
+      return resourceRecords
     } catch (requestError) {
       fetchErr = requestError
     } finally {
@@ -168,10 +169,18 @@ function ResourceDashboard({
       setError(fetchErr.message)
       setToast({ open: true, message: fetchErr.message, severity: 'error' })
     }
+    return []
   }, [config.endpoint, loadOptionsSafely])
 
   useEffect(() => {
     let ignore = false
+    const cached = getCachedApiData(config.endpoint)
+    if (Array.isArray(cached) && cached.length > 0) {
+      setRecords(cached)
+    } else {
+      setRecords([])
+    }
+    setLoading(true)
 
     async function fetchRecords() {
       let fetchErr = null
@@ -254,6 +263,7 @@ function ResourceDashboard({
 
     try {
       let successMsg = ''
+      let createdRecord = null
       if (editingRecord) {
         await updateResource(
           config.endpoint,
@@ -263,18 +273,46 @@ function ResourceDashboard({
         )
         successMsg = `Data ${config.label} berhasil diperbarui.`
       } else {
-        await createResource(config.endpoint, payload)
+        const res = await createResource(config.endpoint, payload)
+        createdRecord = res?.data || res
         successMsg = `Data ${config.label} berhasil ditambahkan.`
       }
 
-      // Bersihkan draf form dan muat ulang data terlebih dahulu sebelum menampilkan notifikasi
+      // Bersihkan draf form dan muat ulang data terlebih dahulu sampai data baru benar-benar muncul di tabel
       clearFormDraft(config.key, user?.id_user)
-      await reload()
+      invalidateApiCache()
+      const freshRecords = await reload()
       setEditingRecord(null)
       setIsFormOpen(false)
       setFormVersion((v) => v + 1)
       setSaving(false)
-      setToast({ open: true, message: successMsg, severity: 'success' })
+
+      const targetLead = config.key === 'calonKlien' && createdRecord
+        ? (Array.isArray(freshRecords) ? freshRecords.find((r) => Number(r.id_calon_klien) === Number(createdRecord.id_calon_klien)) : null) || createdRecord
+        : null
+
+      const isTargetLeadDeal = targetLead && String(targetLead.status_prospek || '').toLowerCase() === 'deal'
+      const hasTargetLeadActiveContract = Boolean(
+        targetLead?.kontrak && targetLead.kontrak.status && targetLead.kontrak.status !== 'draft'
+      )
+      const canConvertTargetLead =
+        isTargetLeadDeal &&
+        !hasTargetLeadActiveContract &&
+        ['admin', 'pimpinan', 'operator', 'sales'].includes(user?.role)
+
+      // Munculkan notifikasi saat data baru/perubahan sudah ada di tabel dan sinkronkan lonceng
+      setToast({
+        open: true,
+        message: successMsg,
+        severity: 'success',
+        action: canConvertTargetLead
+          ? {
+              label: 'Konversi ke Kontrak',
+              onClick: () => setConvertingLead(targetLead),
+            }
+          : null,
+      })
+      window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
     } catch (requestError) {
       setSaving(false)
       setValidationErrors(requestError.errors || {})
@@ -300,10 +338,12 @@ function ResourceDashboard({
         try {
           await deleteResource(config.endpoint, record[config.primaryKey])
           const msg = `Data ${config.label} berhasil dihapus.`
+          invalidateApiCache()
           await reload()
           setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'info' })
+          window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
         } catch (requestError) {
           setConfirmDialog((prev) => ({ ...prev, loading: false }))
           setError(requestError.message)
@@ -331,10 +371,12 @@ function ResourceDashboard({
           await Promise.all(ids.map((id) => deleteResource(config.endpoint, id)))
           const msg = `Berhasil menghapus ${ids.length} data ${config.label}.`
           onComplete?.()
+          invalidateApiCache()
           await reload()
           setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'info' })
+          window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
         } catch (requestError) {
           setConfirmDialog((prev) => ({ ...prev, loading: false }))
           setError(requestError.message)
@@ -368,6 +410,7 @@ function ResourceDashboard({
       const msg = `Pekerjaan "${jobTitle}" berhasil disetujui (Status: Selesai)${
         hasRating ? ' dan nilai kinerja karyawan telah dicatat' : ''
       }.`
+      invalidateApiCache()
       await reload()
       setApprovingRecord(null)
       setApprovingLoading(false)
@@ -383,6 +426,7 @@ function ResourceDashboard({
             }
           : null,
       })
+      window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
     } catch (err) {
       setApprovingLoading(false)
       setError(err.message || 'Gagal menyetujui pekerjaan.')
@@ -423,10 +467,12 @@ function ResourceDashboard({
         try {
           await rejectPekerjaan(targetPekerjaanId, { catatan_review: note })
           const msg = `Pekerjaan "${jobTitle}" dikembalikan kepada karyawan untuk revisi.`
+          invalidateApiCache()
           await reload()
           setPromptDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'warning' })
+          window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
         } catch (err) {
           setPromptDialog((prev) => ({ ...prev, loading: false }))
           setError(err.message || 'Gagal meminta revisi pekerjaan.')
@@ -456,9 +502,11 @@ function ResourceDashboard({
             }
           : null,
       )
+      invalidateApiCache()
       await reload()
       setSuccessMessage(msg)
       setToast({ open: true, message: msg, severity: 'success' })
+      window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
     } catch (err) {
       setError(err.message || 'Gagal menandatangani kontrak.')
       setToast({ open: true, message: err.message || 'Gagal menandatangani kontrak.', severity: 'error' })
@@ -481,10 +529,12 @@ function ResourceDashboard({
         try {
           await startPekerjaan(record.id_pekerjaan)
           const msg = `Tugas "${record.judul}" berhasil dimulai (Status: Dalam Pengerjaan).`
+          invalidateApiCache()
           await reload()
           setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setSuccessMessage(msg)
           setToast({ open: true, message: msg, severity: 'success' })
+          window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
         } catch (err) {
           setConfirmDialog((prev) => ({ ...prev, loading: false }))
           setError(err.message || 'Gagal memulai pengerjaan tugas.')
@@ -730,11 +780,15 @@ function ResourceDashboard({
             try { sessionStorage.removeItem('target_batch_assignment') } catch {}
           }}
           onSuccess={async (msg) => {
-            setToast({ open: true, message: msg, severity: 'success' })
             setIsFormOpen(false)
             onClearNavParams?.()
             try { sessionStorage.removeItem('target_batch_assignment') } catch {}
+            // Muat ulang data ke tabel terlebih dahulu sampai data baru benar-benar muncul
+            invalidateApiCache()
             await reload()
+            // Setelah data baru sudah ada di tabel, baru munculkan notifikasi & perbarui lonceng
+            setToast({ open: true, message: msg, severity: 'success' })
+            window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
           }}
         />
       )}
@@ -793,10 +847,12 @@ function ResourceDashboard({
           lead={convertingLead}
           onClose={() => setConvertingLead(null)}
           onSuccess={async (msg) => {
+            invalidateApiCache()
             await reload()
             setConvertingLead(null)
             setSuccessMessage(msg)
             setToast({ open: true, message: msg, severity: 'success' })
+            window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
           }}
         />
       )}

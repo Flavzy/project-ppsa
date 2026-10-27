@@ -96,6 +96,7 @@ export const resourceConfigs = [
     columns: [
       { key: 'no_kontrak', label: 'No Kontrak' },
       { key: 'id_calon_klien', label: 'Nama Perusahaan' },
+      { key: 'nilai_proyek', label: 'Nilai Kontrak' },
       { key: 'tgl_mulai', label: 'Mulai' },
       { key: 'tgl_selesai', label: 'Selesai' },
       { key: 'status', label: 'Status' },
@@ -112,6 +113,14 @@ export const resourceConfigs = [
         required: true,
       },
       { name: 'no_kontrak', label: 'No Kontrak', type: 'text', required: true },
+      {
+        name: 'nilai_proyek',
+        label: 'Nilai Kontrak (Rp)',
+        type: 'number',
+        min: 0,
+        placeholder: 'Masukkan nominal nilai kontrak (contoh: 50000000)',
+        required: false,
+      },
       { name: 'tgl_mulai', label: 'Tanggal Mulai', type: 'date', defaultValue: () => new Date().toISOString().split('T')[0], required: true },
       { name: 'tgl_selesai', label: 'Tanggal Selesai', type: 'date', required: true },
       {
@@ -163,7 +172,18 @@ export const resourceConfigs = [
       { name: 'nama_perusahaan', label: 'Nama Perusahaan', type: 'text', required: true },
       { name: 'alamat', label: 'Alamat', type: 'textarea', required: true },
       { name: 'kontak', label: 'Kontak', type: 'text', required: true },
-      { name: 'layanan', label: 'Layanan', type: 'text', required: true },
+      {
+        name: 'layanan_ids',
+        label: 'Daftar Layanan yang Diambil Klien',
+        type: 'checkbox_group',
+        optionsResource: 'layanan',
+        optionsFilter: (l) => Boolean(l.is_active),
+        optionValue: 'id_layanan',
+        optionLabel: 'nama_layanan',
+        fullWidth: true,
+        required: false,
+        description: 'Centang layanan aktif yang diambil oleh klien ini. Anda dapat menambah atau mengurangi layanan di sini dan otomatis tersinkronisasi ke data kontrak terkait.',
+      },
     ],
   },
   {
@@ -284,6 +304,10 @@ export const resourceConfigs = [
         optionsFilter: (job) => ['baru', 'in_progress', 'revision_needed'].includes(job.status),
         optionValue: 'id_pekerjaan',
         optionLabel: 'judul',
+        formatOptionLabel: (job) => {
+          const clientName = job.klien?.nama_perusahaan || job.nama_perusahaan || ''
+          return clientName ? `${job.judul} — ${clientName}` : (job.judul || `Pekerjaan #${job.id_pekerjaan}`)
+        },
         required: true,
       },
       {

@@ -21,7 +21,7 @@ class LeadConversionController extends Controller
 
         if ($calonKlien->status_prospek !== 'deal') {
             throw ValidationException::withMessages([
-                'status_prospek' => ['Calon klien harus berstatus deal sebelum dikonversi.'],
+                'status_prospek' => ['Calon klien harus berstatus deal sebelum dapat dikonversi ke kontrak.'],
             ]);
         }
 
@@ -44,6 +44,7 @@ class LeadConversionController extends Controller
                     'lingkup_kerja' => $validated['lingkup_kerja'] ?? $calonKlien->pain_points,
                     'tgl_mulai' => $validated['tgl_mulai'],
                     'tgl_selesai' => $validated['tgl_selesai'],
+                    'status' => 'aktif',
                 ]);
                 $kontrak = $existingKontrak;
             } else {
@@ -56,7 +57,7 @@ class LeadConversionController extends Controller
                     'lingkup_kerja' => $validated['lingkup_kerja'] ?? $calonKlien->pain_points,
                     'tgl_mulai' => $validated['tgl_mulai'],
                     'tgl_selesai' => $validated['tgl_selesai'],
-                    'status' => 'draft',
+                    'status' => 'aktif',
                 ]);
             }
 
@@ -73,6 +74,13 @@ class LeadConversionController extends Controller
             if (!empty($validated['layanan_ids']) && is_array($validated['layanan_ids'])) {
                 $calonKlien->update(['layanan_ids' => $validated['layanan_ids']]);
                 $kontrak->layanan()->sync($validated['layanan_ids']);
+            }
+
+            if (!empty($validated['alamat'])) {
+                $calonKlien->update([
+                    'alamat_perusahaan' => $validated['alamat'],
+                    'alamat' => $validated['alamat'],
+                ]);
             }
         });
 

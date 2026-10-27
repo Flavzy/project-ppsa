@@ -25,7 +25,7 @@ class PekerjaanController extends Controller
         Gate::authorize('viewAny', Pekerjaan::class);
 
         $query = Pekerjaan::query()
-            ->with(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']);
+            ->with(['klien.kontrak.calonKlien', 'klien.kontrak.layanan', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']);
 
         if (request()->user()->role === 'karyawan') {
             $query->where('id_pic', request()->user()->id_user);
@@ -65,7 +65,7 @@ class PekerjaanController extends Controller
         }
 
         $pekerjaan = Pekerjaan::create($data)
-            ->load(['klien.kontrak.calonKlien', 'pic', 'latestReporting', 'layanan', 'masterPekerjaan']);
+            ->load(['klien.kontrak.calonKlien', 'klien.kontrak.layanan', 'pic', 'latestReporting', 'layanan', 'masterPekerjaan']);
 
         return (new PekerjaanResource($pekerjaan))
             ->response()
@@ -77,7 +77,17 @@ class PekerjaanController extends Controller
         Gate::authorize('create', Pekerjaan::class);
 
         $validated = $request->validate([
-            'id_klien' => ['required', 'integer', 'exists:klien,id_klien'],
+            'id_klien' => [
+                'required',
+                'integer',
+                'exists:klien,id_klien',
+                function ($attribute, $value, $fail) {
+                    $klien = \App\Models\Klien::with('kontrak')->find($value);
+                    if (!$klien || !$klien->kontrak || $klien->kontrak->status !== 'aktif') {
+                        $fail('Pekerjaan tidak dapat ditambahkan karena kontrak klien sedang nonaktif atau telah dibatalkan.');
+                    }
+                },
+            ],
             'id_layanan' => ['nullable', 'integer', 'exists:layanan,id_layanan'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.judul' => ['required', 'string', 'max:255'],
@@ -156,7 +166,7 @@ class PekerjaanController extends Controller
 
         $ids = array_map(fn ($p) => $p->id_pekerjaan, $createdPekerjaan);
         $fullRecords = Pekerjaan::whereIn('id_pekerjaan', $ids)
-            ->with(['klien.kontrak.calonKlien', 'pic', 'latestReporting', 'layanan', 'masterPekerjaan'])
+            ->with(['klien.kontrak.calonKlien', 'klien.kontrak.layanan', 'pic', 'latestReporting', 'layanan', 'masterPekerjaan'])
             ->get();
 
         return response()->json([
@@ -169,7 +179,7 @@ class PekerjaanController extends Controller
     {
         Gate::authorize('view', $pekerjaan);
 
-        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']));
+        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'klien.kontrak.layanan', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']));
     }
 
     public function update(UpdatePekerjaanRequest $request, Pekerjaan $pekerjaan): PekerjaanResource
@@ -281,7 +291,7 @@ class PekerjaanController extends Controller
 
         $pekerjaan->update($data);
 
-        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']));
+        return new PekerjaanResource($pekerjaan->load(['klien.kontrak.calonKlien', 'klien.kontrak.layanan', 'pic', 'approver', 'performanceReview', 'latestReporting', 'layanan', 'masterPekerjaan']));
     }
 
     public function destroy(Pekerjaan $pekerjaan): Response

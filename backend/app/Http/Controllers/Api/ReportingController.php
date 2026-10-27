@@ -22,7 +22,7 @@ class ReportingController extends Controller
         Gate::authorize('viewAny', Reporting::class);
 
         $query = Reporting::query()
-            ->with(['pekerjaan', 'user']);
+            ->with(['pekerjaan.klien', 'user']);
 
         if (request()->user()->role === 'karyawan') {
             $userId = request()->user()->id_user;
@@ -61,7 +61,7 @@ class ReportingController extends Controller
         $payload['status_laporan'] = 'submitted';
 
         $reporting = Reporting::create($payload)
-            ->load(['pekerjaan', 'user']);
+            ->load(['pekerjaan.klien', 'user']);
 
         // Sinkronisasi otomatis ke pekerjaan:
         // Saat laporan dibuat di menu Reporting, pekerjaan otomatis diajukan (submitted)
@@ -95,7 +95,7 @@ class ReportingController extends Controller
     {
         Gate::authorize('view', $reporting);
 
-        return new ReportingResource($reporting->load(['pekerjaan', 'user']));
+        return new ReportingResource($reporting->load(['pekerjaan.klien', 'user']));
     }
 
     public function update(UpdateReportingRequest $request, Reporting $reporting): ReportingResource
@@ -138,7 +138,7 @@ class ReportingController extends Controller
             $pekerjaan->update($pekerjaanUpdate);
         }
 
-        return new ReportingResource($reporting->load(['pekerjaan', 'user']));
+        return new ReportingResource($reporting->load(['pekerjaan.klien', 'user']));
     }
 
     public function destroy(Reporting $reporting): Response

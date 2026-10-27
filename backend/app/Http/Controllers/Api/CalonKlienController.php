@@ -10,6 +10,7 @@ use App\Models\CalonKlien;
 use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Helpers\FileUploadHelper;
+use App\Services\ClientSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -36,13 +37,6 @@ class CalonKlienController extends Controller
             ->with(['user', 'kontrak.klien'])
             ->orderByDesc('id_calon_klien')
             ->get();
-
-        foreach ($calonKlien as $ck) {
-            if ($ck->status_prospek === 'deal' && ! $ck->kontrak) {
-                $this->autoGenerateKontrakAndKlien($ck);
-                $ck->load('kontrak.klien');
-            }
-        }
 
         return CalonKlienResource::collection($calonKlien);
     }
@@ -91,9 +85,12 @@ class CalonKlienController extends Controller
         }
 
         $calonKlien = CalonKlien::create($data);
-        $this->autoGenerateKontrakAndKlien($calonKlien);
 
-        return (new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien'])))
+        if ($calonKlien->status_prospek === 'deal') {
+            ClientSyncService::syncFromCalonKlien($calonKlien, $data);
+        }
+
+        return (new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien', 'kontrak.layanan'])))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
     }
@@ -194,9 +191,10 @@ class CalonKlienController extends Controller
         }
 
         $calonKlien->update($data);
-        $this->autoGenerateKontrakAndKlien($calonKlien);
 
-        return new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien']));
+        ClientSyncService::syncFromCalonKlien($calonKlien, $data);
+
+        return new CalonKlienResource($calonKlien->load(['user', 'kontrak.klien', 'kontrak.layanan']));
     }
 
     public function destroy(CalonKlien $calonKlien): Response
@@ -232,59 +230,6 @@ class CalonKlienController extends Controller
      */
     private function autoGenerateKontrakAndKlien(CalonKlien $calonKlien): void
     {
-        if ($calonKlien->status_prospek !== 'deal') {
-            return;
-        }
-
-        DB::transaction(function () use ($calonKlien): void {
-            $kontrak = $calonKlien->kontrak()->first();
-
-            if (!$kontrak) {
-                $year = date('Y');
-                $month = date('m');
-                $paddedId = str_pad((string) $calonKlien->id_calon_klien, 4, '0', STR_PAD_LEFT);
-                $baseNo = "KTR/PPSA/{$year}/{$month}/{$paddedId}";
-                $noKontrak = $baseNo;
-                $counter = 1;
-                while (Kontrak::where('no_kontrak', $noKontrak)->exists()) {
-                    $noKontrak = "{$baseNo}-{$counter}";
-                    $counter++;
-                }
-
-                $kontrak = Kontrak::create([
-                    'id_calon_klien' => $calonKlien->id_calon_klien,
-                    'no_kontrak' => $noKontrak,
-                    'jenis_dokumen' => 'kontrak',
-                    'nilai_proyek' => $calonKlien->nilai_estimasi ?? 0,
-                    'lingkup_kerja' => !empty($calonKlien->pain_points)
-                        ? $calonKlien->pain_points
-                        : 'Penyediaan Layanan Konsultansi dan Manajemen Sistem Informasi SIM-KK PPSA',
-                    'tgl_mulai' => now()->toDateString(),
-                    'tgl_selesai' => now()->addYear()->toDateString(),
-                    'status' => 'draft',
-                ]);
-            }
-
-            $layananIds = $calonKlien->layanan_ids ?: request()->input('layanan_ids');
-            if (is_array($layananIds) && count($layananIds) > 0) {
-                $kontrak->layanan()->sync($layananIds);
-            }
-
-            if (!$kontrak->klien()->exists()) {
-                $layananStr = $kontrak->layanan()->pluck('nama_layanan')->implode(', ') ?: 'Layanan Konsultansi & Manajemen PPSA';
-                Klien::create([
-                    'id_kontrak' => $kontrak->id_kontrak,
-                    'nama_perusahaan' => $calonKlien->nama_perusahaan,
-                    'alamat' => !empty($calonKlien->alamat_perusahaan) ? $calonKlien->alamat_perusahaan : 'Alamat terlampir',
-                    'kontak' => !empty($calonKlien->kontak_person) ? $calonKlien->kontak_person : ($calonKlien->kontak ?: '-'),
-                    'layanan' => $layananStr,
-                ]);
-            } elseif (is_array($layananIds) && count($layananIds) > 0) {
-                $layananStr = $kontrak->layanan()->pluck('nama_layanan')->implode(', ');
-                if ($layananStr) {
-                    $kontrak->klien()->update(['layanan' => $layananStr]);
-                }
-            }
-        });
+        ClientSyncService::generateDefaultKontrakAndKlien($calonKlien);
     }
 }

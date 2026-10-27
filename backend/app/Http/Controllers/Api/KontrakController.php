@@ -9,6 +9,7 @@ use App\Http\Resources\KontrakResource;
 use App\Models\Klien;
 use App\Models\Kontrak;
 use App\Helpers\FileUploadHelper;
+use App\Services\ClientSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
@@ -61,6 +62,8 @@ class KontrakController extends Controller
 
         $kontrak->load(['calonKlien', 'klien', 'reviewer', 'layanan']);
 
+        ClientSyncService::syncFromKontrak($kontrak, $data);
+
         return (new KontrakResource($kontrak))
             ->response()
             ->setStatusCode(Response::HTTP_CREATED);
@@ -85,11 +88,15 @@ class KontrakController extends Controller
 
             if ($kontrak->klien) {
                 $layananNames = $kontrak->layanan()->pluck('nama_layanan')->implode(', ');
-                if ($layananNames) {
-                    $kontrak->klien->update(['layanan' => $layananNames]);
-                }
+                $kontrak->klien->update(['layanan' => $layananNames ?: '-']);
             }
         }
+
+        $payload = $this->preparePayload($request);
+        if ($request->has('layanan_ids')) {
+            $payload['layanan_ids'] = $request->input('layanan_ids') ?: [];
+        }
+        ClientSyncService::syncFromKontrak($kontrak, $payload);
 
         return new KontrakResource($kontrak->load(['calonKlien', 'klien', 'reviewer', 'layanan']));
     }

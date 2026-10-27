@@ -81,14 +81,28 @@ export default function BatchTaskAssignmentCard({
     return contracts.find((c) => String(c.id_kontrak) === String(currentKlien.id_kontrak)) || null
   }, [currentKlien, contracts])
 
+  // Hanya tampilkan klien yang kontraknya berstatus 'aktif' untuk penugasan baru
+  const activeClients = useMemo(() => {
+    return (clients || []).filter((k) => {
+      // Pertahankan klien jika merupakan target otomatis dari pengingat dasbor
+      if (targetAssignment?.id_klien && String(k.id_klien) === String(targetAssignment.id_klien)) {
+        return true
+      }
+      const contractStatus = k.kontrak?.status ||
+        (contracts || []).find((c) => String(c.id_kontrak) === String(k.id_kontrak))?.status
+      return contractStatus === 'aktif'
+    })
+  }, [clients, contracts, targetAssignment])
+
   // Filter Layanan:
   // Jika kontrak memiliki daftar layanan (layanan_ids atau kontrak.layanan),
   // maka hanya tampilkan layanan yang ada dalam kontrak tersebut!
   const availableServices = useMemo(() => {
-    if (!currentKontrak) return services
+    if (!currentKontrak && !currentKlien) return services
 
-    const contractLayananIds = currentKontrak.layanan_ids ||
-      (Array.isArray(currentKontrak.layanan) ? currentKontrak.layanan.map((l) => l.id_layanan) : [])
+    const contractLayananIds = currentKontrak?.layanan_ids ||
+      currentKlien?.layanan_ids ||
+      (Array.isArray(currentKontrak?.layanan) ? currentKontrak.layanan.map((l) => l.id_layanan) : [])
 
     if (contractLayananIds.length > 0) {
       const filtered = services.filter((s) => contractLayananIds.includes(s.id_layanan))
@@ -96,7 +110,7 @@ export default function BatchTaskAssignmentCard({
     }
 
     return services
-  }, [currentKontrak, services])
+  }, [currentKontrak, currentKlien, services])
 
   const loadedLayananIdRef = useRef(null)
   const templateCacheRef = useRef({})
@@ -294,6 +308,13 @@ export default function BatchTaskAssignmentCard({
       return
     }
 
+    const contractStatus = currentKontrak?.status ||
+      (contracts || []).find((c) => String(c.id_kontrak) === String(currentKlien?.id_kontrak))?.status
+    if (contractStatus && contractStatus !== 'aktif') {
+      setErrorMessage('Penugasan tidak dapat diproses karena kontrak klien ini sedang nonaktif atau telah dibatalkan.')
+      return
+    }
+
     const activeItems = jobItems.filter((item) => item.selected)
     if (activeItems.length === 0) {
       setErrorMessage('Pilih minimal satu pekerjaan yang akan ditugaskan.')
@@ -451,8 +472,10 @@ export default function BatchTaskAssignmentCard({
               disabled={submitting}
               className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3.5 py-2.5 text-xs sm:text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             >
-              <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">-- Pilih Perusahaan Klien --</option>
-              {clients.map((k) => (
+              <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
+                {activeClients.length === 0 ? '-- Tidak ada klien dengan kontrak aktif --' : '-- Pilih Perusahaan Klien --'}
+              </option>
+              {activeClients.map((k) => (
                 <option key={k.id_klien} value={k.id_klien} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                   {k.nama_perusahaan} {k.kontrak?.no_kontrak ? `(${k.kontrak.no_kontrak})` : ''}
                 </option>

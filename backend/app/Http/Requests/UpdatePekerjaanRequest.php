@@ -26,7 +26,21 @@ class UpdatePekerjaanRequest extends FormRequest
         $tglPenugasan = $this->input('tgl_penugasan', $pekerjaan?->tgl_penugasan ? \Carbon\Carbon::parse($pekerjaan->tgl_penugasan)->toDateString() : null);
 
         return [
-            'id_klien' => ['sometimes', 'required', 'integer', 'exists:klien,id_klien'],
+            'id_klien' => [
+                'sometimes',
+                'required',
+                'integer',
+                'exists:klien,id_klien',
+                function ($attribute, $value, $fail) use ($pekerjaan) {
+                    if ($pekerjaan && (int) $value === (int) $pekerjaan->id_klien) {
+                        return; // Mempertahankan data historis tugas lama
+                    }
+                    $klien = \App\Models\Klien::with('kontrak')->find($value);
+                    if (!$klien || !$klien->kontrak || $klien->kontrak->status !== 'aktif') {
+                        $fail('Pekerjaan tidak dapat dipindahkan karena kontrak klien sedang nonaktif atau telah dibatalkan.');
+                    }
+                },
+            ],
             'id_layanan' => ['nullable', 'integer', 'exists:layanan,id_layanan'],
             'id_master_pekerjaan' => ['nullable', 'integer', 'exists:master_pekerjaan,id_master_pekerjaan'],
             'periode_bulan' => [

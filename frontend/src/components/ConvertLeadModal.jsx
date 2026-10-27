@@ -11,7 +11,17 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
     } catch { return null }
   })()
 
-  const [noKontrak, setNoKontrak] = useState(() => savedDraft?.noKontrak || `KTR-${lead?.id_calon_klien}-${Date.now().toString().slice(-4)}`)
+  const defaultNoKontrak = lead?.kontrak?.no_kontrak
+    || `KTR-${new Date().getFullYear()}-${String(lead?.id_calon_klien || 1).padStart(3, '0')}`
+
+  const [noKontrak, setNoKontrak] = useState(() => {
+    // Jika ada draf yang sudah valid sesuai format lama KTR-YYYY-XXX, pakai draf tersebut.
+    // Jika draf berupa format acak lama (KTR-id-timestamp), buang dan gunakan nomor standar.
+    if (savedDraft?.noKontrak && !/^KTR-\d+-\d{4}$/.test(savedDraft.noKontrak)) {
+      return savedDraft.noKontrak
+    }
+    return defaultNoKontrak
+  })
   const [jenisDokumen, setJenisDokumen] = useState(() => savedDraft?.jenisDokumen || 'kontrak')
   const [tglMulai, setTglMulai] = useState(() => savedDraft?.tglMulai || new Date().toISOString().split('T')[0])
   const [tglSelesai, setTglSelesai] = useState(() => {
@@ -37,7 +47,7 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Ambil daftar master layanan aktif
+  // Ambil daftar master layanan aktif & hitung nomor kontrak berurutan berikutnya
   useEffect(() => {
     let isMounted = true
     listResource('layanan')
@@ -57,8 +67,35 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
         }
       })
       .catch(() => {})
+
+    listResource('kontrak')
+      .then((kontrakList) => {
+        if (!isMounted) return
+        if (!lead?.kontrak?.no_kontrak) {
+          const year = new Date().getFullYear()
+          let maxSeq = 0
+          if (Array.isArray(kontrakList)) {
+            kontrakList.forEach((k) => {
+              const match = String(k.no_kontrak || '').match(new RegExp(`^KTR-${year}-(\\d+)$`))
+              if (match) {
+                const seq = parseInt(match[1], 10)
+                if (seq > maxSeq) maxSeq = seq
+              }
+            })
+          }
+          const nextNo = `KTR-${year}-${String(maxSeq + 1).padStart(3, '0')}`
+          setNoKontrak((prev) => {
+            if (!prev || prev === defaultNoKontrak || /^KTR-\d+-\d{4}$/.test(prev)) {
+              return nextNo
+            }
+            return prev
+          })
+        }
+      })
+      .catch(() => {})
+
     return () => { isMounted = false }
-  }, [])
+  }, [lead, defaultNoKontrak])
 
   // Simpan draf konversi otomatis ke localStorage
   useEffect(() => {
@@ -311,14 +348,28 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1.5">
               Nilai Proyek (Rp)
             </label>
-            <input
-              type="number"
-              value={nilaiProyek}
-              onChange={(e) => setNilaiProyek(e.target.value)}
-              placeholder="Contoh: 50000000"
-              disabled={submitting}
-              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
-            />
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400 dark:text-gray-500 pointer-events-none select-none">
+                Rp
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={nilaiProyek ? Number(String(nilaiProyek).replace(/\D/g, '')).toLocaleString('id-ID') : ''}
+                onChange={(e) => {
+                  const rawDigits = e.target.value.replace(/\D/g, '')
+                  setNilaiProyek(rawDigits)
+                }}
+                placeholder="0"
+                disabled={submitting}
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent pl-12 pr-4 py-2.5 text-sm font-medium text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
+              />
+            </div>
+            {nilaiProyek && Number(String(nilaiProyek).replace(/\D/g, '')) > 0 && (
+              <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                Terbilang: Rp {Number(String(nilaiProyek).replace(/\D/g, '')).toLocaleString('id-ID')}
+              </p>
+            )}
           </div>
 
           <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">

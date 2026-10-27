@@ -16,6 +16,12 @@ function getInitialValue(field, record, currentUser, config) {
     if (record?.layanan && Array.isArray(record.layanan)) {
       return record.layanan.map((l) => Number(l.id_layanan))
     }
+    if (record?.kontrak?.layanan_ids && Array.isArray(record.kontrak.layanan_ids)) {
+      return record.kontrak.layanan_ids.map(Number)
+    }
+    if (record?.kontrak?.layanan && Array.isArray(record.kontrak.layanan)) {
+      return record.kontrak.layanan.map((l) => Number(l.id_layanan))
+    }
     return []
   }
 
@@ -689,6 +695,22 @@ function ResourceForm({
           next.id_layanan = ''
         }
       }
+      if (config?.key === 'klien' && fieldName === 'id_kontrak' && val) {
+        const selectedKontrak = (options?.kontrak || []).find((c) => String(c.id_kontrak) === String(val))
+        if (selectedKontrak) {
+          const clientData = selectedKontrak.calon_klien || selectedKontrak.calonKlien
+          if (clientData) {
+            if (!next.nama_perusahaan || !record) next.nama_perusahaan = clientData.nama_perusahaan || ''
+            if (!next.alamat || !record) next.alamat = clientData.alamat_perusahaan || clientData.alamat || ''
+            if (!next.kontak || !record) next.kontak = clientData.kontak_person || clientData.kontak || ''
+          }
+          const cLayananIds = selectedKontrak.layanan_ids ||
+            (Array.isArray(selectedKontrak.layanan) ? selectedKontrak.layanan.map((l) => Number(l.id_layanan)) : [])
+          if (cLayananIds.length > 0 && (!next.layanan_ids || next.layanan_ids.length === 0 || !record)) {
+            next.layanan_ids = cLayananIds
+          }
+        }
+      }
       if (!record) {
         saveFormDraft(config.key, currentUser?.id_user, next)
       }
@@ -774,7 +796,11 @@ function ResourceForm({
       if (field.type === 'checkbox_group') {
         const origArr = Array.isArray(origRaw)
           ? origRaw.map(Number).sort((a, b) => a - b)
-          : (record?.layanan ? record.layanan.map((l) => Number(l.id_layanan)).sort((a, b) => a - b) : [])
+          : (record?.layanan && Array.isArray(record.layanan)
+            ? record.layanan.map((l) => Number(l.id_layanan)).sort((a, b) => a - b)
+            : (record?.kontrak?.layanan_ids && Array.isArray(record.kontrak.layanan_ids)
+              ? record.kontrak.layanan_ids.map(Number).sort((a, b) => a - b)
+              : []))
         const currArr = Array.isArray(currentRaw) ? currentRaw.map(Number).sort((a, b) => a - b) : []
         return JSON.stringify(origArr) !== JSON.stringify(currArr)
       }
@@ -791,6 +817,37 @@ function ResourceForm({
       return origVal !== currentVal
     })
   }, [record, fileStates, config, currentUser, values])
+
+  // Deteksi perubahan belum tersimpan untuk konfirmasi saat keluar/batal
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false)
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (record) {
+      return isDirty
+    }
+    const hasFileChanges = Object.values(fileStates).some((fs) => fs?.newFiles && fs.newFiles.length > 0)
+    if (hasFileChanges) return true
+
+    return config.fields.some((field) => {
+      if (isFieldLockedForUser(field, null, config, currentUser)) return false
+      if (field.type === 'file') return false
+      const defVal = getInitialValue(field, null, currentUser, config)
+      const currentVal = values[field.name]
+      if (field.type === 'checkbox_group') {
+        const arr = Array.isArray(currentVal) ? currentVal : []
+        return arr.length > 0
+      }
+      return String(currentVal ?? '').trim() !== String(defVal ?? '').trim() && String(currentVal ?? '').trim() !== ''
+    })
+  }, [record, isDirty, fileStates, config, currentUser, values])
+
+  const handleCancelClick = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedConfirm(true)
+    } else {
+      onCancel?.()
+    }
+  }
 
   // Group fields by section if section is specified
   const sections = useMemo(() => {
@@ -814,14 +871,32 @@ function ResourceForm({
     setActiveSectionIndex(0)
   }, [config?.key, record])
 
-  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit
+  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit dan auto-scroll halus ke field error pertama
   useEffect(() => {
     const errorKeys = Object.keys(clientErrors || {}).concat(Object.keys(errors || {}))
-    if (errorKeys.length > 0 && sections.length > 1) {
-      const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
-      if (targetIdx !== -1 && activeSectionIndex !== -1 && activeSectionIndex !== targetIdx) {
-        setActiveSectionIndex(targetIdx)
+    if (errorKeys.length > 0) {
+      if (sections.length > 1) {
+        const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
+        if (targetIdx !== -1 && activeSectionIndex !== -1 && activeSectionIndex !== targetIdx) {
+          setActiveSectionIndex(targetIdx)
+        }
       }
+
+      // Animasi auto-scroll halus langsung menuju ke input pertama yang mengalami error dan fokuskan kursor seketika
+      const timer = setTimeout(() => {
+        for (const errKey of errorKeys) {
+          const el = document.getElementById(errKey) || document.querySelector(`[name="${errKey}"]`)
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            if (typeof el.focus === 'function') {
+              el.focus({ preventScroll: true })
+            }
+            break
+          }
+        }
+      }, 120)
+
+      return () => clearTimeout(timer)
     }
   }, [clientErrors, errors, sections, activeSectionIndex])
 
@@ -1117,6 +1192,7 @@ function ResourceForm({
 
                     {field.type === 'textarea' ? (
                       <textarea
+                        id={field.name}
                         name={field.name}
                         value={values[field.name] ?? ''}
                         onChange={(e) => handleFieldChange(field.name, e.target.value)}
@@ -1176,6 +1252,20 @@ function ResourceForm({
                         })
                       }
 
+                      if (config.key === 'pekerjaan' && field.name === 'id_klien') {
+                        selectOptions = selectOptions.filter((opt) => {
+                          if (record && initialVal !== undefined && initialVal !== null && initialVal !== '') {
+                            const optVal = typeof opt === 'object' ? opt[valKey] : opt
+                            if (String(optVal) === String(initialVal)) {
+                              return true
+                            }
+                          }
+                          const contractStatus = opt.kontrak?.status ||
+                            (options?.kontrak || []).find((c) => String(c.id_kontrak) === String(opt.id_kontrak))?.status
+                          return contractStatus === 'aktif'
+                        })
+                      }
+
                       if (config.key === 'pekerjaan' && field.name === 'id_pic') {
                         selectOptions = selectOptions.filter((opt) => {
                           if (initialVal && String(opt[valKey]) === String(initialVal)) return true
@@ -1193,9 +1283,10 @@ function ResourceForm({
                         if (selectedKlienId && options?.klien) {
                           const matchedKlien = options.klien.find((k) => String(k.id_klien) === String(selectedKlienId))
                           const matchedKontrak = matchedKlien?.kontrak || (options?.kontrak || []).find((c) => String(c.id_kontrak) === String(matchedKlien?.id_kontrak))
-                          if (matchedKontrak) {
-                            const contractLayananIds = matchedKontrak.layanan_ids ||
-                              (Array.isArray(matchedKontrak.layanan) ? matchedKontrak.layanan.map((l) => l.id_layanan) : [])
+                          if (matchedKontrak || matchedKlien) {
+                            const contractLayananIds = matchedKontrak?.layanan_ids ||
+                              matchedKlien?.layanan_ids ||
+                              (Array.isArray(matchedKontrak?.layanan) ? matchedKontrak.layanan.map((l) => l.id_layanan) : [])
                             if (contractLayananIds.length > 0) {
                               selectOptions = selectOptions.filter((opt) => {
                                 if (record && initialVal && String(opt[valKey]) === String(initialVal)) return true
@@ -1243,7 +1334,10 @@ function ResourceForm({
                           } else if (field.name === 'id_user') {
                             fallbackHumanName = record?.user?.nama
                           } else if (field.name === 'id_pekerjaan') {
-                            fallbackHumanName = record?.pekerjaan?.judul
+                            const clientName = record?.pekerjaan?.klien?.nama_perusahaan
+                            fallbackHumanName = clientName
+                              ? `${record?.pekerjaan?.judul} — ${clientName}`
+                              : record?.pekerjaan?.judul
                           } else if (field.name === 'id_layanan') {
                             fallbackHumanName = record?.layanan?.nama_layanan
                           } else if (field.name === 'judul') {
@@ -1257,6 +1351,7 @@ function ResourceForm({
                       return (
                         <div>
                           <select
+                            id={field.name}
                             name={field.name}
                             value={values[field.name] ?? ''}
                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
@@ -1267,6 +1362,8 @@ function ResourceForm({
                             <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                               {selectOptions.length === 0 && config.key === 'kinerjaKaryawan' && field.name === 'id_pekerjaan'
                                 ? '-- Tidak ada tugas selesai & disetujui yang menunggu penilaian --'
+                                : selectOptions.length === 0 && config.key === 'pekerjaan' && field.name === 'id_klien'
+                                ? '-- Tidak ada klien dengan kontrak aktif --'
                                 : `Pilih ${field.label}`}
                             </option>
                             {record && initialVal && !hasCurrent && (
@@ -1410,7 +1507,8 @@ function ResourceForm({
                       const isDeadline = field.name === 'deadline'
                       const isTglSelesai = field.name === 'tgl_selesai'
                       const isKontakCalonKlien = config.key === 'calonKlien' && (field.name === 'kontak_person' || field.name === 'kontak')
-                      const isNumericOnly = Boolean(field.numericOnly || isKontakCalonKlien)
+                      const isCurrency = field.name === 'nilai_proyek' || field.name === 'nilai_estimasi' || field.name === 'budget' || field.name === 'nominal' || Boolean(field.isCurrency)
+                      const isNumericOnly = Boolean(field.numericOnly || isKontakCalonKlien || isCurrency)
                       const maxCharLength = isKontakCalonKlien ? 16 : (field.maxLength || undefined)
 
                       let minDateAttr = undefined
@@ -1446,7 +1544,12 @@ function ResourceForm({
                       }
 
                       let displayVal = values[field.name] ?? (calculatedVal ?? '')
-                      if (isNumericOnly && typeof displayVal === 'string') {
+                      if (isCurrency) {
+                        if (displayVal !== '' && displayVal !== null && displayVal !== undefined) {
+                          const rawDigits = String(displayVal).replace(/\D/g, '')
+                          displayVal = rawDigits ? `Rp ${Number(rawDigits).toLocaleString('id-ID')}` : ''
+                        }
+                      } else if (isNumericOnly && typeof displayVal === 'string') {
                         displayVal = displayVal.replace(/\D/g, '')
                         if (maxCharLength && displayVal.length > maxCharLength) {
                           displayVal = displayVal.slice(0, maxCharLength)
@@ -1454,83 +1557,105 @@ function ResourceForm({
                       }
 
                       return (
-                        <input
-                          key={record && (field.name === 'password' || field.type === 'password') ? `pwd_edit_${record[config.primaryKey]}` : field.name}
-                          name={field.name}
-                          type={field.type}
-                          inputMode={isNumericOnly ? 'numeric' : undefined}
-                          pattern={isNumericOnly ? '[0-9]*' : undefined}
-                          maxLength={maxCharLength}
-                          value={displayVal}
-                          min={minDateAttr || (field.min !== undefined ? field.min : undefined)}
-                          max={maxDateAttr || (field.max !== undefined ? field.max : undefined)}
-                          step={field.step || (field.type === 'number' ? 'any' : undefined)}
-                          autoComplete={
-                            field.name === 'password' || field.type === 'password'
-                              ? 'new-password'
-                              : 'off'
-                          }
-                          onKeyDown={(e) => {
-                            if (isNumericOnly) {
-                              const allowedKeys = [
-                                'Backspace',
-                                'Delete',
-                                'Tab',
-                                'Escape',
-                                'Enter',
-                                'ArrowLeft',
-                                'ArrowRight',
-                                'ArrowUp',
-                                'ArrowDown',
-                                'Home',
-                                'End',
-                              ]
-                              if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
+                        <div>
+                          <input
+                            key={record && (field.name === 'password' || field.type === 'password') ? `pwd_edit_${record[config.primaryKey]}` : field.name}
+                            id={field.name}
+                            name={field.name}
+                            type={isCurrency ? 'text' : field.type}
+                            inputMode={isNumericOnly ? 'numeric' : undefined}
+                            pattern={isNumericOnly && !isCurrency ? '[0-9]*' : undefined}
+                            maxLength={maxCharLength}
+                            value={displayVal}
+                            min={minDateAttr || (field.min !== undefined ? field.min : undefined)}
+                            max={maxDateAttr || (field.max !== undefined ? field.max : undefined)}
+                            step={field.step || (field.type === 'number' && !isCurrency ? 'any' : undefined)}
+                            autoComplete={
+                              field.name === 'password' || field.type === 'password'
+                                ? 'new-password'
+                                : 'off'
+                            }
+                            onKeyDown={(e) => {
+                              if (isNumericOnly) {
+                                const allowedKeys = [
+                                  'Backspace',
+                                  'Delete',
+                                  'Tab',
+                                  'Escape',
+                                  'Enter',
+                                  'ArrowLeft',
+                                  'ArrowRight',
+                                  'ArrowUp',
+                                  'ArrowDown',
+                                  'Home',
+                                  'End',
+                                ]
+                                if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
+                                  return
+                                }
+                                if (!/^[0-9]$/.test(e.key)) {
+                                  e.preventDefault()
+                                }
+                              }
+                            }}
+                            onPaste={(e) => {
+                              if (isCurrency) {
+                                e.preventDefault()
+                                const clipboardText = (e.clipboardData || window.clipboardData)?.getData('text') || ''
+                                const filteredDigits = clipboardText.replace(/\D/g, '')
+                                if (filteredDigits) {
+                                  handleFieldChange(field.name, Number(filteredDigits))
+                                }
+                              } else if (isNumericOnly) {
+                                e.preventDefault()
+                                const clipboardText = (e.clipboardData || window.clipboardData)?.getData('text') || ''
+                                const filteredDigits = clipboardText.replace(/\D/g, '')
+                                const currentVal = String(values[field.name] ?? (calculatedVal ?? ''))
+                                const inputEl = e.target
+                                const start = inputEl.selectionStart ?? currentVal.length
+                                const end = inputEl.selectionEnd ?? currentVal.length
+                                let combined = currentVal.slice(0, start) + filteredDigits + currentVal.slice(end)
+                                if (maxCharLength && combined.length > maxCharLength) {
+                                  combined = combined.slice(0, maxCharLength)
+                                }
+                                handleFieldChange(field.name, combined)
+                              }
+                            }}
+                            onChange={(e) => {
+                              if (isCurrency) {
+                                const rawDigits = e.target.value.replace(/\D/g, '')
+                                handleFieldChange(field.name, rawDigits ? Number(rawDigits) : '')
                                 return
                               }
-                              if (!/^[0-9]$/.test(e.key)) {
-                                e.preventDefault()
+                              let nextVal = e.target.value
+                              if (isNumericOnly) {
+                                nextVal = nextVal.replace(/\D/g, '')
+                                if (maxCharLength && nextVal.length > maxCharLength) {
+                                  nextVal = nextVal.slice(0, maxCharLength)
+                                }
                               }
-                            }
-                          }}
-                          onPaste={(e) => {
-                            if (isNumericOnly) {
-                              e.preventDefault()
-                              const clipboardText = (e.clipboardData || window.clipboardData)?.getData('text') || ''
-                              const filteredDigits = clipboardText.replace(/\D/g, '')
-                              const currentVal = String(values[field.name] ?? (calculatedVal ?? ''))
-                              const inputEl = e.target
-                              const start = inputEl.selectionStart ?? currentVal.length
-                              const end = inputEl.selectionEnd ?? currentVal.length
-                              let combined = currentVal.slice(0, start) + filteredDigits + currentVal.slice(end)
-                              if (maxCharLength && combined.length > maxCharLength) {
-                                combined = combined.slice(0, maxCharLength)
+                              handleFieldChange(field.name, nextVal)
+                              if (isTglPenugasan) {
+                                setTglPenugasanVal(nextVal)
                               }
-                              handleFieldChange(field.name, combined)
+                            }}
+                            required={record && (field.name === 'password' || field.type === 'password') ? false : (field.required && !isFieldDisabled)}
+                            disabled={isFieldDisabled}
+                            placeholder={
+                              isCurrency
+                                ? 'Rp 0'
+                                : (record && (field.name === 'password' || field.type === 'password')
+                                  ? 'Kosongkan jika tidak ingin mengubah password'
+                                  : (field.placeholder || ''))
                             }
-                          }}
-                          onChange={(e) => {
-                            let nextVal = e.target.value
-                            if (isNumericOnly) {
-                              nextVal = nextVal.replace(/\D/g, '')
-                              if (maxCharLength && nextVal.length > maxCharLength) {
-                                nextVal = nextVal.slice(0, maxCharLength)
-                              }
-                            }
-                            handleFieldChange(field.name, nextVal)
-                            if (isTglPenugasan) {
-                              setTglPenugasanVal(nextVal)
-                            }
-                          }}
-                          required={record && (field.name === 'password' || field.type === 'password') ? false : (field.required && !isFieldDisabled)}
-                          disabled={isFieldDisabled}
-                          placeholder={
-                            record && (field.name === 'password' || field.type === 'password')
-                              ? 'Kosongkan jika tidak ingin mengubah password'
-                              : (field.placeholder || '')
-                          }
-                          className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                        />
+                            className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          />
+                          {isCurrency && values[field.name] ? (
+                            <p className="mt-1 text-[11px] font-semibold text-brand-600 dark:text-brand-400">
+                              Format Nominal: Rp {Number(values[field.name]).toLocaleString('id-ID')}
+                            </p>
+                          ) : null}
+                        </div>
                       )
                     })()}
                     {fieldError && (
@@ -1592,7 +1717,7 @@ function ResourceForm({
         )}
 
         {isReadOnlyDetail ? (
-          <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="sticky bottom-16 md:bottom-0 z-20 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 p-4 sm:p-5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/80 dark:border-gray-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-b-3xl shadow-[0_-4px_16px_rgba(0,0,0,0.05)]">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {isTaskCompleted || isReportCompleted ? (
                 <>
@@ -1611,17 +1736,17 @@ function ResourceForm({
             <button
               type="button"
               onClick={onCancel}
-              className="inline-flex items-center justify-center h-10 px-6 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 font-semibold text-sm text-white shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer self-end sm:self-auto"
+              className="inline-flex items-center justify-center h-10 px-6 rounded-xl bg-brand-500 hover:bg-brand-600 active:bg-brand-700 font-semibold text-sm text-white shadow-theme-xs shadow-brand-500/20 transition-all active:scale-95 cursor-pointer self-end sm:self-auto shrink-0"
             >
               Tutup Detail
             </button>
           </div>
         ) : (
-          <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3">
+          <div className="sticky bottom-16 md:bottom-0 z-20 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 p-4 sm:p-5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/80 dark:border-gray-800 flex justify-end gap-3 rounded-b-3xl shadow-[0_-4px_16px_rgba(0,0,0,0.05)]">
             {onCancel && (
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={handleCancelClick}
                 className="inline-flex items-center justify-center h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 Batal
@@ -1669,6 +1794,23 @@ function ResourceForm({
             setShowResetConfirm(false)
           }}
           onClose={() => setShowResetConfirm(false)}
+        />
+      )}
+
+      {/* Konfirmasi Perubahan Belum Disimpan */}
+      {showUnsavedConfirm && (
+        <ConfirmModal
+          open={showUnsavedConfirm}
+          title="Perubahan Belum Disimpan"
+          message="Perubahan belum disimpan. Yakin ingin keluar?"
+          confirmText="Ya, Keluar"
+          cancelText="Lanjut Edit"
+          type="warning"
+          onConfirm={() => {
+            setShowUnsavedConfirm(false)
+            onCancel?.()
+          }}
+          onClose={() => setShowUnsavedConfirm(false)}
         />
       )}
     </div>

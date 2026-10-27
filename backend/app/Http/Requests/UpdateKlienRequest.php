@@ -27,7 +27,9 @@ class UpdateKlienRequest extends FormRequest
             'nama_perusahaan' => ['sometimes', 'required', 'string', 'max:255'],
             'alamat' => ['sometimes', 'required', 'string'],
             'kontak' => ['sometimes', 'required', 'string', 'max:255'],
-            'layanan' => ['sometimes', 'required', 'string', 'max:255'],
+            'layanan' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'layanan_ids' => ['sometimes', 'nullable', 'array'],
+            'layanan_ids.*' => ['integer', 'exists:layanan,id_layanan'],
         ];
     }
 }

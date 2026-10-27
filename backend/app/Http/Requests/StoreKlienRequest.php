@@ -23,7 +23,9 @@ class StoreKlienRequest extends FormRequest
             'nama_perusahaan' => ['required', 'string', 'max:255'],
             'alamat' => ['required', 'string'],
             'kontak' => ['required', 'string', 'max:255'],
-            'layanan' => ['required', 'string', 'max:255'],
+            'layanan' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'layanan_ids' => ['sometimes', 'nullable', 'array'],
+            'layanan_ids.*' => ['integer', 'exists:layanan,id_layanan'],
         ];
     }
 }

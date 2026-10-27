@@ -60,15 +60,15 @@ export default function LoadingSpinner({
         {/* Soft Ambient Glow in the Background */}
         <div className="absolute -inset-3 rounded-full bg-gradient-to-tr from-brand-500/20 via-orange-400/20 to-brand-500/20 blur-xl animate-pulse" />
 
-        {/* Orbiting Gradient Spinner Ring */}
+        {/* Background Track Ring */}
         <div
-          className={`${currentSize.ring} rounded-full border-2 border-transparent border-t-brand-500 border-r-orange-400 border-b-brand-300/40 animate-spin`}
-          style={{ animationDuration: '1.2s' }}
+          className={`absolute ${currentSize.ring} rounded-full border-2 border-brand-500/20 dark:border-brand-500/30`}
         />
 
-        {/* Concentric Subtle Inner Pulse Ring */}
+        {/* Orbiting Gradient Spinner Ring encircling the logo */}
         <div
-          className={`absolute ${currentSize.ring} rounded-full border border-brand-100/60 dark:border-gray-800 scale-90`}
+          className={`${currentSize.ring} rounded-full border-2 border-transparent border-t-brand-600 border-r-orange-500 border-b-brand-400/30 animate-spin`}
+          style={{ animationDuration: '0.9s' }}
         />
 
         {/* Center Logo with Breathing Animation */}
@@ -76,7 +76,7 @@ export default function LoadingSpinner({
           <img
             src="/images/logo/loading-logo.png"
             alt="Loading..."
-            className={`${currentSize.logo} rounded-full object-cover transition-transform duration-700 drop-shadow-sm select-none pointer-events-none`}
+            className={`${currentSize.logo} rounded-full object-cover transition-transform duration-700 drop-shadow-sm select-none pointer-events-none ring-1 ring-brand-500/30`}
             style={{
               animation: 'logo-breathe 2.2s ease-in-out infinite',
             }}

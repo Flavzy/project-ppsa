@@ -63,7 +63,7 @@ export default function DetailLegalitasModal({ record, onClose }) {
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-gray-100 dark:border-gray-800 dark:bg-gray-900 transition-all z-10 animate-fade-in max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-2xl rounded-3xl bg-white p-4 sm:p-6 md:p-8 shadow-2xl border border-gray-100 dark:border-gray-800 dark:bg-gray-900 transition-all z-10 animate-fade-in max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
@@ -108,18 +108,28 @@ export default function DetailLegalitasModal({ record, onClose }) {
             </div>
           </div>
 
-          {/* Legalitas Table */}
-          <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
+          {/* Mobile Swipe Hint */}
+          <div className="flex sm:hidden items-center justify-between px-1 text-[11px] text-gray-400 dark:text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <svg className="size-3.5 text-brand-500 shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              <span>Geser tabel ke samping untuk melihat berkas →</span>
+            </span>
+          </div>
+
+          {/* Legalitas Table with Horizontal Scroll Support */}
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xs">
+            <table className="min-w-[480px] sm:min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Jenis Dokumen
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Nomor Dokumen
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Berkas
                   </th>
                 </tr>
@@ -127,10 +137,10 @@ export default function DetailLegalitasModal({ record, onClose }) {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900">
                 {legalitasList.map((item, idx) => (
                   <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                       {item.nama}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
                       {item.nomor ? (
                         <span className="inline-block px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 font-semibold text-gray-700 dark:text-gray-300">
                           {item.nomor}
@@ -139,7 +149,7 @@ export default function DetailLegalitasModal({ record, onClose }) {
                         <span className="text-gray-400 italic">Belum dicatat</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {item.fileUrl ? (() => {
                         const fileName = decodeURIComponent(item.fileUrl.split('/').pop()) || 'Buka File'
                         return (
@@ -165,7 +175,7 @@ export default function DetailLegalitasModal({ record, onClose }) {
                 ))}
                 {Boolean(record.file_dokumen_pendukung_urls?.length || record.file_dokumen_pendukung_url) && (
                   <tr className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                       Dokumen Pendukung Tambahan
                       {record.file_dokumen_pendukung_urls && record.file_dokumen_pendukung_urls.length > 1 && (
                         <span className="ml-1.5 text-[11px] font-normal text-gray-500 dark:text-gray-400">
@@ -173,8 +183,8 @@ export default function DetailLegalitasModal({ record, onClose }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-400">-</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-400 whitespace-nowrap">-</td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       <div className="flex flex-wrap justify-center gap-1.5">
                         {(record.file_dokumen_pendukung_urls && record.file_dokumen_pendukung_urls.length > 0
                           ? record.file_dokumen_pendukung_urls

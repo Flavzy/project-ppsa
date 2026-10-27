@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { useAuth } from '../auth/useAuth'
 import { resourceConfigs, supportResources } from '../config/resources'
 import { getDashboardSummary } from '../api/resources'
+import { invalidateApiCache } from '../api/client'
 import ConfirmModal from './ConfirmModal'
 import DashboardView from './DashboardView'
 import ResourceDashboard from './ResourceDashboard'
@@ -100,10 +101,13 @@ export default function ProtectedShell() {
   // Active resource selection state
   const [activeKey, setActiveKey] = useState('dashboard')
   const [navParams, setNavParams] = useState(null)
+  const [navVersion, setNavVersion] = useState(0)
 
   const handleNavigate = useCallback((key, params = null) => {
+    invalidateApiCache()
     setNavParams(params)
     setActiveKey(key)
+    setNavVersion((v) => v + 1)
   }, [])
 
   const isDashboardActive = activeKey === 'dashboard'
@@ -115,24 +119,41 @@ export default function ProtectedShell() {
     return allowedResources.find((resource) => resource.key === currentActiveKey) || allowedResources[0]
   }, [allowedResources, currentActiveKey])
 
-  // Dark Mode Toggle State & Persistence
+  // Dark Mode Toggle State & Sinkronisasi Otomatis Tema dengan OS (Windows/Android/macOS)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const saved = localStorage.getItem('theme')
-      if (saved) return saved === 'dark'
+      // Jika pengguna sudah pernah memilih secara eksplisit, hormati pilihan pengguna
+      if (saved === 'dark') return true
+      if (saved === 'light') return false
+      // Default: Otomatis mendeteksi tema sistem operasi pengguna (OS Dark/Light mode)
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
     } catch {
       return false
     }
   })
 
+  // Sinkronisasi otomatis secara dinamis saat OS Windows/Android berganti tema (misal jadwal malam OS)
+  useEffect(() => {
+    if (!window.matchMedia) return
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleOsThemeChange = (e) => {
+      const saved = localStorage.getItem('theme')
+      // Jika belum ada override manual di localStorage, ikuti perubahan tema OS secara real-time
+      if (!saved) {
+        setIsDarkMode(e.matches)
+      }
+    }
+
+    mediaQuery.addEventListener('change', handleOsThemeChange)
+    return () => mediaQuery.removeEventListener('change', handleOsThemeChange)
+  }, [])
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark')
-      try { localStorage.setItem('theme', 'dark') } catch {}
     } else {
       document.documentElement.classList.remove('dark')
-      try { localStorage.setItem('theme', 'light') } catch {}
     }
   }, [isDarkMode])
 
@@ -143,6 +164,7 @@ export default function ProtectedShell() {
 
   const loadNotifications = useCallback(async () => {
     try {
+      invalidateApiCache()
       const res = await getDashboardSummary()
       const data = res?.data || res || {}
       const notifs = []
@@ -339,6 +361,15 @@ export default function ProtectedShell() {
     return () => clearInterval(timer)
   }, [loadNotifications, currentActiveKey])
 
+  // Sinkronkan notifikasi lonceng seketika setiap kali ada data baru yang dibuat atau diperbarui di sistem
+  useEffect(() => {
+    function handleDataMutated() {
+      loadNotifications()
+    }
+    window.addEventListener('simkk:data-mutated', handleDataMutated)
+    return () => window.removeEventListener('simkk:data-mutated', handleDataMutated)
+  }, [loadNotifications])
+
   // Tutup panel notifikasi jika pengguna mengklik di luar area
   useEffect(() => {
     function handleClickOutside(e) {
@@ -378,6 +409,32 @@ export default function ProtectedShell() {
     karyawan: 'Karyawan',
   }[user?.role] || user?.role
 
+  const roleShortLabel = {
+    admin: 'Pimpinan',
+    pimpinan: 'Pimpinan',
+    operator: 'Operator',
+    sales: 'Operator',
+    karyawan: 'Karyawan',
+  }[user?.role] || user?.role
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('simkk_sidebar_collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('simkk_sidebar_collapsed', String(next))
+      } catch {}
+      return next
+    })
+  }
+
   // Group resources for clean TailAdmin sidebar sections
   const crmResources = allowedResources.filter((r) => ['calonKlien', 'kontrak'].includes(r.key))
   const operationsResources = allowedResources.filter((r) => ['klien', 'pekerjaan'].includes(r.key))
@@ -395,15 +452,17 @@ export default function ProtectedShell() {
         />
       )}
 
-      {/* TailAdmin Sleek Sidebar - Fixed stationary w-64 size */}
+      {/* TailAdmin Sleek Sidebar - Responsive with Desktop Collapse Toggle */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 shrink-0 flex-col justify-between border-r border-gray-200/80 bg-white transition-transform duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full ${
+          isSidebarCollapsed ? 'lg:w-20' : 'lg:w-64'
+        } w-64 shrink-0 flex-col justify-between border-r border-gray-200/80 bg-white transition-all duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:static lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col flex-1 min-h-0">
           {/* Logo & Brand Header */}
-          <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 px-5 dark:border-gray-800">
+          <div className={`flex h-16 shrink-0 items-center justify-between border-b border-gray-100 ${isSidebarCollapsed ? 'lg:px-3.5' : 'px-5'} dark:border-gray-800 transition-all`}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-xs ring-2 ring-brand-500/20 bg-white dark:bg-gray-800 shrink-0">
                 <img
@@ -412,12 +471,25 @@ export default function ProtectedShell() {
                   className="size-full object-cover"
                 />
               </div>
-              <div className="min-w-0">
+              <div className={`min-w-0 ${isSidebarCollapsed ? 'lg:hidden' : 'block'}`}>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
                   SIM-KK
                 </h2>
               </div>
             </div>
+
+            {/* Desktop Collapse Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleSidebarCollapse}
+              className="hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors cursor-pointer"
+              title={isSidebarCollapsed ? 'Perluas Sidebar' : 'Ciutkan Sidebar (Mode Mini)'}
+              aria-label="Toggle sidebar collapse"
+            >
+              <svg className={`size-4.5 transition-transform duration-200 ${isSidebarCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
 
             {/* Mobile Close Button */}
             <button
@@ -435,16 +507,23 @@ export default function ProtectedShell() {
           <nav className="flex-1 space-y-4 px-3 py-4 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 dark:[&::-webkit-scrollbar-thumb]:bg-gray-800">
             {/* Menu Utama */}
             <div>
-              <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
-                Menu Utama
-              </p>
+              {!isSidebarCollapsed ? (
+                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                  Menu Utama
+                </p>
+              ) : (
+                <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+              )}
               <button
                 type="button"
                 onClick={() => {
                   handleNavigate('dashboard', null)
                   setIsMobileOpen(false)
                 }}
-                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                title="Dasbor Utama"
+                className={`group flex w-full items-center ${
+                  isSidebarCollapsed ? 'lg:justify-center lg:px-2' : 'gap-3 px-3'
+                } rounded-xl py-2 text-sm font-medium transition-all cursor-pointer ${
                   currentActiveKey === 'dashboard'
                     ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
                     : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -454,16 +533,20 @@ export default function ProtectedShell() {
                   type="dashboard"
                   className={currentActiveKey === 'dashboard' ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                 />
-                <span className="truncate">Dasbor Utama</span>
+                <span className={`truncate ${isSidebarCollapsed ? 'lg:hidden' : 'inline'}`}>Dasbor Utama</span>
               </button>
             </div>
 
             {/* CRM & Sales */}
             {crmResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
-                  CRM & Penjualan
-                </p>
+                {!isSidebarCollapsed ? (
+                  <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                    CRM & Penjualan
+                  </p>
+                ) : (
+                  <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+                )}
                 <div className="space-y-0.5">
                   {crmResources.map((res) => {
                     const isActive = currentActiveKey === res.key
@@ -475,7 +558,10 @@ export default function ProtectedShell() {
                           handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
-                        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                        title={res.label}
+                        className={`group flex w-full items-center ${
+                          isSidebarCollapsed ? 'lg:justify-center lg:px-2' : 'gap-3 px-3'
+                        } rounded-xl py-2 text-sm font-medium transition-all cursor-pointer ${
                           isActive
                             ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
                             : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -485,7 +571,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{res.label}</span>
+                        <span className={`truncate ${isSidebarCollapsed ? 'lg:hidden' : 'inline'}`}>{res.label}</span>
                       </button>
                     )
                   })}
@@ -496,9 +582,13 @@ export default function ProtectedShell() {
             {/* Operasional Proyek */}
             {operationsResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
-                  {user?.role === 'karyawan' ? 'Tugas & Pekerjaan' : 'Operasional Proyek'}
-                </p>
+                {!isSidebarCollapsed ? (
+                  <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                    {user?.role === 'karyawan' ? 'Tugas & Pekerjaan' : 'Operasional Proyek'}
+                  </p>
+                ) : (
+                  <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+                )}
                 <div className="space-y-0.5">
                   {operationsResources.map((res) => {
                     const isActive = currentActiveKey === res.key
@@ -511,7 +601,10 @@ export default function ProtectedShell() {
                           handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
-                        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                        title={itemLabel}
+                        className={`group flex w-full items-center ${
+                          isSidebarCollapsed ? 'lg:justify-center lg:px-2' : 'gap-3 px-3'
+                        } rounded-xl py-2 text-sm font-medium transition-all cursor-pointer ${
                           isActive
                             ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
                             : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -521,7 +614,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{itemLabel}</span>
+                        <span className={`truncate ${isSidebarCollapsed ? 'lg:hidden' : 'inline'}`}>{itemLabel}</span>
                       </button>
                     )
                   })}
@@ -532,9 +625,13 @@ export default function ProtectedShell() {
             {/* Laporan & Review */}
             {reportingResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
-                  Laporan & Evaluasi
-                </p>
+                {!isSidebarCollapsed ? (
+                  <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                    Laporan & Evaluasi
+                  </p>
+                ) : (
+                  <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+                )}
                 <div className="space-y-0.5">
                   {reportingResources.map((res) => {
                     const isActive = currentActiveKey === res.key
@@ -550,7 +647,10 @@ export default function ProtectedShell() {
                           handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
-                        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                        title={itemLabel}
+                        className={`group flex w-full items-center ${
+                          isSidebarCollapsed ? 'lg:justify-center lg:px-2' : 'gap-3 px-3'
+                        } rounded-xl py-2 text-sm font-medium transition-all cursor-pointer ${
                           isActive
                             ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
                             : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -560,7 +660,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{itemLabel}</span>
+                        <span className={`truncate ${isSidebarCollapsed ? 'lg:hidden' : 'inline'}`}>{itemLabel}</span>
                       </button>
                     )
                   })}
@@ -571,9 +671,13 @@ export default function ProtectedShell() {
             {/* Data Master - Khusus Pimpinan */}
             {masterResources.length > 0 && user?.role === 'pimpinan' && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
-                  Data Master (Katalog)
-                </p>
+                {!isSidebarCollapsed ? (
+                  <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                    Data Master (Katalog)
+                  </p>
+                ) : (
+                  <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+                )}
                 <div className="space-y-0.5">
                   {masterResources.map((res) => {
                     const isActive = currentActiveKey === res.key
@@ -585,7 +689,10 @@ export default function ProtectedShell() {
                           handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
-                        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                        title={res.label}
+                        className={`group flex w-full items-center ${
+                          isSidebarCollapsed ? 'lg:justify-center lg:px-2' : 'gap-3 px-3'
+                        } rounded-xl py-2 text-sm font-medium transition-all cursor-pointer ${
                           isActive
                             ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
                             : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -595,7 +702,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{res.label}</span>
+                        <span className={`truncate ${isSidebarCollapsed ? 'lg:hidden' : 'inline'}`}>{res.label}</span>
                       </button>
                     )
                   })}
@@ -606,9 +713,13 @@ export default function ProtectedShell() {
             {/* Administrasi Akun */}
             {adminResources.length > 0 && (
               <div>
-                <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
-                  Sistem & User
-                </p>
+                {!isSidebarCollapsed ? (
+                  <p className="px-3 mb-1.5 text-[11px] font-bold tracking-wider text-brand-600 dark:text-brand-400 uppercase">
+                    Sistem & User
+                  </p>
+                ) : (
+                  <div className="my-2 border-t border-gray-100 dark:border-gray-800" />
+                )}
                 <div className="space-y-0.5">
                   {adminResources.map((res) => {
                     const isActive = currentActiveKey === res.key
@@ -620,7 +731,10 @@ export default function ProtectedShell() {
                           handleNavigate(res.key, null)
                           setIsMobileOpen(false)
                         }}
-                        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                        title={res.label}
+                        className={`group flex w-full items-center ${
+                          isSidebarCollapsed ? 'lg:justify-center lg:px-2' : 'gap-3 px-3'
+                        } rounded-xl py-2 text-sm font-medium transition-all cursor-pointer ${
                           isActive
                             ? 'bg-brand-50 text-brand-600 font-semibold dark:bg-brand-500/15 dark:text-brand-400 shadow-xs'
                             : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
@@ -630,7 +744,7 @@ export default function ProtectedShell() {
                           type={res.key}
                           className={isActive ? 'text-brand-500' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'}
                         />
-                        <span className="truncate">{res.label}</span>
+                        <span className={`truncate ${isSidebarCollapsed ? 'lg:hidden' : 'inline'}`}>{res.label}</span>
                       </button>
                     )
                   })}
@@ -641,12 +755,12 @@ export default function ProtectedShell() {
         </div>
 
         {/* Sidebar Footer User Info */}
-        <div className="shrink-0 border-t border-gray-100 p-3.5 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-          <div className="flex items-center gap-3">
+        <div className={`shrink-0 border-t border-gray-100 ${isSidebarCollapsed ? 'p-2 lg:p-2.5' : 'p-3.5'} dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 transition-all`}>
+          <div className={`flex items-center ${isSidebarCollapsed ? 'lg:justify-center' : 'gap-3'}`} title={user?.nama || 'Pengguna'}>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white font-bold text-xs shadow-xs">
               {user?.nama ? user.nama.charAt(0).toUpperCase() : 'U'}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={`min-w-0 flex-1 ${isSidebarCollapsed ? 'lg:hidden' : 'block'}`}>
               <p className="truncate text-xs font-semibold text-gray-900 dark:text-white">
                 {user?.nama || 'Pengguna'}
               </p>
@@ -675,12 +789,44 @@ export default function ProtectedShell() {
               </svg>
             </button>
 
-            {/* Breadcrumb / Title Indicator */}
+            {/* Breadcrumb / Title Indicator (Disembunyikan di Mobile, Ditampilkan di Layar Laptop / Desktop) */}
             <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-                SIM-KK
-              </span>
-              <h1 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight">
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                <button
+                  type="button"
+                  onClick={() => handleNavigate('dashboard')}
+                  className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors cursor-pointer"
+                >
+                  SIM-KK
+                </button>
+                <span>/</span>
+                <span className="text-gray-600 dark:text-gray-300 font-semibold">
+                  {currentActiveKey === 'dashboard'
+                    ? 'Ikhtisar'
+                    : ['calonKlien', 'kontrak'].includes(currentActiveKey)
+                    ? 'CRM & Kontrak'
+                    : ['klien', 'pekerjaan'].includes(currentActiveKey)
+                    ? 'Operasional'
+                    : ['reporting', 'performanceReviews', 'kinerjaKaryawan'].includes(currentActiveKey)
+                    ? 'Laporan & Kinerja'
+                    : ['layanan', 'masterPekerjaan'].includes(currentActiveKey)
+                    ? 'Data Master'
+                    : 'Administrasi'}
+                </span>
+                {currentActiveKey !== 'dashboard' && (
+                  <>
+                    <span>/</span>
+                    <span className="text-brand-600 dark:text-brand-400 font-bold truncate max-w-[120px] sm:max-w-xs">
+                      {activeConfig?.key === 'pekerjaan' && user?.role === 'karyawan'
+                        ? 'Pekerjaan Saya'
+                        : activeConfig?.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
+                        ? 'Kinerja Saya'
+                        : activeConfig?.label}
+                    </span>
+                  </>
+                )}
+              </div>
+              <h1 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight mt-0.5">
                 {currentActiveKey === 'dashboard'
                   ? 'Dasbor Utama'
                   : activeConfig?.key === 'pekerjaan' && user?.role === 'karyawan'
@@ -697,7 +843,15 @@ export default function ProtectedShell() {
             {/* Tombol Pengubah Mode Gelap (Dark Mode Toggle) */}
             <button
               type="button"
-              onClick={() => setIsDarkMode((prev) => !prev)}
+              onClick={() => {
+                setIsDarkMode((prev) => {
+                  const next = !prev
+                  try {
+                    localStorage.setItem('theme', next ? 'dark' : 'light')
+                  } catch {}
+                  return next
+                })
+              }}
               className="flex size-9 items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-2xs transition-all active:scale-95 cursor-pointer"
               title={isDarkMode ? 'Beralih ke Mode Terang (Light Mode)' : 'Beralih ke Mode Gelap (Dark Mode)'}
               aria-label="Toggle dark mode"
@@ -736,9 +890,9 @@ export default function ProtectedShell() {
                 )}
               </button>
 
-              {/* Dropdown Popover Panel Notifikasi */}
+              {/* Dropdown Popover Panel Notifikasi (Responsive Mobile & Desktop) */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2.5 w-80 sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl z-50 overflow-hidden animate-fade-in">
+                <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2.5 w-auto sm:w-96 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl z-50 overflow-hidden animate-fade-in max-h-[80vh] flex flex-col">
                   <div className="flex items-center justify-between p-3.5 border-b border-gray-100 dark:border-gray-700/80 bg-gray-50/75 dark:bg-gray-900/60">
                     <div className="flex items-center gap-2">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
@@ -802,7 +956,8 @@ export default function ProtectedShell() {
             </div>
 
             <Badge size="sm" color={roleBadgeColor} className="uppercase font-bold tracking-wide">
-              {roleLabel}
+              <span className="hidden sm:inline">{roleLabel}</span>
+              <span className="sm:hidden">{roleShortLabel}</span>
             </Badge>
 
             <button
@@ -822,12 +977,12 @@ export default function ProtectedShell() {
 
         {/* Main Body with balanced TailAdmin padding */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6 lg:p-7">
+          <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6 lg:p-7 pb-36 md:pb-8">
             {currentActiveKey === 'dashboard' ? (
-              <DashboardView onNavigate={handleNavigate} />
+              <DashboardView key={`dashboard_${navVersion}`} onNavigate={handleNavigate} />
             ) : activeConfig ? (
               <ResourceDashboard
-                key={currentActiveKey}
+                key={`${currentActiveKey}_${navVersion}`}
                 config={activeConfig}
                 resourceConfigs={resourceConfigs}
                 supportResources={supportResources}
@@ -842,6 +997,102 @@ export default function ProtectedShell() {
             )}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation Bar (Fixed bottom on screens < md) */}
+        <nav
+          aria-label="Navigasi Bawah Mobile"
+          className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/90 dark:border-gray-800/90 px-2 py-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
+        >
+          <div className="grid grid-cols-5 items-center justify-around gap-1 max-w-lg mx-auto">
+            {/* 1. Dasbor */}
+            <button
+              type="button"
+              onClick={() => handleNavigate('dashboard')}
+              className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
+                currentActiveKey === 'dashboard'
+                  ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              <NavIcon
+                type="dashboard"
+                className={`size-5 transition-colors ${currentActiveKey === 'dashboard' ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
+              />
+              <span className="text-[10px] mt-0.5 truncate leading-tight">Dasbor</span>
+            </button>
+
+            {/* 2. Calon Klien / Klien */}
+            {allowedResources.some((r) => ['klien', 'calonKlien'].includes(r.key)) && (
+              <button
+                type="button"
+                onClick={() => handleNavigate(allowedResources.some((r) => r.key === 'klien') ? 'klien' : 'calonKlien')}
+                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
+                  ['klien', 'calonKlien'].includes(currentActiveKey)
+                    ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                <NavIcon
+                  type="klien"
+                  className={`size-5 transition-colors ${['klien', 'calonKlien'].includes(currentActiveKey) ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
+                />
+                <span className="text-[10px] mt-0.5 truncate leading-tight">Klien</span>
+              </button>
+            )}
+
+            {/* 3. Pekerjaan */}
+            {allowedResources.some((r) => r.key === 'pekerjaan') && (
+              <button
+                type="button"
+                onClick={() => handleNavigate('pekerjaan')}
+                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
+                  currentActiveKey === 'pekerjaan'
+                    ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                <NavIcon
+                  type="pekerjaan"
+                  className={`size-5 transition-colors ${currentActiveKey === 'pekerjaan' ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
+                />
+                <span className="text-[10px] mt-0.5 truncate leading-tight">Tugas</span>
+              </button>
+            )}
+
+            {/* 4. Reporting / Kinerja */}
+            {allowedResources.some((r) => ['reporting', 'kinerjaKaryawan'].includes(r.key)) && (
+              <button
+                type="button"
+                onClick={() => handleNavigate(allowedResources.some((r) => r.key === 'reporting') ? 'reporting' : 'kinerjaKaryawan')}
+                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
+                  ['reporting', 'kinerjaKaryawan'].includes(currentActiveKey)
+                    ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                <NavIcon
+                  type="reporting"
+                  className={`size-5 transition-colors ${['reporting', 'kinerjaKaryawan'].includes(currentActiveKey) ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
+                />
+                <span className="text-[10px] mt-0.5 truncate leading-tight">Laporan</span>
+              </button>
+            )}
+
+            {/* 5. Menu Lainnya (Buka Sidebar Drawer Mobile) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileOpen(true)}
+              className="flex flex-col items-center justify-center py-1 px-1.5 rounded-xl text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all select-none cursor-pointer"
+            >
+              <div className="size-5 flex items-center justify-center">
+                <svg className="size-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+              </div>
+              <span className="text-[10px] mt-0.5 truncate leading-tight">Lainnya</span>
+            </button>
+          </div>
+        </nav>
       </div>
 
       {/* Logout Confirmation Modal */}

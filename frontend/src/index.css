@@ -64,21 +64,21 @@
   --color-blue-light-900: #0b4a6f;
   --color-blue-light-950: #062c41;
 
-  --color-gray-25: #fcfdfc;
-  --color-gray-50: #f8faf8;
-  --color-gray-100: #eff3f0;
-  --color-gray-200: #e0e7e1;
-  --color-gray-300: #c7d2c9;
-  --color-gray-400: #8fa092;
-  --color-gray-500: #5f7263;
-  --color-gray-600: #445447;
-  --color-gray-700: #22352b;
-  --color-gray-750: #172820;
-  --color-gray-800: #11221b;
-  --color-gray-850: #0d1a14;
-  --color-gray-900: #0a1712;
-  --color-gray-950: #050d09;
-  --color-gray-dark: #11221b;
+  --color-gray-25: #fcfcfd;
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f2f4f7;
+  --color-gray-200: #e4e7ec;
+  --color-gray-300: #d0d5dd;
+  --color-gray-400: #98a2b3;
+  --color-gray-500: #667085;
+  --color-gray-600: #475467;
+  --color-gray-700: #344054;
+  --color-gray-750: #293548;
+  --color-gray-800: #1d2939;
+  --color-gray-850: #141c28;
+  --color-gray-900: #101828;
+  --color-gray-950: #0c111d;
+  --color-gray-dark: #1a2231;
 
   --color-orange-25: #fffaf5;
   --color-orange-50: #fff6ed;
@@ -93,18 +93,18 @@
   --color-orange-900: #7e2410;
   --color-orange-950: #511c10;
 
-  --color-success-25: #f4fbf7;
-  --color-success-50: #e8f7ee;
-  --color-success-100: #cbeddb;
-  --color-success-200: #9adcb8;
-  --color-success-300: #60c490;
-  --color-success-400: #2fa96c;
-  --color-success-500: #0e854e;
-  --color-success-600: #096c3e;
-  --color-success-700: #0b5733;
-  --color-success-800: #0d4733;
-  --color-success-900: #0a3a29;
-  --color-success-950: #052017;
+  --color-success-25: #f6fef9;
+  --color-success-50: #ecfdf3;
+  --color-success-100: #d1fadf;
+  --color-success-200: #a6f4c5;
+  --color-success-300: #6ce9a6;
+  --color-success-400: #32d583;
+  --color-success-500: #12b76a;
+  --color-success-600: #039855;
+  --color-success-700: #027a48;
+  --color-success-800: #05603a;
+  --color-success-900: #054f31;
+  --color-success-950: #053321;
 
   --color-error-25: #fffbfa;
   --color-error-50: #fef3f2;
@@ -135,8 +135,8 @@
 
 body {
   font-family: var(--font-outfit), sans-serif;
-  background-color: #f8faf8;
-  color: #14221a;
+  background-color: #f8fafc;
+  color: #1e293b;
   margin: 0;
   -webkit-font-smoothing: antialiased;
 }
@@ -144,8 +144,15 @@ body {
 .dark body,
 :root.dark body,
 html.dark body {
-  background-color: #050d09;
-  color: #edf5f0;
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+/* Dark mode global color-scheme */
+.dark,
+:root.dark,
+html.dark {
+  color-scheme: dark !important;
 }
 
 #root {
@@ -170,6 +177,7 @@ select {
 select option {
   background-color: #ffffff;
   color: #0f172a;
+  font-size: 11px;
 }
 
 .dark select,
@@ -181,8 +189,9 @@ html.dark select {
 .dark select option,
 :root.dark select option,
 html.dark select option {
-  background-color: #11221b !important;
+  background-color: #1e293b !important;
   color: #f8fafc !important;
+  font-size: 11px;
 }
 
 .dark select option:checked,
@@ -196,6 +205,92 @@ html.dark select option:checked {
 :root.dark select option:disabled,
 html.dark select option:disabled {
   color: #64748b !important;
+}
+
+/* Kalender (input type date, month, time, datetime-local) di Mode Gelap */
+input[type="date"],
+input[type="month"],
+input[type="datetime-local"],
+input[type="time"] {
+  color-scheme: light;
+}
+
+.dark input[type="date"],
+.dark input[type="month"],
+.dark input[type="datetime-local"],
+.dark input[type="time"],
+:root.dark input[type="date"],
+:root.dark input[type="month"],
+:root.dark input[type="datetime-local"],
+:root.dark input[type="time"],
+html.dark input[type="date"],
+html.dark input[type="month"],
+html.dark input[type="datetime-local"],
+html.dark input[type="time"] {
+  color-scheme: dark !important;
+  color: #f8fafc !important;
+}
+
+/* Ikon kalender (picker indicator) di browser Chromium (Chrome, Edge) & Safari */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+:root.dark input[type="date"]::-webkit-calendar-picker-indicator,
+:root.dark input[type="month"]::-webkit-calendar-picker-indicator,
+html.dark input[type="date"]::-webkit-calendar-picker-indicator,
+html.dark input[type="month"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) invert(1) !important;
+  cursor: pointer;
+  opacity: 1 !important;
+  padding: 0;
+  margin: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="month"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+.dark input[type="time"]::-webkit-calendar-picker-indicator:hover,
+:root.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
+:root.dark input[type="month"]::-webkit-calendar-picker-indicator:hover,
+html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover,
+html.dark input[type="month"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1 !important;
+  filter: brightness(0) invert(1) !important;
+  transform: scale(1.1);
+}
+
+/* Native date/month text display color fix */
+.dark input[type="date"]::-webkit-datetime-edit,
+.dark input[type="month"]::-webkit-datetime-edit,
+.dark input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.dark input[type="month"]::-webkit-datetime-edit-fields-wrapper,
+.dark input[type="date"]::-webkit-datetime-edit-text,
+.dark input[type="month"]::-webkit-datetime-edit-text,
+.dark input[type="date"]::-webkit-datetime-edit-month-field,
+.dark input[type="date"]::-webkit-datetime-edit-day-field,
+.dark input[type="date"]::-webkit-datetime-edit-year-field {
+  color: #f8fafc !important;
+}
+
+/* Scrollbar mode gelap agar halus dan kontras */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 @keyframes logo-breathe {
