@@ -264,53 +264,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Fill Buttons (TailAdmin Badge Style) */}
-          <div className="mt-6 border-t border-dashed border-gray-200 pt-5 text-center dark:border-gray-700/80">
-            <span className="block text-xs font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400 mb-2.5">
-              Akun Uji Coba Cepat (Klik untuk Mengisi):
-            </span>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                disabled={submitting || isLockedOut}
-                onClick={() => {
-                  setEmail('pimpinan@example.com')
-                  setPassword('password123')
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3.5 py-1.5 text-xs font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 cursor-pointer shadow-xs"
-              >
-                <span className="h-2 w-2 rounded-full bg-purple-500"></span>
-                Pimpinan (Admin Utama)
-              </button>
-
-              <button
-                type="button"
-                disabled={submitting || isLockedOut}
-                onClick={() => {
-                  setEmail('operator@example.com')
-                  setPassword('password123')
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3.5 py-1.5 text-xs font-semibold text-success-700 transition hover:bg-success-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300 cursor-pointer shadow-xs"
-              >
-                <span className="h-2 w-2 rounded-full bg-success-500"></span>
-                Operator
-              </button>
-
-              <button
-                type="button"
-                disabled={submitting || isLockedOut}
-                onClick={() => {
-                  setEmail('karyawan@example.com')
-                  setPassword('password123')
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3.5 py-1.5 text-xs font-semibold text-orange-700 transition hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 cursor-pointer shadow-xs"
-              >
-                <span className="h-2 w-2 rounded-full bg-orange-500"></span>
-                Karyawan
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer Copyright */}
