@@ -74,6 +74,7 @@ class DashboardSummaryController extends Controller
                     ],
                     'work_by_status' => $workByStatus,
                     'recent_tasks' => $recentTasks,
+                    'monthly_trends' => $this->getMonthlyTrends($user),
                 ],
             ]);
         }
@@ -130,6 +131,7 @@ class DashboardSummaryController extends Controller
                     'contract_by_status' => $contractByStatus,
                     'work_by_status' => $workByStatus,
                     'monthly_reminders' => $monthlyReminders,
+                    'monthly_trends' => $this->getMonthlyTrends($user),
                 ],
             ]);
         }
@@ -197,8 +199,111 @@ class DashboardSummaryController extends Controller
                 'work_by_status' => $workByStatus,
                 'employee_scores' => $employeeScores,
                 'monthly_reminders' => $monthlyReminders,
+                'monthly_trends' => $this->getMonthlyTrends($user),
             ],
         ]);
+    }
+
+    /**
+     * Ambil data tren visual bulanan interaktif (6 bulan terakhir) untuk grafik dashboard.
+     *
+     * @param \App\Models\User $user
+     * @return array<int, array<string, mixed>>
+     */
+    protected function getMonthlyTrends($user): array
+    {
+        $months = [];
+        $isKaryawan = $user->role === 'karyawan';
+        $isOperator = in_array($user->role, ['operator', 'sales'], true);
+
+        // Siapkan rentang 6 bulan terakhir mundur dari awal bulan berjalan tanpa overflow
+        for ($i = 5; $i >= 0; $i--) {
+            $dt = now()->startOfMonth()->subMonths($i);
+            $monthKey = $dt->format('Y-m');
+            $months[$monthKey] = [
+                'periode' => $monthKey,
+                'bulan' => $dt->translatedFormat('F Y'),
+                'label' => $dt->translatedFormat('M Y'),
+                'short' => $dt->translatedFormat('M'),
+                'pekerjaan_total' => 0,
+                'pekerjaan_selesai' => 0,
+                'kontrak_baru' => 0,
+                'nilai_kontrak' => 0,
+                'calon_klien' => 0,
+                'calon_klien_deal' => 0,
+                'work_by_status' => [],
+                'lead_by_status' => [],
+                'contract_by_status' => [],
+            ];
+        }
+
+        // 1. Ambil data Pekerjaan
+        $pekerjaanQuery = Pekerjaan::query();
+        if ($isKaryawan) {
+            $pekerjaanQuery->where('id_pic', $user->id_user);
+        }
+        $allPekerjaan = $pekerjaanQuery->get(['id_pekerjaan', 'status', 'periode_bulan', 'tgl_penugasan']);
+
+        foreach ($allPekerjaan as $p) {
+            $pMonth = $p->periode_bulan;
+            if (!$pMonth && $p->tgl_penugasan) {
+                $pMonth = date('Y-m', strtotime((string) $p->tgl_penugasan));
+            }
+            if (!$pMonth) {
+                $pMonth = now()->format('Y-m');
+            }
+
+            if (isset($months[$pMonth])) {
+                $months[$pMonth]['pekerjaan_total']++;
+                if (in_array($p->status, ['completed', 'approved'], true)) {
+                    $months[$pMonth]['pekerjaan_selesai']++;
+                }
+                $statusKey = $p->status ?: 'baru';
+                $months[$pMonth]['work_by_status'][$statusKey] = ($months[$pMonth]['work_by_status'][$statusKey] ?? 0) + 1;
+            }
+        }
+
+        // 2. Ambil data Kontrak (Untuk Pimpinan, Admin, & Operator)
+        if (!$isKaryawan) {
+            $kontrakQuery = Kontrak::query();
+            if ($isOperator) {
+                $kontrakQuery->whereHas('calonKlien', function ($q) use ($user) {
+                    $q->where('id_user', $user->id_user);
+                });
+            }
+            $allKontrak = $kontrakQuery->get(['id_kontrak', 'status', 'nilai_proyek', 'tgl_mulai']);
+
+            foreach ($allKontrak as $k) {
+                $kMonth = $k->tgl_mulai ? date('Y-m', strtotime((string) $k->tgl_mulai)) : now()->format('Y-m');
+                if (isset($months[$kMonth])) {
+                    $months[$kMonth]['kontrak_baru']++;
+                    $months[$kMonth]['nilai_kontrak'] += (float) ($k->nilai_proyek ?? 0);
+                    $kStatus = $k->status ?: 'aktif';
+                    $months[$kMonth]['contract_by_status'][$kStatus] = ($months[$kMonth]['contract_by_status'][$kStatus] ?? 0) + 1;
+                }
+            }
+
+            // 3. Ambil data Calon Klien
+            $leadQuery = CalonKlien::query();
+            if ($isOperator) {
+                $leadQuery->where('id_user', $user->id_user);
+            }
+            $allLeads = $leadQuery->get(['id_calon_klien', 'status_prospek', 'tgl_followup']);
+
+            foreach ($allLeads as $l) {
+                $lMonth = $l->tgl_followup ? date('Y-m', strtotime((string) $l->tgl_followup)) : now()->format('Y-m');
+                if (isset($months[$lMonth])) {
+                    $months[$lMonth]['calon_klien']++;
+                    if ($l->status_prospek === 'deal') {
+                        $months[$lMonth]['calon_klien_deal']++;
+                    }
+                    $lStatus = $l->status_prospek ?: 'prospek';
+                    $months[$lMonth]['lead_by_status'][$lStatus] = ($months[$lMonth]['lead_by_status'][$lStatus] ?? 0) + 1;
+                }
+            }
+        }
+
+        return array_values($months);
     }
 
     /**

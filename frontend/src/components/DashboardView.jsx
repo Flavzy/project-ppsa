@@ -100,12 +100,12 @@ function WelcomeBannerWidget({ user }) {
       <GridShape />
       <div className="relative z-1 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="max-w-2xl">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <Badge color={roleConfig.color} size="sm">
-              {roleConfig.label}
-            </Badge>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              • {todayFormatted}
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+              <svg className="size-3.5 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {todayFormatted}
             </span>
           </div>
 
@@ -135,14 +135,21 @@ function WelcomeBannerWidget({ user }) {
   )
 }
 
-// Subcomponent: Status Breakdown Card dengan Hover Tooltip Interaktif
+// Subcomponent: Status Breakdown Card dengan Hover & Click Tooltip Interaktif
 function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total' }) {
   const entries = Object.entries(data || {})
   const total = entries.reduce((sum, [, count]) => sum + Number(count || 0), 0)
   const [hoveredKey, setHoveredKey] = useState(null)
+  const [selectedKey, setSelectedKey] = useState(null)
+
+  const activeKey = hoveredKey || selectedKey
+
+  const toggleSelect = (key) => {
+    setSelectedKey((prev) => (prev === key ? null : key))
+  }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 flex flex-col justify-between">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 flex flex-col justify-between transition-all">
       <div>
         <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2.5">
@@ -169,10 +176,16 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
               {entries.map(([key, count]) => {
                 const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
                 const percentage = total > 0 ? Math.round((Number(count) / total) * 100) : 0
+                const isSelected = selectedKey === key
                 return (
                   <div
                     key={`compact-${key}`}
-                    className="p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50 flex flex-col justify-between"
+                    onClick={() => toggleSelect(key)}
+                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/20 ring-1 ring-brand-500'
+                        : 'border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50'
+                    }`}
                   >
                     <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
                       <span className={`size-2 rounded-full shrink-0 ${config.color}`} />
@@ -187,14 +200,18 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
               })}
             </div>
 
-            {/* 2. Tampilan Normal Grafik Distribusi & Rincian Progress (Layar Ponsel Standar, Tablet & Desktop >= 360px) */}
+            {/* 2. Tampilan Normal Grafik Distribusi & Rincian Progress (Layar Standar, Tablet & Desktop >= 360px) */}
             <div className="max-[360px]:hidden">
-              {/* Visual Segmented Distribution Bar dengan Hover Tooltip Interaktif */}
+              {/* Visual Segmented Distribution Bar dengan Hover Tooltip Interaktif & Klik */}
               {total > 0 && (
                 <div className="mb-5">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-2">
                     <span>Distribusi Status Interaktif</span>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500">Arahkan kursor ke grafik</span>
+                    {selectedKey && (
+                      <span className="text-[10px] text-brand-600 dark:text-brand-400 font-medium">
+                        Klik status untuk melepas sorotan
+                      </span>
+                    )}
                   </div>
                   <div className="h-4.5 w-full rounded-xl bg-gray-100 dark:bg-gray-800 p-0.5 flex gap-1 overflow-visible relative">
                     {entries.map(([key, count]) => {
@@ -202,29 +219,38 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
                       const percentage = total > 0 ? (Number(count) / total) * 100 : 0
                       if (percentage === 0 && Number(count) === 0) return null
                       const isHovered = hoveredKey === key
+                      const isSelected = selectedKey === key
+                      const isActive = activeKey === key
 
                       return (
                         <div
                           key={key}
                           onMouseEnter={() => setHoveredKey(key)}
                           onMouseLeave={() => setHoveredKey(null)}
+                          onClick={() => toggleSelect(key)}
                           className={`h-full rounded-lg ${config.color} transition-all duration-200 cursor-pointer relative ${
-                            isHovered
-                              ? 'scale-y-125 brightness-110 shadow-sm z-20'
-                              : hoveredKey
+                            isActive
+                              ? 'scale-y-125 brightness-110 shadow-sm z-20 ring-2 ring-white/90 dark:ring-gray-900/90'
+                              : activeKey
                               ? 'opacity-35'
-                              : 'opacity-100'
+                              : 'opacity-100 hover:opacity-90'
                           }`}
                           style={{ width: `${Math.max(percentage, 2.5)}%` }}
+                          title={`Klik untuk mengunci sorotan status: ${config.label}`}
                         >
-                          {/* Hover Tooltip Popover */}
-                          {isHovered && (
+                          {/* Hover / Click Tooltip Popover */}
+                          {isActive && (
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
                               <div className="bg-gray-900/95 dark:bg-gray-800/95 backdrop-blur-xs text-white text-xs rounded-xl py-1.5 px-3 shadow-xl border border-gray-700/60 dark:border-gray-600/60 flex items-center gap-2">
                                 <span className={`size-2.5 rounded-full ${config.color}`} />
                                 <span className="font-semibold">{config.label}:</span>
                                 <span className="font-bold text-amber-300">{count}</span>
                                 <span className="text-gray-300 text-[11px]">({Math.round(percentage)}%)</span>
+                                {isSelected && (
+                                  <span className="text-[10px] bg-brand-500/30 text-brand-300 px-1 py-0.5 rounded font-mono">
+                                    Terkunci
+                                  </span>
+                                )}
                               </div>
                               <div className="size-2 bg-gray-900 dark:bg-gray-800 rotate-45 mx-auto -mt-1 border-r border-b border-gray-700/60 dark:border-gray-600/60" />
                             </div>
@@ -236,40 +262,47 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
                 </div>
               )}
 
-              {/* List Rincian Status dengan Hover Highlight Interaktif */}
+              {/* List Rincian Status dengan Hover Highlight Interaktif & Klik */}
               <div className="space-y-2">
                 {entries.map(([key, count]) => {
                   const config = configMap[key] || { label: key, color: 'bg-brand-500', badgeColor: 'primary' }
                   const percentage = total > 0 ? Math.round((Number(count) / total) * 100) : 0
                   const isHovered = hoveredKey === key
+                  const isSelected = selectedKey === key
+                  const isActive = activeKey === key
 
                   return (
                     <div
                       key={key}
                       onMouseEnter={() => setHoveredKey(key)}
                       onMouseLeave={() => setHoveredKey(null)}
+                      onClick={() => toggleSelect(key)}
                       className={`p-2 rounded-xl transition-all duration-150 cursor-pointer ${
-                        isHovered
-                          ? 'bg-brand-50/70 dark:bg-brand-500/15 ring-1 ring-brand-500/25 shadow-2xs scale-[1.01]'
-                          : hoveredKey
+                        isActive
+                          ? 'bg-brand-50/70 dark:bg-brand-500/15 ring-2 ring-brand-500/40 shadow-2xs scale-[1.01]'
+                          : activeKey
                           ? 'opacity-40'
                           : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
                       }`}
+                      title="Klik untuk menyorot status ini"
                     >
                       <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
                         <span className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                          <span className={`size-2.5 rounded-full ${config.color} ${isHovered ? 'ring-2 ring-brand-500/40' : ''}`} />
-                          <span className={isHovered ? 'font-bold text-gray-900 dark:text-white' : ''}>
+                          <span className={`size-2.5 rounded-full ${config.color} ${isActive ? 'ring-2 ring-brand-500/40 scale-110' : ''}`} />
+                          <span className={isActive ? 'font-bold text-gray-900 dark:text-white' : ''}>
                             {config.label}
                           </span>
+                          {isSelected && (
+                            <span className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold">(Disorot)</span>
+                          )}
                         </span>
-                        <span className={`text-gray-900 dark:text-white font-bold transition-transform ${isHovered ? 'scale-105 text-brand-600 dark:text-brand-400' : ''}`}>
+                        <span className={`text-gray-900 dark:text-white font-bold transition-transform ${isActive ? 'scale-105 text-brand-600 dark:text-brand-400' : ''}`}>
                           {count} <span className="font-normal text-gray-400">({percentage}%)</span>
                         </span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${config.color} transition-all duration-500 ${isHovered ? 'brightness-110 shadow-xs' : ''}`}
+                          className={`h-full rounded-full ${config.color} transition-all duration-500 ${isActive ? 'brightness-110 shadow-xs' : ''}`}
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -280,6 +313,493 @@ function StatusBreakdownCard({ title, icon, data, configMap, totalLabel = 'Total
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Helper Format Rupiah & Angka Kompak
+function formatRupiah(num) {
+  if (num === null || num === undefined) return 'Rp 0'
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(num)
+}
+
+function formatCompactRupiah(num) {
+  if (num >= 1000000000) return `Rp ${(num / 1000000000).toFixed(1)} M`
+  if (num >= 1000000) return `Rp ${(num / 1000000).toFixed(1)} Jt`
+  if (num >= 1000) return `Rp ${(num / 1000).toFixed(0)} Rb`
+  return `Rp ${num}`
+}
+
+// Subcomponent: Grafik Visual Tren Interaktif dengan Animasi Kursor & Timbul Kartu Rincian Saat Diklik
+function InteractiveTrendChartCard({
+  monthlyTrends = [],
+  userRole = 'admin',
+  selectedMonthKey = null,
+  onSelectMonth = () => {},
+}) {
+  const isKaryawan = userRole === 'karyawan'
+  const [activeMetric, setActiveMetric] = useState('pekerjaan') // 'pekerjaan' | 'kontrak' | 'calon_klien'
+  const [hoveredIndex, setHoveredIndex] = useState(null)
+
+  // Opsi switcher tab metrik
+  const metricOptions = useMemo(() => {
+    if (isKaryawan) {
+      return [{ id: 'pekerjaan', label: 'Tugas Operasional Saya', unit: 'Tugas' }]
+    }
+    return [
+      { id: 'pekerjaan', label: 'Pekerjaan & Tugas', unit: 'Tugas' },
+      { id: 'kontrak', label: 'Nilai Kontrak (Rp)', unit: 'Rupiah' },
+      { id: 'calon_klien', label: 'Calon Klien CRM', unit: 'Leads' },
+    ]
+  }, [isKaryawan])
+
+  // Normalisasi data titik
+  const dataPoints = useMemo(() => {
+    if (!monthlyTrends || monthlyTrends.length === 0) return []
+    return monthlyTrends.map((m, index) => {
+      let value = 0
+      let subValue = ''
+      let detailDesc = ''
+
+      if (activeMetric === 'pekerjaan') {
+        value = Number(m.pekerjaan_total || 0)
+        subValue = `${m.pekerjaan_selesai || 0} Selesai`
+        detailDesc = `${m.pekerjaan_total || 0} tugas terdaftar (${m.pekerjaan_selesai || 0} selesai)`
+      } else if (activeMetric === 'kontrak') {
+        value = Number(m.nilai_kontrak || 0)
+        subValue = `${m.kontrak_baru || 0} Kontrak`
+        detailDesc = `${m.kontrak_baru || 0} kontrak baru diterbitkan`
+      } else if (activeMetric === 'calon_klien') {
+        value = Number(m.calon_klien || 0)
+        subValue = `${m.calon_klien_deal || 0} Deal`
+        detailDesc = `${m.calon_klien || 0} calon klien (${m.calon_klien_deal || 0} deal)`
+      }
+
+      return {
+        ...m,
+        index,
+        value,
+        subValue,
+        detailDesc,
+      }
+    })
+  }, [monthlyTrends, activeMetric])
+
+  // Nilai maksimum untuk skala Y
+  const maxValue = useMemo(() => {
+    const max = Math.max(...dataPoints.map((d) => d.value), 0)
+    if (max > 0) return max
+    return activeMetric === 'kontrak' ? 5000000 : 10
+  }, [dataPoints, activeMetric])
+
+  // Total akumulasi metrik aktif selama 6 bulan
+  const activeMetricSum = useMemo(() => {
+    return dataPoints.reduce((acc, d) => acc + d.value, 0)
+  }, [dataPoints])
+
+  // SVG Dimension & Coordinate Math
+  const SVG_W = 680
+  const SVG_H = 220
+  const PAD_L = 60
+  const PAD_R = 40
+  const PAD_T = 30
+  const PAD_B = 40
+  const USABLE_W = SVG_W - PAD_L - PAD_R
+  const USABLE_H = SVG_H - PAD_T - PAD_B
+
+  const count = dataPoints.length
+  const step = count > 1 ? USABLE_W / (count - 1) : USABLE_W
+
+  const computedPoints = useMemo(() => {
+    return dataPoints.map((p, i) => {
+      const x = PAD_L + i * step
+      const ratio = maxValue > 0 ? p.value / maxValue : 0
+      const y = SVG_H - PAD_B - ratio * USABLE_H
+      const barHeight = Math.max(ratio * USABLE_H, p.value > 0 ? 6 : 2)
+      const barY = SVG_H - PAD_B - barHeight
+      return {
+        ...p,
+        x,
+        y: Math.min(Math.max(y, PAD_T), SVG_H - PAD_B),
+        barY,
+        barHeight,
+      }
+    })
+  }, [dataPoints, maxValue, step, USABLE_H, PAD_B, PAD_L, PAD_T, SVG_H])
+
+  // Smooth Area & Line Path Generation
+  const { linePath, areaPath } = useMemo(() => {
+    if (computedPoints.length === 0) return { linePath: '', areaPath: '' }
+    if (computedPoints.length === 1) {
+      const p = computedPoints[0]
+      return {
+        linePath: `M ${p.x - 20} ${p.y} L ${p.x + 20} ${p.y}`,
+        areaPath: `M ${p.x - 20} ${p.y} L ${p.x + 20} ${p.y} L ${p.x + 20} ${SVG_H - PAD_B} L ${p.x - 20} ${SVG_H - PAD_B} Z`,
+      }
+    }
+
+    let d = `M ${computedPoints[0].x} ${computedPoints[0].y}`
+    for (let i = 1; i < computedPoints.length; i++) {
+      const prev = computedPoints[i - 1]
+      const curr = computedPoints[i]
+      const cx1 = prev.x + (curr.x - prev.x) / 2
+      const cy1 = prev.y
+      const cx2 = prev.x + (curr.x - prev.x) / 2
+      const cy2 = curr.y
+      d += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${curr.x} ${curr.y}`
+    }
+
+    const first = computedPoints[0]
+    const last = computedPoints[computedPoints.length - 1]
+    const a = `${d} L ${last.x} ${SVG_H - PAD_B} L ${first.x} ${SVG_H - PAD_B} Z`
+
+    return { linePath: d, areaPath: a }
+  }, [computedPoints, PAD_B, SVG_H])
+
+  // Handler interaksi gerakan kursor mouse
+  const handleMouseMove = (e) => {
+    if (computedPoints.length === 0) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const relativeX = (mouseX / rect.width) * SVG_W
+
+    let closestIdx = 0
+    let minDiff = Infinity
+    computedPoints.forEach((p, idx) => {
+      const diff = Math.abs(relativeX - p.x)
+      if (diff < minDiff) {
+        minDiff = diff
+        closestIdx = idx
+      }
+    })
+    setHoveredIndex(closestIdx)
+  }
+
+  // Bulan yang saat ini aktif dipilih (dikunci melalui klik)
+  const selectedMonth = useMemo(() => {
+    if (!selectedMonthKey) return null
+    return monthlyTrends.find((m) => m.periode === selectedMonthKey) || null
+  }, [monthlyTrends, selectedMonthKey])
+
+  // Titik yang sedang aktif (hovered)
+  const activeHoverPoint = hoveredIndex !== null ? computedPoints[hoveredIndex] : null
+
+  return (
+    <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-xs dark:border-gray-800 dark:bg-gray-900 transition-all mb-6">
+      {/* 1. Header Kartu: Judul, Switcher Metrik & Badge */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15">
+            <svg className="size-6 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+                Grafik Visual Tren Interaktif
+              </h3>
+              <Badge size="sm" color="primary">
+                Tren 6 Bulan
+              </Badge>
+              {selectedMonthKey && (
+                <Badge size="sm" color="success">
+                  Terpilih: {selectedMonth?.bulan || selectedMonthKey}
+                </Badge>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Pantau tren perkembangan 6 bulan terakhir dan <strong>klik titik / bar</strong> untuk memfilter rincian distribusi status.
+            </p>
+          </div>
+        </div>
+
+        {/* Tab Switcher Metrik */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 self-start lg:self-auto overflow-x-auto max-w-full">
+          {metricOptions.map((opt) => {
+            const isActive = activeMetric === opt.id
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setActiveMetric(opt.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-white dark:bg-gray-900 text-brand-600 dark:text-brand-400 shadow-xs ring-1 ring-black/5 dark:ring-white/10'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 2. Ringkasan Cepat Metrik Terpilih */}
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2 px-1">
+        <div>
+          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+            Total {metricOptions.find((m) => m.id === activeMetric)?.label} (6 Bulan)
+          </span>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <h4 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              {activeMetric === 'kontrak' ? formatRupiah(activeMetricSum) : activeMetricSum}
+            </h4>
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              {activeMetric === 'pekerjaan' && `${computedPoints[computedPoints.length - 1]?.value || 0} Tugas bulan ini`}
+              {activeMetric === 'kontrak' && `${computedPoints[computedPoints.length - 1]?.kontrak_baru || 0} Kontrak bulan ini`}
+              {activeMetric === 'calon_klien' && `${computedPoints[computedPoints.length - 1]?.value || 0} Calon Klien bulan ini`}
+            </span>
+          </div>
+        </div>
+
+        <div className="text-right hidden sm:block">
+          <span className="text-xs text-gray-400">
+            {selectedMonthKey ? 'Klik bulan lain untuk beralih' : 'Klik titik bulan untuk melihat rincian kartu'}
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Area Visual SVG Chart dengan Gerakan Kursor Interaktif */}
+      <div className="mt-4 relative overflow-visible w-full">
+        {/* Tooltip Mengambang Interaktif */}
+        {activeHoverPoint && (
+          <div
+            className="absolute z-30 pointer-events-none transition-all duration-150 ease-out -translate-x-1/2 -translate-y-full -mt-2.5 hidden sm:block"
+            style={{
+              left: `${(activeHoverPoint.x / SVG_W) * 100}%`,
+              top: `${(activeHoverPoint.y / SVG_H) * 100}%`,
+            }}
+          >
+            <div className="bg-gray-900/95 dark:bg-gray-800/95 backdrop-blur-md text-white text-xs rounded-2xl py-2 px-3.5 shadow-2xl border border-gray-700/60 dark:border-gray-600/60 min-w-[170px] whitespace-nowrap">
+              <div className="flex items-center justify-between gap-3 pb-1 mb-1 border-b border-gray-700/60">
+                <span className="font-bold text-gray-200">{activeHoverPoint.bulan}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/30 text-brand-300 font-mono">
+                  {activeHoverPoint.short}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 mt-1">
+                <span className="text-gray-300">
+                  {activeMetric === 'pekerjaan' ? 'Pekerjaan:' : activeMetric === 'kontrak' ? 'Nilai Kontrak:' : 'Calon Klien:'}
+                </span>
+                <span className="font-extrabold text-amber-300">
+                  {activeMetric === 'kontrak' ? formatRupiah(activeHoverPoint.value) : activeHoverPoint.value}
+                </span>
+              </div>
+              <div className="text-[11px] text-gray-300 mt-0.5">
+                {activeHoverPoint.subValue}
+              </div>
+              <div className="mt-1.5 pt-1 border-t border-gray-700/60 text-[10px] text-brand-300 font-medium flex items-center gap-1">
+                <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                </svg>
+                <span>Klik untuk lihat rincian lengkap</span>
+              </div>
+            </div>
+            <div className="size-2.5 bg-gray-900 dark:bg-gray-800 rotate-45 mx-auto -mt-1.5 border-r border-b border-gray-700/60 dark:border-gray-600/60" />
+          </div>
+        )}
+
+        {/* SVG Canvas */}
+        <div className="w-full overflow-hidden">
+          <svg
+            viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+            className="w-full h-auto select-none overflow-visible cursor-pointer"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            <defs>
+              {/* Linear Gradient untuk Area Fill */}
+              <linearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.32" />
+                <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.08" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+              </linearGradient>
+
+              {/* Linear Gradient untuk Bar Normal */}
+              <linearGradient id="trendBarGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.45" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.1" />
+              </linearGradient>
+
+              {/* Linear Gradient untuk Bar Hover / Selected */}
+              <linearGradient id="trendBarGradActive" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.9" />
+                <stop offset="100%" stopColor="#2563eb" stopOpacity="0.4" />
+              </linearGradient>
+            </defs>
+
+            {/* Garis Grid Horizontal & Label Sumbu Y */}
+            {[0, 0.5, 1].map((ratio) => {
+              const y = SVG_H - PAD_B - ratio * USABLE_H
+              const val = Math.round(ratio * maxValue)
+              return (
+                <g key={ratio}>
+                  <line
+                    x1={PAD_L - 10}
+                    y1={y}
+                    x2={SVG_W - PAD_R + 10}
+                    y2={y}
+                    stroke="currentColor"
+                    strokeWidth={1}
+                    className="text-gray-100 dark:text-gray-800/80"
+                    strokeDasharray="4 4"
+                  />
+                  <text
+                    x={PAD_L - 16}
+                    y={y + 3.5}
+                    textAnchor="end"
+                    className="text-[10px] font-mono fill-gray-400 dark:fill-gray-500"
+                  >
+                    {activeMetric === 'kontrak' ? formatCompactRupiah(val) : val}
+                  </text>
+                </g>
+              )
+            })}
+
+            {/* Area Fill Gradient di Bawah Garis */}
+            {areaPath && (
+              <path
+                d={areaPath}
+                fill="url(#trendAreaGrad)"
+                className="transition-all duration-300"
+              />
+            )}
+
+            {/* Batang Bar Vertikal untuk Setiap Bulan */}
+            {computedPoints.map((p, idx) => {
+              const isHovered = hoveredIndex === idx
+              const isSelected = selectedMonthKey === p.periode
+              const barW = Math.min(Math.max(step * 0.45, 16), 34)
+
+              return (
+                <g key={`bar-${p.periode}`} onClick={() => onSelectMonth(p.periode)}>
+                  {/* Invisible Hitbox untuk Mempermudah Klik & Hover */}
+                  <rect
+                    x={p.x - step / 2}
+                    y={PAD_T}
+                    width={step}
+                    height={USABLE_H + PAD_B}
+                    fill="transparent"
+                    className="cursor-pointer"
+                  />
+
+                  {/* Batang Bar Grafis */}
+                  <rect
+                    x={p.x - barW / 2}
+                    y={p.barY}
+                    width={barW}
+                    height={p.barHeight}
+                    rx={6}
+                    fill={isHovered || isSelected ? 'url(#trendBarGradActive)' : 'url(#trendBarGrad)'}
+                    className="transition-all duration-200 cursor-pointer"
+                    style={{
+                      transformOrigin: `${p.x}px ${SVG_H - PAD_B}px`,
+                      transform: isHovered ? 'scaleY(1.04)' : 'scaleY(1)',
+                    }}
+                  />
+
+                  {/* Garis Pemandu Vertikal Saat Kursor Dekat */}
+                  {isHovered && (
+                    <line
+                      x1={p.x}
+                      y1={PAD_T}
+                      x2={p.x}
+                      y2={SVG_H - PAD_B}
+                      stroke="#94a3b8"
+                      strokeWidth={1.2}
+                      strokeDasharray="3 3"
+                      opacity={0.6}
+                    />
+                  )}
+                </g>
+              )
+            })}
+
+            {/* Garis Kurva Tren (Line Stroke) */}
+            {linePath && (
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="drop-shadow-sm transition-all duration-300"
+              />
+            )}
+
+            {/* Titik-Titik Data (Data Points) */}
+            {computedPoints.map((p, idx) => {
+              const isHovered = hoveredIndex === idx
+              const isSelected = selectedMonthKey === p.periode
+
+              return (
+                <g
+                  key={`point-${p.periode}`}
+                  onClick={() => onSelectMonth(p.periode)}
+                  className="cursor-pointer"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {/* Cincin Luar Penanda Titik Bersih & Tegas (Tanpa Efek Cahaya Ping Berkedip) */}
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={isSelected ? 6.5 : isHovered ? 5.5 : 4.5}
+                    fill={isSelected ? '#1d4ed8' : '#3b82f6'}
+                    stroke={isSelected ? '#ffffff' : 'none'}
+                    strokeWidth={isSelected ? 2 : 0}
+                    className="transition-all duration-150"
+                  />
+
+                  {/* Inti Titik Putih */}
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={isSelected ? 2.5 : isHovered ? 2 : 1.8}
+                    fill="#ffffff"
+                    className="transition-all duration-150"
+                  />
+
+                  {/* Label Nama Bulan pada Sumbu X */}
+                  <g>
+                    {isSelected && (
+                      <rect
+                        x={p.x - 22}
+                        y={SVG_H - PAD_B + 10}
+                        width={44}
+                        height={18}
+                        rx={9}
+                        fill="#3b82f6"
+                        className="transition-all duration-200"
+                      />
+                    )}
+                    <text
+                      x={p.x}
+                      y={SVG_H - PAD_B + 23}
+                      textAnchor="middle"
+                      className={`text-xs font-semibold cursor-pointer select-none transition-colors duration-150 ${
+                        isSelected
+                          ? 'fill-white font-bold'
+                          : isHovered
+                          ? 'fill-brand-600 dark:fill-brand-400 font-bold'
+                          : 'fill-gray-500 dark:fill-gray-400'
+                      }`}
+                    >
+                      {p.short}
+                    </text>
+                  </g>
+                </g>
+              )
+            })}
+          </svg>
+        </div>
       </div>
     </div>
   )
@@ -606,7 +1126,22 @@ function MonthlyTaskReminderWidget({ reminders = [], onNavigate }) {
 }
 
 // Subcomponent: Admin Dashboard View
-function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStatus, employeeScores }) {
+function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStatus, employeeScores, monthlyTrends = [] }) {
+  const [selectedMonthKey, setSelectedMonthKey] = useState(null)
+
+  const handleSelectMonth = (monthKey) => {
+    setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))
+  }
+
+  const selectedMonthData = useMemo(() => {
+    if (!selectedMonthKey) return null
+    return monthlyTrends.find((m) => m.periode === selectedMonthKey) || null
+  }, [monthlyTrends, selectedMonthKey])
+
+  const activeWorkByStatus = selectedMonthData ? selectedMonthData.work_by_status : workByStatus
+  const activeLeadByStatus = selectedMonthData ? selectedMonthData.lead_by_status : leadByStatus
+  const activeContractByStatus = selectedMonthData ? selectedMonthData.contract_by_status : contractByStatus
+
   return (
     <>
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
@@ -684,42 +1219,82 @@ function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStat
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatusBreakdownCard
-          title="Distribusi Status Pekerjaan"
-          icon={
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          }
-          data={workByStatus}
-          configMap={WORK_STATUS_CONFIG}
-          totalLabel="Total Tugas"
-        />
+      {/* 2. Grafik Visual Tren Interaktif */}
+      <InteractiveTrendChartCard
+        monthlyTrends={monthlyTrends}
+        userRole="admin"
+        selectedMonthKey={selectedMonthKey}
+        onSelectMonth={handleSelectMonth}
+      />
 
-        <StatusBreakdownCard
-          title="Pipeline Calon Klien (CRM)"
-          icon={
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          }
-          data={leadByStatus}
-          configMap={LEAD_STATUS_CONFIG}
-          totalLabel="Total Leads"
-        />
+      {/* 3. Distribusi Status */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <span>{selectedMonthData ? `Distribusi Status: ${selectedMonthData.bulan}` : 'Distribusi Status Keseluruhan'}</span>
+              <Badge size="sm" color={selectedMonthKey ? 'success' : 'light'}>
+                {selectedMonthData ? `Periode: ${selectedMonthData.bulan}` : 'Akumulasi Semua Periode'}
+              </Badge>
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {selectedMonthData
+                ? `Menampilkan rincian status khusus periode ${selectedMonthData.bulan}.`
+                : 'Menampilkan data status kumulatif. Anda juga dapat mengklik salah satu bulan pada grafik tren di atas untuk melihat rincian bulan tersebut.'}
+            </p>
+          </div>
+          {selectedMonthKey && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonthKey(null)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-all cursor-pointer shadow-2xs self-start sm:self-auto shrink-0"
+              title="Kembali ke tampilan akumulasi semua periode"
+            >
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Tutup Rincian Periode Ini</span>
+            </button>
+          )}
+        </div>
 
-        <StatusBreakdownCard
-          title="Status Kontrak Kerja Sama"
-          icon={
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          }
-          data={contractByStatus}
-          configMap={CONTRACT_STATUS_CONFIG}
-          totalLabel="Total Kontrak"
-        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatusBreakdownCard
+            title="Distribusi Status Pekerjaan"
+            icon={
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            }
+            data={activeWorkByStatus}
+            configMap={WORK_STATUS_CONFIG}
+            totalLabel="Total Tugas"
+          />
+
+          <StatusBreakdownCard
+            title="Pipeline Calon Klien (CRM)"
+            icon={
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            }
+            data={activeLeadByStatus}
+            configMap={LEAD_STATUS_CONFIG}
+            totalLabel="Total Leads"
+          />
+
+          <StatusBreakdownCard
+            title="Status Kontrak Kerja Sama"
+            icon={
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            }
+            data={activeContractByStatus}
+            configMap={CONTRACT_STATUS_CONFIG}
+            totalLabel="Total Kontrak"
+          />
+        </div>
       </div>
 
       <LeaderboardTable employees={employeeScores} />
@@ -728,7 +1303,21 @@ function AdminDashboardView({ totals, workByStatus, leadByStatus, contractByStat
 }
 
 // Subcomponent: Pimpinan Dashboard View
-function PimpinanDashboardView({ totals, workByStatus, leadByStatus, employeeScores }) {
+function PimpinanDashboardView({ totals, workByStatus, leadByStatus, employeeScores, monthlyTrends = [] }) {
+  const [selectedMonthKey, setSelectedMonthKey] = useState(null)
+
+  const handleSelectMonth = (monthKey) => {
+    setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))
+  }
+
+  const selectedMonthData = useMemo(() => {
+    if (!selectedMonthKey) return null
+    return monthlyTrends.find((m) => m.periode === selectedMonthKey) || null
+  }, [monthlyTrends, selectedMonthKey])
+
+  const activeWorkByStatus = selectedMonthData ? selectedMonthData.work_by_status : workByStatus
+  const activeLeadByStatus = selectedMonthData ? selectedMonthData.lead_by_status : leadByStatus
+
   return (
     <>
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -782,30 +1371,69 @@ function PimpinanDashboardView({ totals, workByStatus, leadByStatus, employeeSco
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <StatusBreakdownCard
-          title="Progres Pengerjaan Proyek & Tugas"
-          icon={
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          }
-          data={workByStatus}
-          configMap={WORK_STATUS_CONFIG}
-          totalLabel="Total Tugas"
-        />
+      {/* 2. Grafik Visual Tren Interaktif */}
+      <InteractiveTrendChartCard
+        monthlyTrends={monthlyTrends}
+        userRole="pimpinan"
+        selectedMonthKey={selectedMonthKey}
+        onSelectMonth={handleSelectMonth}
+      />
 
-        <StatusBreakdownCard
-          title="Kesehatan Pipeline Penjualan"
-          icon={
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          }
-          data={leadByStatus}
-          configMap={LEAD_STATUS_CONFIG}
-          totalLabel="Total Leads"
-        />
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <span>{selectedMonthData ? `Distribusi Status: ${selectedMonthData.bulan}` : 'Distribusi Status Pekerjaan & Pipeline'}</span>
+              <Badge size="sm" color={selectedMonthKey ? 'success' : 'light'}>
+                {selectedMonthData ? `Periode: ${selectedMonthData.bulan}` : 'Akumulasi Semua Periode'}
+              </Badge>
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {selectedMonthData
+                ? `Menampilkan rincian status untuk periode ${selectedMonthData.bulan}.`
+                : 'Menampilkan data status kumulatif. Anda juga dapat mengklik salah satu bulan pada grafik tren di atas untuk melihat rincian bulan tersebut.'}
+            </p>
+          </div>
+          {selectedMonthKey && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonthKey(null)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-all cursor-pointer shadow-2xs self-start sm:self-auto shrink-0"
+              title="Kembali ke tampilan akumulasi semua periode"
+            >
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Tutup Rincian Periode Ini</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <StatusBreakdownCard
+            title="Progres Pengerjaan Proyek & Tugas"
+            icon={
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            }
+            data={activeWorkByStatus}
+            configMap={WORK_STATUS_CONFIG}
+            totalLabel="Total Tugas"
+          />
+
+          <StatusBreakdownCard
+            title="Kesehatan Pipeline Penjualan"
+            icon={
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            }
+            data={activeLeadByStatus}
+            configMap={LEAD_STATUS_CONFIG}
+            totalLabel="Total Leads"
+          />
+        </div>
       </div>
 
       <LeaderboardTable employees={employeeScores} />
@@ -814,7 +1442,22 @@ function PimpinanDashboardView({ totals, workByStatus, leadByStatus, employeeSco
 }
 
 // Subcomponent: Sales & Operator Dashboard View
-function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStatus }) {
+function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStatus, monthlyTrends = [] }) {
+  const [selectedMonthKey, setSelectedMonthKey] = useState(null)
+
+  const handleSelectMonth = (monthKey) => {
+    setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))
+  }
+
+  const selectedMonthData = useMemo(() => {
+    if (!selectedMonthKey) return null
+    return monthlyTrends.find((m) => m.periode === selectedMonthKey) || null
+  }, [monthlyTrends, selectedMonthKey])
+
+  const activeWorkByStatus = selectedMonthData ? selectedMonthData.work_by_status : workByStatus
+  const activeLeadByStatus = selectedMonthData ? selectedMonthData.lead_by_status : leadByStatus
+  const activeContractByStatus = selectedMonthData ? selectedMonthData.contract_by_status : contractByStatus
+
   return (
     <>
       {/* 1. Ringkasan Pipeline & Penjualan (CRM) */}
@@ -942,46 +1585,85 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStat
         />
       </div>
 
-      {/* 3. Distribusi Status & Funnel */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-4">
-          <StatusBreakdownCard
-            title="Funnel Calon Klien"
-            icon={
-              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      {/* 3. Grafik Visual Tren Interaktif */}
+      <InteractiveTrendChartCard
+        monthlyTrends={monthlyTrends}
+        userRole="operator"
+        selectedMonthKey={selectedMonthKey}
+        onSelectMonth={handleSelectMonth}
+      />
+
+      {/* 4. Distribusi Status & Funnel */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-2">
+              <span>{selectedMonthData ? `Distribusi Status: ${selectedMonthData.bulan}` : 'Distribusi Status CRM, Kontrak & Pekerjaan'}</span>
+              <Badge size="sm" color={selectedMonthKey ? 'success' : 'light'}>
+                {selectedMonthData ? `Periode: ${selectedMonthData.bulan}` : 'Akumulasi Semua Periode'}
+              </Badge>
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {selectedMonthData
+                ? `Menampilkan rincian status khusus periode ${selectedMonthData.bulan}.`
+                : 'Menampilkan data status kumulatif. Anda juga dapat mengklik salah satu bulan pada grafik tren di atas untuk melihat rincian bulan tersebut.'}
+            </p>
+          </div>
+          {selectedMonthKey && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonthKey(null)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-all cursor-pointer shadow-2xs self-start sm:self-auto shrink-0"
+              title="Kembali ke tampilan akumulasi semua periode"
+            >
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-            }
-            data={leadByStatus}
-            configMap={LEAD_STATUS_CONFIG}
-            totalLabel="Total Calon Klien"
-          />
+              <span>Tutup Rincian Periode Ini</span>
+            </button>
+          )}
         </div>
-        <div className="md:col-span-4">
-          <StatusBreakdownCard
-            title="Distribusi Kontrak"
-            icon={
-              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            }
-            data={contractByStatus}
-            configMap={CONTRACT_STATUS_CONFIG}
-            totalLabel="Total Kontrak"
-          />
-        </div>
-        <div className="md:col-span-4">
-          <StatusBreakdownCard
-            title="Distribusi Pekerjaan"
-            icon={
-              <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-            }
-            data={workByStatus}
-            configMap={WORK_STATUS_CONFIG}
-            totalLabel="Total Pekerjaan"
-          />
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-4">
+            <StatusBreakdownCard
+              title="Funnel Calon Klien"
+              icon={
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              }
+              data={activeLeadByStatus}
+              configMap={LEAD_STATUS_CONFIG}
+              totalLabel="Total Calon Klien"
+            />
+          </div>
+          <div className="md:col-span-4">
+            <StatusBreakdownCard
+              title="Distribusi Kontrak"
+              icon={
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              }
+              data={activeContractByStatus}
+              configMap={CONTRACT_STATUS_CONFIG}
+              totalLabel="Total Kontrak"
+            />
+          </div>
+          <div className="md:col-span-4">
+            <StatusBreakdownCard
+              title="Distribusi Pekerjaan"
+              icon={
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              }
+              data={activeWorkByStatus}
+              configMap={WORK_STATUS_CONFIG}
+              totalLabel="Total Pekerjaan"
+            />
+          </div>
         </div>
       </div>
     </>
@@ -989,7 +1671,20 @@ function SalesDashboardView({ totals, leadByStatus, contractByStatus, workByStat
 }
 
 // Subcomponent: Karyawan Dashboard View
-function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], onNavigate }) {
+function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], monthlyTrends = [], onNavigate }) {
+  const [selectedMonthKey, setSelectedMonthKey] = useState(null)
+
+  const handleSelectMonth = (monthKey) => {
+    setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))
+  }
+
+  const selectedMonthData = useMemo(() => {
+    if (!selectedMonthKey) return null
+    return monthlyTrends.find((m) => m.periode === selectedMonthKey) || null
+  }, [monthlyTrends, selectedMonthKey])
+
+  const activeWorkByStatus = selectedMonthData ? selectedMonthData.work_by_status : workByStatus
+
   const revisionTasks = recentTasks.filter(
     (task) => task.status === 'revision_needed' || task.status === 'revision'
   )
@@ -1142,16 +1837,46 @@ function KaryawanDashboardView({ totals, workByStatus, recentTasks = [], onNavig
         />
       </div>
 
+      {/* 2. Grafik Visual Tren Interaktif Tugas Karyawan */}
+      <InteractiveTrendChartCard
+        monthlyTrends={monthlyTrends}
+        userRole="karyawan"
+        selectedMonthKey={selectedMonthKey}
+        onSelectMonth={handleSelectMonth}
+      />
+
+      {selectedMonthKey && (
+        <div className="flex items-center justify-between gap-3 mb-4 p-3.5 rounded-2xl bg-brand-50/60 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-900/60">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-brand-900 dark:text-brand-200">
+              Menampilkan Rincian Status Tugas: {selectedMonthData?.bulan}
+            </span>
+            <Badge size="sm" color="success">Periode Terpilih</Badge>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedMonthKey(null)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-all cursor-pointer shadow-2xs shrink-0"
+            title="Kembali ke tampilan akumulasi semua periode"
+          >
+            <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>Tutup Rincian Periode Ini</span>
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
         <div className="md:col-span-7">
           <StatusBreakdownCard
-            title="Distribusi Status Tugas Saya"
+            title={selectedMonthData ? `Distribusi Status Tugas (${selectedMonthData.bulan})` : "Distribusi Status Tugas Saya"}
             icon={
               <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             }
-            data={workByStatus}
+            data={activeWorkByStatus}
             configMap={WORK_STATUS_CONFIG}
             totalLabel="Tugas Terdaftar"
           />
@@ -1329,6 +2054,7 @@ export default function DashboardView({ onNavigate }) {
   const leadByStatus = summary?.lead_by_status || {}
   const contractByStatus = summary?.contract_by_status || {}
   const employeeScores = summary?.employee_scores || []
+  const monthlyTrends = summary?.monthly_trends || []
 
   return (
     <div className="space-y-6">
@@ -1351,6 +2077,7 @@ export default function DashboardView({ onNavigate }) {
           leadByStatus={leadByStatus}
           contractByStatus={contractByStatus}
           employeeScores={employeeScores}
+          monthlyTrends={monthlyTrends}
         />
       )}
 
@@ -1360,6 +2087,7 @@ export default function DashboardView({ onNavigate }) {
           leadByStatus={leadByStatus}
           contractByStatus={contractByStatus}
           workByStatus={workByStatus}
+          monthlyTrends={monthlyTrends}
         />
       )}
 
@@ -1368,6 +2096,7 @@ export default function DashboardView({ onNavigate }) {
           totals={totals}
           workByStatus={workByStatus}
           recentTasks={summary?.recent_tasks || []}
+          monthlyTrends={monthlyTrends}
           onNavigate={onNavigate}
         />
       )}

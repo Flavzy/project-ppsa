@@ -4,6 +4,18 @@ import MonthInputField from './common/MonthInputField'
 import ConfirmModal from './ConfirmModal'
 import { loadFormDraft, saveFormDraft, clearFormDraft } from '../utils/formDraft'
 
+function getFieldCleanLabel(field) {
+  if (!field || !field.label) return 'Bidang ini'
+  let label = String(field.label).replace(/^[0-9]+\.\s*/, '')
+  if (label.includes('(')) {
+    const mainPart = label.split('(')[0].trim()
+    if (mainPart) {
+      label = mainPart
+    }
+  }
+  return label.trim() || 'Bidang ini'
+}
+
 function getInitialValue(field, record, currentUser, config) {
   if (field.type === 'password' || field.name === 'password') {
     return ''
@@ -37,8 +49,11 @@ function getInitialValue(field, record, currentUser, config) {
     return typeof field.defaultValue === 'function' ? field.defaultValue() : field.defaultValue
   }
 
-  // Pre-fill user id for creator roles
+  // Pre-fill user id for creator roles (hanya jika lolos optionsFilter bila ada)
   if (!record && field.name === 'id_user' && currentUser?.id_user) {
+    if (field.optionsFilter && !field.optionsFilter(currentUser)) {
+      return ''
+    }
     return currentUser.id_user
   }
 
@@ -107,6 +122,60 @@ export function isImageFile(fileNameOrUrl) {
     clean.endsWith('.gif') ||
     clean.endsWith('.svg')
   )
+}
+
+export function isAcceptedFile(file, acceptString) {
+  if (!acceptString || !file) return true
+  const tokens = acceptString
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (!tokens.length) return true
+
+  const fileName = (file.name || '').toLowerCase()
+  const fileType = (file.type || '').toLowerCase()
+
+  return tokens.some((token) => {
+    // 1. Ekstensi file (.pdf, .xlsx, .docx, .zip, dll.)
+    if (token.startsWith('.')) {
+      return fileName.endsWith(token)
+    }
+    // 2. Wildcard MIME (image/*)
+    if (token.endsWith('/*')) {
+      const prefix = token.slice(0, -2)
+      if (fileType && fileType.startsWith(`${prefix}/`)) return true
+      if (prefix === 'image') {
+        return /\.(jpg|jpeg|png|webp|gif|svg|bmp|ico|tif|tiff)$/i.test(fileName)
+      }
+      return false
+    }
+    // 3. Exact MIME check (application/pdf, application/vnd.ms-excel, dll.)
+    if (token.includes('/')) {
+      return fileType === token
+    }
+    return false
+  })
+}
+
+export function formatAcceptLabel(accept) {
+  if (!accept) return 'PDF, Gambar, atau Dokumen'
+  if (accept.includes('image') && !accept.includes('xls') && !accept.includes('doc') && !accept.includes('csv')) {
+    return 'PDF atau Gambar (.pdf, .jpg, .png, .webp)'
+  }
+  const hasPresentation = accept.includes('ppt') || accept.includes('presentation')
+  if (hasPresentation) {
+    return 'PDF, Word, Excel (.xlsx/.xls), CSV, PowerPoint, Gambar, ZIP/RAR'
+  }
+  if (accept.includes('xls') || accept.includes('spreadsheet') || accept.includes('csv') || accept.includes('doc')) {
+    return 'PDF, Word, Excel (.xlsx/.xls), CSV, Gambar, ZIP/RAR'
+  }
+  const exts = accept
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.startsWith('.'))
+    .map((t) => t.toUpperCase().replace('.', ''))
+  return exts.length > 0 ? exts.join(', ') : 'PDF, Gambar, atau Dokumen'
 }
 
 export function ImagePreviewModal({ isOpen, imageUrl, fileName, onClose }) {
@@ -199,10 +268,12 @@ function FileInputField({
   }, [existingFileUrls, existingFileUrl, fieldLabel])
 
   const [retainedExisting, setRetainedExisting] = useState(normalizedExisting)
+  const [uploadError, setUploadError] = useState('')
 
   useEffect(() => {
     setSelectedFiles([])
     setRetainedExisting(normalizedExisting)
+    setUploadError('')
     if (inputRef.current) {
       inputRef.current.value = ''
     }
@@ -244,20 +315,44 @@ function FileInputField({
     })
   }
 
-  const handleFileChange = (e) => {
-    const fresh = e.target.files ? Array.from(e.target.files) : []
-    if (!fresh.length) return
+  const processIncomingFiles = (fresh) => {
+    if (!fresh || !fresh.length) return
+
+    const validFiles = []
+    const rejectedFiles = []
+
+    for (const file of fresh) {
+      if (isAcceptedFile(file, accept)) {
+        validFiles.push(file)
+      } else {
+        rejectedFiles.push(file)
+      }
+    }
+
+    if (rejectedFiles.length > 0) {
+      const rejectedNames = rejectedFiles.map((f) => f.name).join(', ')
+      setUploadError(
+        `Format berkas "${rejectedNames}" tidak didukung untuk kolom ini. Format yang diizinkan: ${formatAcceptLabel(accept)}.`
+      )
+    } else {
+      setUploadError('')
+    }
+
+    if (!validFiles.length) {
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
 
     if (multiple) {
       setSelectedFiles((prev) => {
         const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`))
-        const uniqueFresh = fresh.filter((f) => !existingKeys.has(`${f.name}-${f.size}`))
+        const uniqueFresh = validFiles.filter((f) => !existingKeys.has(`${f.name}-${f.size}`))
         const updated = [...prev, ...uniqueFresh]
         emitChange(updated, retainedExisting)
         return updated
       })
     } else {
-      const chosen = [fresh[0]]
+      const chosen = [validFiles[0]]
       setSelectedFiles(chosen)
       emitChange(chosen, retainedExisting)
     }
@@ -265,6 +360,11 @@ function FileInputField({
     if (inputRef.current) {
       inputRef.current.value = ''
     }
+  }
+
+  const handleFileChange = (e) => {
+    const fresh = e.target.files ? Array.from(e.target.files) : []
+    processIncomingFiles(fresh)
   }
 
   const handleRemoveSingleNew = (index) => {
@@ -275,6 +375,7 @@ function FileInputField({
 
   const handleClearAllNew = () => {
     setSelectedFiles([])
+    setUploadError('')
     if (inputRef.current) {
       inputRef.current.value = ''
     }
@@ -313,21 +414,7 @@ function FileInputField({
     if (disabled) return
     const dt = e.dataTransfer
     const fresh = dt.files ? Array.from(dt.files) : []
-    if (!fresh.length) return
-
-    if (multiple) {
-      setSelectedFiles((prev) => {
-        const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`))
-        const uniqueFresh = fresh.filter((f) => !existingKeys.has(`${f.name}-${f.size}`))
-        const updated = [...prev, ...uniqueFresh]
-        emitChange(updated, retainedExisting)
-        return updated
-      })
-    } else {
-      const chosen = [fresh[0]]
-      setSelectedFiles(chosen)
-      emitChange(chosen, retainedExisting)
-    }
+    processIncomingFiles(fresh)
   }
 
   const hasExisting = normalizedExisting.length > 0
@@ -370,20 +457,36 @@ function FileInputField({
                   <span className="text-brand-600 dark:text-brand-400 underline">Klik untuk memilih berkas</span> atau seret & jatuhkan berkas ke sini
                 </p>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                  {accept ? `Format didukung: ${accept.replace(/\./g, ' ').toUpperCase()}` : 'Mendukung format PDF, dokumen acuan, dan gambar'} {multiple ? '(Bisa banyak berkas sekaligus)' : ''}
+                  Format didukung: {formatAcceptLabel(accept)}
                 </p>
               </div>
             </div>
           </div>
+
+          {/* Pesan Kesalahan Validasi Format Berkas */}
+          {uploadError && (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs animate-in fade-in">
+              <svg className="size-4 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="flex-1 font-medium">{uploadError}</span>
+              <button
+                type="button"
+                onClick={() => setUploadError('')}
+                className="text-rose-400 hover:text-rose-600 dark:hover:text-rose-200 text-xs font-bold p-0.5 cursor-pointer"
+                title="Tutup pesan peringatan"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Status Berkas yang Dipilih */}
           <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <span className="text-xs text-gray-500 dark:text-gray-400 select-none">
               {selectedFiles.length === 0
                 ? 'Belum ada berkas baru dipilih'
-                : multiple
-                ? `${selectedFiles.length} berkas baru siap diunggah`
-                : `${selectedFiles[0].name} (${(selectedFiles[0].size / 1024).toFixed(0)} KB)`}
+                : `${selectedFiles.length} berkas baru siap diunggah`}
             </span>
             {selectedFiles.length > 0 && (
               <button
@@ -397,45 +500,8 @@ function FileInputField({
             )}
           </div>
 
-          {/* Pratinjau Berkas Baru Tunggal (Single File Preview) */}
-          {!multiple && newFilePreviews.length === 1 && (
-            <div className="pt-1">
-              {newFilePreviews[0].isImg ? (
-                <div className="flex items-center gap-3 p-2 rounded-2xl bg-brand-50/70 dark:bg-brand-500/15 border border-brand-200 dark:border-brand-800 shadow-2xs max-w-full sm:max-w-md">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewModal({ open: true, url: newFilePreviews[0].url, name: newFilePreviews[0].file.name })}
-                    className="relative group shrink-0 size-11 rounded-xl overflow-hidden border border-brand-300 dark:border-brand-700 cursor-pointer shadow-2xs"
-                    title="Klik untuk memperbesar pratinjau gambar"
-                  >
-                    <img src={newFilePreviews[0].url} alt={newFilePreviews[0].file.name} className="size-full object-cover group-hover:scale-110 transition-transform duration-200" />
-                    <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
-                      🔍
-                    </div>
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-brand-900 dark:text-brand-100 block truncate">
-                      {newFilePreviews[0].file.name}
-                    </span>
-                    <span className="text-[10px] text-brand-600 dark:text-brand-400">
-                      {(newFilePreviews[0].file.size / 1024).toFixed(0)} KB • Pratinjau gambar siap diunggah
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClearAllNew}
-                    className="text-brand-500 hover:text-rose-600 dark:text-brand-400 dark:hover:text-rose-400 p-1.5 cursor-pointer font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors shrink-0"
-                    title="Batalkan pilihan berkas"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {/* List badge file baru yang dipilih (khusus multiple) - dilengkapi pratinjau visual thumbnail */}
-          {multiple && newFilePreviews.length > 0 && (
+          {/* List badge file baru yang dipilih (seragam untuk single maupun multiple) */}
+          {newFilePreviews.length > 0 && (
             <div className="flex flex-col gap-1.5 items-start pt-1">
               {newFilePreviews.map((item, idx) => (
                 <div
@@ -459,14 +525,14 @@ function FileInputField({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   )}
-                  <span className="truncate max-w-[220px] sm:max-w-xs font-medium">{item.file.name}</span>
-                  <span className="text-[11px] text-gray-400 font-normal shrink-0">
+                  <span className="truncate max-w-[220px] sm:max-w-xs font-semibold">{item.file.name}</span>
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 font-normal shrink-0">
                     ({(item.file.size / 1024).toFixed(0)} KB)
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveSingleNew(idx)}
-                    className="text-gray-400 hover:text-rose-600 ml-1 cursor-pointer font-bold hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-full size-4 inline-flex items-center justify-center transition-colors shrink-0"
+                    className="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 ml-1 cursor-pointer font-bold hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-full size-4 inline-flex items-center justify-center transition-colors shrink-0"
                     title={`Hapus ${item.file.name} dari daftar pilihan`}
                   >
                     ×
@@ -654,12 +720,24 @@ function ResourceForm({
   // Pelacakan status berkas/file yang dipilih secara lokal untuk deteksi perubahan
   const [fileStates, setFileStates] = useState({})
   const [clientErrors, setClientErrors] = useState({})
+  const [dismissedErrors, setDismissedErrors] = useState({})
+  const prevServerErrorsRef = useRef(null)
+
+  const isErrorActive = (fieldName) => !dismissedErrors[fieldName] && Boolean(clientErrors?.[fieldName] || errors?.[fieldName])
+  const getFieldError = (fieldName) => (!dismissedErrors[fieldName] ? (clientErrors?.[fieldName]?.[0] || errors?.[fieldName]?.[0]) : null)
 
   function handleFileChangeState(name, fileData) {
     setFileStates((prev) => ({
       ...prev,
       [name]: fileData,
     }))
+    setDismissedErrors((prev) => (prev[name] ? prev : { ...prev, [name]: true }))
+    setClientErrors((prev) => {
+      if (!prev[name]) return prev
+      const copy = { ...prev }
+      delete copy[name]
+      return copy
+    })
   }
 
   // Sinkronisasi tgl penugasan untuk batas minimal deadline
@@ -667,6 +745,14 @@ function ResourceForm({
 
   // Tangani perubahan nilai input dan otomatis simpan ke draf jika mode tambah baru
   function handleFieldChange(fieldName, val) {
+    setDismissedErrors((prev) => (prev[fieldName] ? prev : { ...prev, [fieldName]: true }))
+    setClientErrors((prev) => {
+      if (!prev[fieldName]) return prev
+      const copy = { ...prev }
+      delete copy[fieldName]
+      return copy
+    })
+
     if (config?.key === 'pekerjaan' && fieldName === 'deadline') {
       const recordDeadlineStr = record?.deadline ? String(record.deadline).split('T')[0] : null
       if (val && val !== recordDeadlineStr && val < todayStr) {
@@ -674,13 +760,6 @@ function ResourceForm({
           ...prev,
           deadline: ['Batas waktu (deadline) tidak boleh sebelum hari ini.'],
         }))
-      } else {
-        setClientErrors((prev) => {
-          if (!prev.deadline) return prev
-          const copy = { ...prev }
-          delete copy.deadline
-          return copy
-        })
       }
     }
 
@@ -719,6 +798,24 @@ function ResourceForm({
   }
 
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+  const [pendingSubmitData, setPendingSubmitData] = useState(null)
+  const [formResetKey, setFormResetKey] = useState(0)
+  const [showPasswordMap, setShowPasswordMap] = useState({})
+
+  const handleConfirmSubmit = async () => {
+    if (pendingSubmitData) {
+      const dataToSend = pendingSubmitData
+      setShowSubmitConfirm(false)
+      setPendingSubmitData(null)
+      await onSubmit?.(dataToSend)
+    }
+  }
+
+  const handleCancelSubmit = () => {
+    setShowSubmitConfirm(false)
+    setPendingSubmitData(null)
+  }
 
   // Tombol untuk mereset / menghapus draf kembali ke awal
   function handleClearDraft() {
@@ -728,6 +825,11 @@ function ResourceForm({
       resetMap[field.name] = getInitialValue(field, null, currentUser, config)
     })
     setValues(resetMap)
+    setFileStates({})
+    setShowPasswordMap({})
+    setFormResetKey((prev) => prev + 1)
+    setClientErrors({})
+    setDismissedErrors({})
   }
 
   // Sinkronisasi opsi select: Jika mode tambah baru (!record) dan opsi yang ada di values tidak lagi valid menurut optionsFilter, reset ke ''
@@ -743,25 +845,71 @@ function ResourceForm({
           const valid = raw.filter(field.optionsFilter)
           const isStillValid = valid.some((opt) => String(typeof opt === 'object' ? opt[valKey] : opt) === String(values[field.name]))
           if (!isStillValid) {
-            handleFieldChange(field.name, '')
+            setValues((prev) => ({ ...prev, [field.name]: '' }))
           }
         }
       })
     }
   }, [options, record, config])
 
-  // Indikator apakah draf tersimpan aktif
-  const hasDraft = useMemo(() => {
+  // Indikator apakah draf / isian aktif (mendeteksi real-time saat mengetik atau mengunggah berkas)
+  const hasDraftOrContent = useMemo(() => {
     if (record) return false
-    const draft = loadFormDraft(config.key, currentUser?.id_user)
-    if (!draft) return false
-    return Object.keys(draft).some((k) => {
-      const field = config.fields.find((f) => f.name === k)
-      if (!field) return false
-      const defVal = getInitialValue(field, null, currentUser, config)
-      return draft[k] !== defVal && draft[k] !== '' && draft[k] !== undefined
+
+    // 1. Cek berkas baru yang dipilih pengguna secara real-time
+    const hasFileContent = Object.values(fileStates).some((fs) => {
+      return Array.isArray(fs?.newFiles) && fs.newFiles.length > 0
     })
-  }, [config, currentUser?.id_user, record])
+    if (hasFileContent) return true
+
+    // 2. Cek isian input teks/select/checkbox yang sedang diketik atau dipilih
+    const hasFieldContent = config.fields.some((field) => {
+      if (isFieldLockedForUser(field, record, config, currentUser)) {
+        return false
+      }
+      const defVal = getInitialValue(field, null, currentUser, config)
+      const currentVal = values[field.name]
+
+      if (field.type === 'checkbox_group') {
+        const defArr = Array.isArray(defVal) ? defVal : []
+        const curArr = Array.isArray(currentVal) ? currentVal : []
+        return curArr.length > 0 && JSON.stringify(curArr) !== JSON.stringify(defArr)
+      }
+
+      if (currentVal === undefined || currentVal === null || currentVal === '') {
+        return false
+      }
+
+      return currentVal !== defVal
+    })
+    if (hasFieldContent) return true
+
+    // 3. Cek draf tersimpan dari sesi sebelumnya di localStorage
+    const savedDraft = loadFormDraft(config.key, currentUser?.id_user)
+    if (savedDraft) {
+      const hasRealDraft = Object.keys(savedDraft).some((k) => {
+        const field = config.fields.find((f) => f.name === k)
+        if (!field) return false
+        const defVal = getInitialValue(field, null, currentUser, config)
+        const val = savedDraft[k]
+
+        if (field.type === 'checkbox_group') {
+          const defArr = Array.isArray(defVal) ? defVal : []
+          const curArr = Array.isArray(val) ? val : []
+          return curArr.length > 0 && JSON.stringify(curArr) !== JSON.stringify(defArr)
+        }
+
+        if (val === undefined || val === null || val === '') {
+          return false
+        }
+
+        return val !== defVal
+      })
+      if (hasRealDraft) return true
+    }
+
+    return false
+  }, [config, currentUser, fileStates, record, values])
 
   // Deteksi apakah ada perubahan data (dirty check) saat mode edit
   const isDirty = useMemo(() => {
@@ -871,13 +1019,16 @@ function ResourceForm({
     setActiveSectionIndex(0)
   }, [config?.key, record])
 
-  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit dan auto-scroll halus ke field error pertama
+  // Otomatis arahkan tab ke bagian yang memiliki error validasi saat submit dari server dan auto-scroll ke field error pertama
   useEffect(() => {
-    const errorKeys = Object.keys(clientErrors || {}).concat(Object.keys(errors || {}))
-    if (errorKeys.length > 0) {
-      if (sections.length > 1) {
+    if (errors && Object.keys(errors).length > 0 && errors !== prevServerErrorsRef.current) {
+      prevServerErrorsRef.current = errors
+      const errorKeys = Object.keys(errors)
+      setDismissedErrors({})
+
+      if (sections.length > 1 && activeSectionIndex !== -1) {
         const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
-        if (targetIdx !== -1 && activeSectionIndex !== -1 && activeSectionIndex !== targetIdx) {
+        if (targetIdx !== -1 && activeSectionIndex !== targetIdx) {
           setActiveSectionIndex(targetIdx)
         }
       }
@@ -898,7 +1049,7 @@ function ResourceForm({
 
       return () => clearTimeout(timer)
     }
-  }, [clientErrors, errors, sections, activeSectionIndex])
+  }, [errors, sections])
 
   // If editing but cannot edit, or adding but cannot create, don't show the form
   if (record && !canEdit) {
@@ -915,20 +1066,119 @@ function ResourceForm({
   function handleSubmit(event) {
     event.preventDefault()
 
-    // Validasi client-side: Deadline pekerjaan tidak boleh sebelum hari ini jika diubah atau ditambah baru
-    if (config?.key === 'pekerjaan' && values.deadline) {
-      const recordDeadlineStr = record?.deadline ? String(record.deadline).split('T')[0] : null
-      if (values.deadline !== recordDeadlineStr && values.deadline < todayStr) {
-        setClientErrors((prev) => ({
-          ...prev,
-          deadline: ['Batas waktu (deadline) tidak boleh sebelum hari ini.'],
-        }))
-        return
-      }
-    }
-
     // Jika mode edit dan tidak ada perubahan sama sekali, cegah penyimpanan
     if (record && !isDirty) {
+      return
+    }
+
+    // 1. Validasi Client-Side Menyeluruh Lintas Seluruh Bagian (Tab)
+    const newClientErrors = {}
+
+    config.fields.forEach((field) => {
+      // Lewati field yang terkunci / tidak dapat diubah oleh peran pengguna saat ini
+      if (isFieldLockedForUser(field, record, config, currentUser)) {
+        return
+      }
+
+      // Khusus field password: saat mode edit bersifat opsional
+      if (field.name === 'password' || field.type === 'password') {
+        const pwdVal = values[field.name]
+        if (!record && (!pwdVal || String(pwdVal).trim() === '')) {
+          newClientErrors[field.name] = ['Password wajib diisi.']
+        }
+        return
+      }
+
+      // Khusus Calon Klien: field Operator PIC otomatis terisi dan terkunci untuk Operator / Sales
+      if (config.key === 'calonKlien' && field.name === 'id_user' && ['operator', 'sales'].includes(currentUser?.role)) {
+        return
+      }
+
+      const cleanLabel = getFieldCleanLabel(field)
+
+      if (field.type === 'file') {
+        if (field.required) {
+          const fs = fileStates[field.name]
+          const hasNew = fs?.newFiles && fs.newFiles.length > 0
+          const hasExisting = record && (record[`${field.name}_url`] || record[field.name] || (fs?.retainedExisting && fs.retainedExisting.length > 0))
+          if (!hasNew && !hasExisting) {
+            newClientErrors[field.name] = [`${cleanLabel} wajib diunggah.`]
+          }
+        }
+        return
+      }
+
+      if (field.type === 'checkbox_group') {
+        if (field.required) {
+          const arr = values[field.name]
+          if (!Array.isArray(arr) || arr.length === 0) {
+            newClientErrors[field.name] = [`Pilih minimal satu ${cleanLabel.toLowerCase()}.`]
+          }
+        }
+        return
+      }
+
+      const rawVal = values[field.name] !== undefined ? values[field.name] : getInitialValue(field, record, currentUser, config)
+      const strVal = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : ''
+
+      if (field.required && !strVal) {
+        const actionVerb = field.type === 'select' ? 'wajib dipilih' : 'wajib diisi'
+        newClientErrors[field.name] = [`${cleanLabel} ${actionVerb}.`]
+        return
+      }
+
+      // Format email jika diisi
+      if (field.type === 'email' && strVal) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(strVal)) {
+          newClientErrors[field.name] = ['Format email tidak valid.']
+          return
+        }
+      }
+
+      // Format numeric only / kontak jika diisi
+      if (field.numericOnly && strVal) {
+        if (!/^[0-9]+$/.test(strVal)) {
+          newClientErrors[field.name] = [`${cleanLabel} hanya boleh berisi angka.`]
+          return
+        }
+      }
+
+      // Deadline pekerjaan tidak boleh sebelum hari ini
+      if (config?.key === 'pekerjaan' && field.name === 'deadline' && strVal) {
+        const recordDeadlineStr = record?.deadline ? String(record.deadline).split('T')[0] : null
+        if (strVal !== recordDeadlineStr && strVal < todayStr) {
+          newClientErrors[field.name] = ['Batas waktu (deadline) tidak boleh sebelum hari ini.']
+          return
+        }
+      }
+    })
+
+    if (Object.keys(newClientErrors).length > 0) {
+      setClientErrors(newClientErrors)
+      setDismissedErrors({})
+
+      const errorKeys = Object.keys(newClientErrors)
+      if (sections.length > 1 && activeSectionIndex !== -1) {
+        const targetIdx = sections.findIndex((s) => s.fields.some((f) => errorKeys.includes(f.name)))
+        if (targetIdx !== -1 && activeSectionIndex !== targetIdx) {
+          setActiveSectionIndex(targetIdx)
+        }
+      }
+
+      setTimeout(() => {
+        for (const errKey of errorKeys) {
+          const el = document.getElementById(errKey) || document.querySelector(`[name="${errKey}"]`)
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            if (typeof el.focus === 'function') {
+              el.focus({ preventScroll: true })
+            }
+            break
+          }
+        }
+      }, 100)
+
       return
     }
 
@@ -991,7 +1241,8 @@ function ResourceForm({
         formData.append('id_master_pekerjaan', values.id_master_pekerjaan)
       }
 
-      onSubmit(formData)
+      setPendingSubmitData(formData)
+      setShowSubmitConfirm(true)
     } else {
       const payload = {}
 
@@ -1022,7 +1273,8 @@ function ResourceForm({
         payload['id_master_pekerjaan'] = values.id_master_pekerjaan
       }
 
-      onSubmit(payload)
+      setPendingSubmitData(payload)
+      setShowSubmitConfirm(true)
     }
   }
 
@@ -1079,18 +1331,24 @@ function ResourceForm({
             <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
               {headerBadge}
             </span>
-            {hasDraft && !record && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 shadow-2xs">
-                <span>Draf aktif</span>
+            {hasDraftOrContent && !record && (
+              <>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 shadow-2xs">
+                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Draf aktif</span>
+                </span>
                 <button
                   type="button"
                   onClick={() => setShowResetConfirm(true)}
-                  className="ml-1 text-xs text-amber-800 dark:text-amber-300 underline hover:font-bold cursor-pointer"
-                  title="Hapus draf dan kosongkan isian form"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-error-200 hover:bg-error-50 hover:text-error-600 dark:hover:bg-error-500/15 dark:hover:border-error-500/30 dark:hover:text-error-400 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  title="Hapus draf dan kosongkan isian formulir"
                 >
-                  Reset
+                  <svg className="size-3 text-inherit shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Reset</span>
                 </button>
-              </span>
+              </>
             )}
           </div>
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mt-0.5">
@@ -1100,7 +1358,7 @@ function ResourceForm({
 
       </div>
 
-      <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-6">
         {/* Input semu tersembunyi untuk mencegah autofill paksa dari browser password manager */}
         <input type="text" style={{ display: 'none' }} tabIndex={-1} autoComplete="off" aria-hidden="true" />
         <input type="password" style={{ display: 'none' }} tabIndex={-1} autoComplete="new-password" aria-hidden="true" />
@@ -1109,7 +1367,7 @@ function ResourceForm({
           <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-gray-100/80 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/60 mb-6">
             {sections.map((sec, sIdx) => {
               const isActive = activeSectionIndex === sIdx
-              const hasSecError = sec.fields.some((f) => clientErrors?.[f.name] || errors?.[f.name])
+              const hasSecError = sec.fields.some((f) => isErrorActive(f.name))
               return (
                 <button
                   key={sec.title}
@@ -1172,7 +1430,7 @@ function ResourceForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {section.fields.map((field) => {
-                const fieldError = clientErrors?.[field.name]?.[0] || errors?.[field.name]?.[0]
+                const fieldError = getFieldError(field.name)
                 const isFieldDisabled = isFieldLockedForUser(field, record, config, currentUser)
                 const initialVal = values[field.name] !== undefined ? values[field.name] : getInitialValue(field, record, currentUser, config)
                 const rawFieldVal = record?.[field.name]
@@ -1200,7 +1458,11 @@ function ResourceForm({
                         rows={field.rows || 3}
                         disabled={isFieldDisabled}
                         placeholder={field.placeholder || ''}
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        className={`w-full rounded-xl border ${
+                          fieldError
+                            ? 'border-error-500 focus:border-error-500 focus:ring-error-500/10'
+                            : 'border-gray-300 dark:border-gray-700 focus:border-brand-500 focus:ring-brand-500/10'
+                        } bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-hidden focus:ring-4 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60`}
                       />
                     ) : field.type === 'select' ? (() => {
                       // Khusus Calon Klien: Jika user ber-role Operator/Sales, kunci field Operator PIC ke namanya sendiri tanpa dropdown
@@ -1357,7 +1619,11 @@ function ResourceForm({
                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
                             required={field.required && !isFieldDisabled}
                             disabled={isFieldDisabled}
-                            className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            className={`w-full rounded-xl border ${
+                              fieldError
+                                ? 'border-error-500 focus:border-error-500 focus:ring-error-500/10'
+                                : 'border-gray-300 dark:border-gray-700 focus:border-brand-500 focus:ring-brand-500/10'
+                            } bg-transparent dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:outline-hidden focus:ring-4 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60`}
                           >
                             <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                               {selectOptions.length === 0 && config.key === 'kinerjaKaryawan' && field.name === 'id_pekerjaan'
@@ -1409,6 +1675,13 @@ function ResourceForm({
                           ? currentSelected.filter((x) => Number(x) !== numId)
                           : [...currentSelected, numId]
                         setValues((prev) => ({ ...prev, [field.name]: next }))
+                        setDismissedErrors((prev) => (prev[field.name] ? prev : { ...prev, [field.name]: true }))
+                        setClientErrors((prev) => {
+                          if (!prev[field.name]) return prev
+                          const copy = { ...prev }
+                          delete copy[field.name]
+                          return copy
+                        })
                       }
 
                       return (
@@ -1466,7 +1739,7 @@ function ResourceForm({
                       )
                     })() : field.type === 'file' ? (
                       <FileInputField
-                        key={`${field.name}-${record ? record[config.primaryKey] : 'new'}`}
+                        key={`${field.name}-${record ? record[config.primaryKey] : 'new'}-${formResetKey}`}
                         name={field.name}
                         accept={field.accept}
                         multiple={field.multiple}
@@ -1556,13 +1829,20 @@ function ResourceForm({
                         }
                       }
 
+                      const isPassword = field.name === 'password' || field.type === 'password'
+                      const inputType = isCurrency
+                        ? 'text'
+                        : isPassword
+                        ? (showPasswordMap[field.name] ? 'text' : 'password')
+                        : field.type
+
                       return (
-                        <div>
+                        <div className={isPassword ? 'relative' : ''}>
                           <input
-                            key={record && (field.name === 'password' || field.type === 'password') ? `pwd_edit_${record[config.primaryKey]}` : field.name}
+                            key={record && isPassword ? `pwd_edit_${record[config.primaryKey]}` : field.name}
                             id={field.name}
                             name={field.name}
-                            type={isCurrency ? 'text' : field.type}
+                            type={inputType}
                             inputMode={isNumericOnly ? 'numeric' : undefined}
                             pattern={isNumericOnly && !isCurrency ? '[0-9]*' : undefined}
                             maxLength={maxCharLength}
@@ -1571,7 +1851,7 @@ function ResourceForm({
                             max={maxDateAttr || (field.max !== undefined ? field.max : undefined)}
                             step={field.step || (field.type === 'number' && !isCurrency ? 'any' : undefined)}
                             autoComplete={
-                              field.name === 'password' || field.type === 'password'
+                              isPassword
                                 ? 'new-password'
                                 : 'off'
                             }
@@ -1639,17 +1919,42 @@ function ResourceForm({
                                 setTglPenugasanVal(nextVal)
                               }
                             }}
-                            required={record && (field.name === 'password' || field.type === 'password') ? false : (field.required && !isFieldDisabled)}
+                            required={record && isPassword ? false : (field.required && !isFieldDisabled)}
                             disabled={isFieldDisabled}
                             placeholder={
                               isCurrency
                                 ? 'Rp 0'
-                                : (record && (field.name === 'password' || field.type === 'password')
+                                : (record && isPassword
                                   ? 'Kosongkan jika tidak ingin mengubah password'
                                   : (field.placeholder || ''))
                             }
-                            className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            className={`w-full rounded-xl border ${
+                              fieldError
+                                ? 'border-error-500 focus:border-error-500 focus:ring-error-500/10'
+                                : 'border-gray-300 dark:border-gray-700 focus:border-brand-500 focus:ring-brand-500/10'
+                            } bg-transparent px-4 py-2.5 ${isPassword ? 'pr-11 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden' : ''} text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-hidden focus:ring-4 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60`}
                           />
+                          {isPassword && (
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswordMap((prev) => ({ ...prev, [field.name]: !prev[field.name] }))}
+                              disabled={isFieldDisabled}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50 cursor-pointer p-1 rounded-lg transition-colors"
+                              title={showPasswordMap[field.name] ? 'Sembunyikan password' : 'Lihat password'}
+                              aria-label={showPasswordMap[field.name] ? 'Sembunyikan password' : 'Lihat password'}
+                            >
+                              {showPasswordMap[field.name] ? (
+                                <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                                </svg>
+                              ) : (
+                                <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
                           {isCurrency && values[field.name] ? (
                             <p className="mt-1 text-[11px] font-semibold text-brand-600 dark:text-brand-400">
                               Format Nominal: Rp {Number(values[field.name]).toLocaleString('id-ID')}
@@ -1758,7 +2063,13 @@ function ResourceForm({
               title={
                 record && !isDirty
                   ? 'Tidak ada perubahan data untuk disimpan'
-                  : (record ? 'Simpan Perubahan' : 'Tambah Data')
+                  : record
+                  ? 'Simpan Perubahan'
+                  : config.key === 'reporting'
+                  ? 'Kirim Laporan / Submit Tugas'
+                  : config.key === 'pekerjaan'
+                  ? 'Buat Penugasan'
+                  : 'Tambah Data'
               }
               className={`inline-flex items-center justify-center gap-2 h-10 px-6 rounded-xl font-semibold text-sm transition-all active:scale-95 shadow-theme-xs ${
                 record && !isDirty
@@ -1773,6 +2084,10 @@ function ResourceForm({
                 </>
               ) : record ? (
                 'Simpan Perubahan'
+              ) : config.key === 'reporting' ? (
+                'Kirim Laporan'
+              ) : config.key === 'pekerjaan' ? (
+                'Buat Penugasan'
               ) : (
                 'Tambah Data'
               )}
@@ -1781,12 +2096,56 @@ function ResourceForm({
         )}
       </form>
 
+      {/* Konfirmasi Simpan / Kirim Formulir */}
+      {showSubmitConfirm && (
+        <ConfirmModal
+          open={showSubmitConfirm}
+          title={
+            config.key === 'reporting'
+              ? record
+                ? 'Simpan Perubahan Laporan?'
+                : 'Kirim Laporan Hasil Kerja?'
+              : record
+              ? 'Simpan Perubahan Data?'
+              : config.key === 'pekerjaan'
+              ? 'Buat Penugasan Pekerjaan?'
+              : `Tambah Data ${config.label} Baru?`
+          }
+          message={
+            config.key === 'reporting'
+              ? record
+                ? 'Apakah Anda yakin ingin menyimpan perubahan pada berkas dan catatan laporan ini?'
+                : 'Apakah Anda yakin data laporan dan berkas bukti hasil kerja ini sudah lengkap dan siap dikirim kepada pimpinan untuk ditinjau?'
+              : record
+              ? `Apakah Anda yakin ingin menyimpan perubahan data ${config.label} ini?`
+              : config.key === 'pekerjaan'
+              ? 'Apakah Anda yakin rincian penugasan pekerjaan ini sudah sesuai dan siap ditugaskan kepada staf pelaksana?'
+              : `Apakah Anda yakin ingin menambahkan data ${config.label} baru ini?`
+          }
+          confirmText={
+            config.key === 'reporting'
+              ? record
+                ? 'Ya, Simpan Perubahan'
+                : 'Ya, Kirim Laporan'
+              : record
+              ? 'Ya, Simpan Perubahan'
+              : config.key === 'pekerjaan'
+              ? 'Ya, Buat Penugasan'
+              : 'Ya, Tambah Data'
+          }
+          type="info"
+          loading={saving}
+          onConfirm={handleConfirmSubmit}
+          onClose={handleCancelSubmit}
+        />
+      )}
+
       {/* Konfirmasi Hapus Draf Formulir */}
       {showResetConfirm && (
         <ConfirmModal
           open={showResetConfirm}
-          title="Hapus Draf Formulir?"
-          message={`Apakah Anda yakin ingin menghapus seluruh draf isian formulir ${config.label} ini? Seluruh data yang telah diketik akan dikosongkan kembali.`}
+          title="Kosongkan Isian Formulir?"
+          message={`Apakah Anda yakin ingin mengosongkan seluruh isian formulir ${config.label} ini dan mengulang dari awal? Seluruh data yang telah diketik dan berkas yang dipilih akan dibersihkan kembali.`}
           confirmText="Ya, Kosongkan"
           type="warning"
           onConfirm={() => {

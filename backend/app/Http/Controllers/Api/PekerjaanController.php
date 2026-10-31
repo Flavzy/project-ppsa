@@ -111,7 +111,21 @@ class PekerjaanController extends Controller
             ],
             'items.*.prioritas' => ['nullable', 'string', 'max:255'],
             'items.*.lampiran_instruksi' => ['nullable'],
-            'items.*.lampiran_instruksi.*' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp,zip,rar,doc,docx,xls,xlsx', 'max:15360'],
+            'items.*.lampiran_instruksi.*' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    if ($value instanceof \Illuminate\Http\UploadedFile) {
+                        if ($value->getSize() > 20480 * 1024) {
+                            $fail("Ukuran file {$value->getClientOriginalName()} melebihi batas 20MB.");
+                        }
+                        $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx'];
+                        $ext = strtolower($value->getClientOriginalExtension());
+                        if (!in_array($ext, $allowedExts, true)) {
+                            $fail("Format file {$value->getClientOriginalName()} ({$ext}) tidak didukung.");
+                        }
+                    }
+                },
+            ],
         ], [
             'items.*.id_pic.exists' => 'Penanggung jawab (PIC) harus merupakan pengguna dengan peran Karyawan.',
             'items.*.deadline.after_or_equal' => 'Batas waktu (deadline) tidak boleh sebelum hari ini.',
@@ -297,6 +311,14 @@ class PekerjaanController extends Controller
     public function destroy(Pekerjaan $pekerjaan): Response
     {
         Gate::authorize('delete', $pekerjaan);
+
+        $hasReports = $pekerjaan->reporting()->exists();
+        $hasReview = $pekerjaan->performanceReview()->exists();
+        $isNotBaru = $pekerjaan->status !== 'baru';
+
+        if ($isNotBaru || $hasReports || $hasReview) {
+            abort(422, 'Pekerjaan yang sedang berjalan atau sudah selesai/dinilai tidak dapat dihapus demi menjaga riwayat laporan dan penilaian kinerja karyawan.');
+        }
 
         if ($pekerjaan->lampiran_instruksi) {
             if (str_starts_with($pekerjaan->lampiran_instruksi, '[') && str_ends_with($pekerjaan->lampiran_instruksi, ']')) {

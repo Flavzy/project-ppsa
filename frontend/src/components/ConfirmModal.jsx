@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import LoadingSpinner from './common/LoadingSpinner'
 
 export default function ConfirmModal({
@@ -76,7 +77,7 @@ export default function ConfirmModal({
     ),
   }
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 sm:p-5 overflow-y-auto">
       {/* Backdrop */}
       <div
@@ -128,4 +129,10 @@ export default function ConfirmModal({
       </div>
     </div>
   )
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body)
+  }
+
+  return modalContent
 }

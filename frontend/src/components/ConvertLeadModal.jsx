@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ConfirmModal from './ConfirmModal'
 import LoadingSpinner from './common/LoadingSpinner'
 import { convertLead, listResource } from '../api/resources'
 
@@ -46,6 +47,7 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [showConvertConfirm, setShowConvertConfirm] = useState(false)
 
   // Ambil daftar master layanan aktif & hitung nomor kontrak berurutan berikutnya
   useEffect(() => {
@@ -124,8 +126,18 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
 
   if (!lead) return null
 
-  async function handleConvert(e) {
+  function handleConvert(e) {
     e.preventDefault()
+    setError('')
+    if (!noKontrak || !noKontrak.trim()) {
+      setError('Nomor kontrak wajib diisi.')
+      return
+    }
+    setShowConvertConfirm(true)
+  }
+
+  async function executeConvert() {
+    setShowConvertConfirm(false)
     setSubmitting(true)
     setError('')
 
@@ -398,6 +410,20 @@ export default function ConvertLeadModal({ lead, onClose, onSuccess }) {
           </div>
         </form>
       </div>
+
+      {/* Konfirmasi Konversi Lead ke Kontrak */}
+      {showConvertConfirm && (
+        <ConfirmModal
+          open={showConvertConfirm}
+          title="Konfirmasi Konversi ke Kontrak?"
+          message={`Apakah Anda yakin ingin mengonversi calon klien "${lead.nama_perusahaan}" menjadi Kontrak resmi dan Klien aktif dengan No. Kontrak ${noKontrak}?`}
+          confirmText="Ya, Konversi Sekarang"
+          type="info"
+          loading={submitting}
+          onConfirm={executeConvert}
+          onClose={() => setShowConvertConfirm(false)}
+        />
+      )}
     </div>
   )
 }

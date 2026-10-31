@@ -103,6 +103,13 @@ class KlienController extends Controller
     {
         Gate::authorize('delete', $klien);
 
+        $isContractActive = $klien->kontrak && $klien->kontrak->status === 'aktif';
+        $hasPekerjaan = $klien->pekerjaan()->where('status', '!=', 'batal')->exists();
+
+        if ($isContractActive || $hasPekerjaan) {
+            abort(422, 'Data klien tidak dapat dihapus karena masih terikat kontrak aktif atau masih memiliki pekerjaan yang sedang berjalan.');
+        }
+
         $klien->delete();
 
         return response()->noContent();

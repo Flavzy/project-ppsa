@@ -345,7 +345,7 @@ function ResourceDashboard({
           setToast({ open: true, message: msg, severity: 'info' })
           window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
         } catch (requestError) {
-          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setError(requestError.message)
           setToast({ open: true, message: requestError.message, severity: 'error' })
         }
@@ -378,7 +378,7 @@ function ResourceDashboard({
           setToast({ open: true, message: msg, severity: 'info' })
           window.dispatchEvent(new CustomEvent('simkk:data-mutated'))
         } catch (requestError) {
-          setConfirmDialog((prev) => ({ ...prev, loading: false }))
+          setConfirmDialog((prev) => ({ ...prev, open: false, loading: false }))
           setError(requestError.message)
           setToast({ open: true, message: requestError.message, severity: 'error' })
         }
@@ -575,32 +575,29 @@ function ResourceDashboard({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-            {config.key === 'pekerjaan' && user?.role === 'karyawan'
-              ? 'Tugas & Penugasan'
-              : config.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
-              ? 'Evaluasi & Penilaian Pribadi'
-              : config.key === 'kinerjaKaryawan' && user?.role === 'pimpinan'
-              ? 'Evaluasi & Penilaian Karyawan'
-              : 'Modul Operasional'}
-          </span>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
             {config.key === 'pekerjaan' && user?.role === 'karyawan'
               ? 'Pekerjaan Saya'
               : config.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
               ? 'Kinerja Saya'
               : config.label}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {config.key === 'pekerjaan' && user?.role === 'karyawan'
-              ? 'Daftar penugasan dan pekerjaan yang ditugaskan secara khusus kepada Anda.'
-              : config.key === 'reporting' && user?.role === 'pimpinan'
-              ? 'Pantau riwayat laporan progres dan periksa berkas penyerahan tugas dari seluruh karyawan.'
-              : config.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
-              ? 'Pantau riwayat evaluasi, skor kecepatan, kualitas kerja, dan catatan penilaian kinerja Anda dari pimpinan.'
-              : config.key === 'kinerjaKaryawan' && user?.role === 'pimpinan'
-              ? 'Kelola, evaluasi, dan pantau penilaian kinerja seluruh karyawan secara komprehensif.'
-              : `Kelola dan pantau data ${config.label.toLowerCase()} secara komprehensif.`}
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {config.key === 'calonKlien'
+              ? 'Daftar prospek bisnis dan kelengkapan berkas legalitas perusahaan.'
+              : config.key === 'kontrak'
+              ? 'Daftar kontrak kerja sama aktif dan rincian perjanjian jasa.'
+              : config.key === 'klien'
+              ? 'Daftar profil resmi klien dan kontak penanggung jawab.'
+              : config.key === 'pekerjaan' && user?.role === 'karyawan'
+              ? 'Daftar penugasan dan pekerjaan yang ditugaskan kepada Anda.'
+              : config.key === 'pekerjaan'
+              ? 'Distribusi penugasan proyek dan alokasi staf PIC operasional.'
+              : config.key === 'reporting'
+              ? 'Riwayat penyerahan laporan hasil kerja dan verifikasi berkas tugas.'
+              : config.key === 'kinerjaKaryawan'
+              ? 'Rekapitulasi evaluasi mutu kerja dan indeks performa staf.'
+              : `Daftar dan pengelolaan data ${config.label.toLowerCase()}.`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
@@ -811,6 +808,8 @@ function ResourceDashboard({
           onCancel={() => {
             setEditingRecord(null)
             setIsFormOpen(false)
+            setError('')
+            setValidationErrors({})
           }}
           onSubmit={handleSubmit}
         />
@@ -826,8 +825,14 @@ function ResourceDashboard({
           canEdit={canEdit}
           canDelete={canDelete}
           user={user}
-          onOpenCreate={() => setIsFormOpen(true)}
+          onOpenCreate={() => {
+            setError('')
+            setValidationErrors({})
+            setIsFormOpen(true)
+          }}
           onEdit={(rec) => {
+            setError('')
+            setValidationErrors({})
             setEditingRecord(rec)
             setIsFormOpen(true)
           }}

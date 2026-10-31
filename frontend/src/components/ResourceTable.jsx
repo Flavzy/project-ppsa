@@ -1013,6 +1013,32 @@ function ResourceTable({
     setPreviewModal({ open: true, url, name })
   }
 
+  // Teks petunjuk (placeholder) pencarian khusus per modul agar ringkas, rapi, dan tepat sasaran
+  const searchPlaceholder = useMemo(() => {
+    switch (config.key) {
+      case 'kontrak':
+        return 'Cari data kontrak...'
+      case 'users':
+        return 'Cari pengguna...'
+      case 'pekerjaan':
+        return 'Cari tugas / pekerjaan...'
+      case 'reporting':
+        return 'Cari laporan tugas...'
+      case 'layanan':
+        return 'Cari layanan...'
+      case 'masterPekerjaan':
+        return 'Cari template pekerjaan...'
+      case 'kinerjaKaryawan':
+        return 'Cari evaluasi kinerja...'
+      case 'calonKlien':
+        return 'Cari calon klien...'
+      case 'klien':
+        return 'Cari klien...'
+      default:
+        return `Cari ${config.label.toLowerCase()}...`
+    }
+  }, [config.key, config.label])
+
   // Reset filter, paginasi, sortir, dan seleksi massal saat modul berganti
   useEffect(() => {
     setStatusFilter('all')
@@ -1133,17 +1159,16 @@ function ResourceTable({
 
     if (config.key === 'users') {
       const roles = [
-        { key: 'admin', label: 'Admin' },
-        { key: 'pimpinan', label: 'Pimpinan' },
-        { key: 'operator', label: 'Operator' },
-        { key: 'sales', label: 'Sales' },
-        { key: 'karyawan', label: 'Karyawan' },
+        { key: 'pimpinan', label: 'Pimpinan (Admin Utama)', matches: ['pimpinan', 'admin'] },
+        { key: 'operator', label: 'Operator', matches: ['operator', 'sales'] },
+        { key: 'karyawan', label: 'Karyawan', matches: ['karyawan'] },
       ]
       return [
         { key: 'all', label: 'Semua Role', count: records.length },
         ...roles.map((r) => ({
-          ...r,
-          count: records.filter((u) => String(u.role || '').toLowerCase() === r.key).length,
+          key: r.key,
+          label: r.label,
+          count: records.filter((u) => r.matches.includes(String(u.role || '').toLowerCase())).length,
         })),
       ]
     }
@@ -1222,7 +1247,13 @@ function ResourceTable({
           result = result.filter((rec) => String(rec.id_layanan || rec.layanan?.id_layanan) === String(statusFilter))
         }
       } else if (config.key === 'users') {
-        result = result.filter((rec) => String(rec.role || '').toLowerCase() === statusFilter)
+        const roleMap = {
+          pimpinan: ['pimpinan', 'admin'],
+          operator: ['operator', 'sales'],
+          karyawan: ['karyawan'],
+        }
+        const validRoles = roleMap[statusFilter] || [statusFilter]
+        result = result.filter((rec) => validRoles.includes(String(rec.role || '').toLowerCase()))
       }
     }
 
@@ -1606,7 +1637,7 @@ function ResourceTable({
               setSearchQuery(e.target.value)
               setCurrentPage(1)
             }}
-            placeholder={`Cari ${config.label.toLowerCase()}...`}
+            placeholder={searchPlaceholder}
             className="w-full pl-9 pr-8 py-2 rounded-xl text-xs border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-hidden focus:border-brand-500 shadow-2xs"
           />
           {searchQuery && (
@@ -1675,17 +1706,10 @@ function ResourceTable({
                 setSearchQuery(e.target.value)
                 setCurrentPage(1)
               }}
-              placeholder={`Cari data ${config.label.toLowerCase()}...`}
+              placeholder={searchPlaceholder}
               className="w-full pl-10 pr-9 py-2 rounded-xl text-xs sm:text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-hidden focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all shadow-2xs"
             />
-            {!searchQuery ? (
-              <kbd
-                className="hidden sm:inline-flex items-center absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700/80 rounded border border-gray-200 dark:border-gray-600 pointer-events-none select-none shadow-2xs"
-                title="Tekan tombol '/' di keyboard untuk langsung mengetik cari"
-              >
-                /
-              </kbd>
-            ) : (
+            {searchQuery && (
               <button
                 type="button"
                 onClick={() => {
@@ -1760,31 +1784,6 @@ function ResourceTable({
             </div>
           )}
 
-          {/* Pengatur Kepadatan Baris Tabel (Desktop Density Mode Toggle) */}
-          <div className="hidden md:flex items-center rounded-xl border border-gray-300 dark:border-gray-700 p-0.5 bg-white dark:bg-gray-800 shadow-2xs" title="Atur Kepadatan Tampilan Baris Tabel">
-            <button
-              type="button"
-              onClick={() => handleDensityChange('normal')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                density === 'normal'
-                  ? 'bg-brand-500 text-white shadow-xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Normal
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDensityChange('compact')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                density === 'compact'
-                  ? 'bg-brand-500 text-white shadow-xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Ringkas
-            </button>
-          </div>
 
           {/* Tombol Ekspor Rekap Data Cepat ke Excel / CSV */}
           {isExportAllowed && (
@@ -2378,10 +2377,7 @@ function ResourceTable({
                           />
                         )}
                         <div className="min-w-0 flex-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400 block">
-                            {config.label}
-                          </span>
-                          <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-0.5 truncate">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
                             {record[config.displayField] || record.nama_perusahaan || record.judul || record.nama || `Data #${rowKey}`}
                           </h4>
                         </div>

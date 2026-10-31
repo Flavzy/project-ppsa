@@ -443,7 +443,7 @@ export default function ProtectedShell() {
   const adminResources = allowedResources.filter((r) => ['users'].includes(r.key))
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50/75 dark:bg-gray-950 font-outfit text-gray-800 dark:text-gray-200">
+    <div className="h-screen flex overflow-hidden bg-gray-50/75 dark:bg-gray-950 font-inter text-gray-800 dark:text-gray-200">
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div
@@ -754,20 +754,36 @@ export default function ProtectedShell() {
           </nav>
         </div>
 
-        {/* Sidebar Footer User Info */}
-        <div className={`shrink-0 border-t border-gray-100 ${isSidebarCollapsed ? 'p-2 lg:p-2.5' : 'p-3.5'} dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 transition-all`}>
-          <div className={`flex items-center ${isSidebarCollapsed ? 'lg:justify-center' : 'gap-3'}`} title={user?.nama || 'Pengguna'}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white font-bold text-xs shadow-xs">
-              {user?.nama ? user.nama.charAt(0).toUpperCase() : 'U'}
+        {/* Sidebar Footer User Info & Logout Button */}
+        <div className={`shrink-0 border-t border-gray-100 ${isSidebarCollapsed ? 'p-2 lg:p-2.5' : 'p-3'} dark:border-gray-800 bg-gray-50/75 dark:bg-gray-900/60 transition-all`}>
+          <div className={`flex items-center ${isSidebarCollapsed ? 'lg:flex-col lg:gap-2 lg:justify-center' : 'justify-between gap-3'}`}>
+            <div className={`flex items-center ${isSidebarCollapsed ? 'lg:justify-center' : 'gap-2.5'} min-w-0 flex-1`} title={user?.nama || 'Pengguna'}>
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white font-bold text-xs shadow-xs">
+                {user?.nama ? user.nama.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className={`min-w-0 flex-1 ${isSidebarCollapsed ? 'lg:hidden' : 'block'}`}>
+                <p className="truncate text-xs font-bold text-gray-900 dark:text-white leading-tight">
+                  {user?.nama || 'Pengguna'}
+                </p>
+                <p className="truncate text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 leading-tight">
+                  {user?.email}
+                </p>
+              </div>
             </div>
-            <div className={`min-w-0 flex-1 ${isSidebarCollapsed ? 'lg:hidden' : 'block'}`}>
-              <p className="truncate text-xs font-semibold text-gray-900 dark:text-white">
-                {user?.nama || 'Pengguna'}
-              </p>
-              <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">
-                {user?.email}
-              </p>
-            </div>
+
+            {/* Tombol Logout di Footer Sidebar (Action Button Rapi dengan Border & Background) */}
+            <button
+              type="button"
+              onClick={() => setShowLogoutModal(true)}
+              disabled={loggingOut}
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-gray-200/90 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:border-error-200 hover:bg-error-50 hover:text-error-600 dark:hover:bg-error-500/15 dark:hover:border-error-500/30 dark:hover:text-error-400 shadow-2xs transition-all active:scale-95 cursor-pointer"
+              title="Keluar dari akun Anda"
+              aria-label="Tombol Keluar"
+            >
+              <svg className="size-4 text-inherit" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -780,7 +796,7 @@ export default function ProtectedShell() {
             {/* Hamburger button for Mobile */}
             <button
               type="button"
-              className="lg:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+              className="lg:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 cursor-pointer"
               onClick={() => setIsMobileOpen(true)}
               aria-label="Toggle mobile menu"
             >
@@ -788,54 +804,6 @@ export default function ProtectedShell() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-
-            {/* Breadcrumb / Title Indicator (Disembunyikan di Mobile, Ditampilkan di Layar Laptop / Desktop) */}
-            <div>
-              <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-gray-400 dark:text-gray-500">
-                <button
-                  type="button"
-                  onClick={() => handleNavigate('dashboard')}
-                  className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors cursor-pointer"
-                >
-                  SIM-KK
-                </button>
-                <span>/</span>
-                <span className="text-gray-600 dark:text-gray-300 font-semibold">
-                  {currentActiveKey === 'dashboard'
-                    ? 'Ikhtisar'
-                    : ['calonKlien', 'kontrak'].includes(currentActiveKey)
-                    ? 'CRM & Kontrak'
-                    : ['klien', 'pekerjaan'].includes(currentActiveKey)
-                    ? 'Operasional'
-                    : ['reporting', 'performanceReviews', 'kinerjaKaryawan'].includes(currentActiveKey)
-                    ? 'Laporan & Kinerja'
-                    : ['layanan', 'masterPekerjaan'].includes(currentActiveKey)
-                    ? 'Data Master'
-                    : 'Administrasi'}
-                </span>
-                {currentActiveKey !== 'dashboard' && (
-                  <>
-                    <span>/</span>
-                    <span className="text-brand-600 dark:text-brand-400 font-bold truncate max-w-[120px] sm:max-w-xs">
-                      {activeConfig?.key === 'pekerjaan' && user?.role === 'karyawan'
-                        ? 'Pekerjaan Saya'
-                        : activeConfig?.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
-                        ? 'Kinerja Saya'
-                        : activeConfig?.label}
-                    </span>
-                  </>
-                )}
-              </div>
-              <h1 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight mt-0.5">
-                {currentActiveKey === 'dashboard'
-                  ? 'Dasbor Utama'
-                  : activeConfig?.key === 'pekerjaan' && user?.role === 'karyawan'
-                  ? 'Pekerjaan Saya'
-                  : activeConfig?.key === 'kinerjaKaryawan' && user?.role === 'karyawan'
-                  ? 'Kinerja Saya'
-                  : activeConfig?.label || 'Modul Operasional'}
-              </h1>
-            </div>
           </div>
 
           {/* Right Header: Theme Toggle, Notifications, Role Pill & Logout */}
@@ -884,9 +852,7 @@ export default function ProtectedShell() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {totalNotifCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex min-w-4.5 h-4.5 px-1 items-center justify-center rounded-full bg-error-500 text-[10px] font-black text-white ring-2 ring-white dark:ring-gray-900 animate-pulse">
-                    {totalNotifCount > 99 ? '99+' : totalNotifCount}
-                  </span>
+                  <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-error-500 ring-2 ring-white dark:ring-gray-900" />
                 )}
               </button>
 
@@ -959,25 +925,12 @@ export default function ProtectedShell() {
               <span className="hidden sm:inline">{roleLabel}</span>
               <span className="sm:hidden">{roleShortLabel}</span>
             </Badge>
-
-            <button
-              type="button"
-              onClick={() => setShowLogoutModal(true)}
-              disabled={loggingOut}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 transition hover:bg-error-50 hover:border-error-200 hover:text-error-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-error-500/10 dark:hover:text-error-400 cursor-pointer shadow-2xs active:scale-95"
-              title="Keluar dari akun Anda"
-            >
-              <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span className="hidden sm:inline">{loggingOut ? 'Keluar...' : 'Keluar'}</span>
-            </button>
           </div>
         </header>
 
         {/* Main Body with balanced TailAdmin padding */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6 lg:p-7 pb-36 md:pb-8">
+          <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6 lg:p-7 pb-8">
             {currentActiveKey === 'dashboard' ? (
               <DashboardView key={`dashboard_${navVersion}`} onNavigate={handleNavigate} />
             ) : activeConfig ? (
@@ -997,102 +950,6 @@ export default function ProtectedShell() {
             )}
           </div>
         </main>
-
-        {/* Mobile Bottom Navigation Bar (Fixed bottom on screens < md) */}
-        <nav
-          aria-label="Navigasi Bawah Mobile"
-          className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200/90 dark:border-gray-800/90 px-2 py-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
-        >
-          <div className="grid grid-cols-5 items-center justify-around gap-1 max-w-lg mx-auto">
-            {/* 1. Dasbor */}
-            <button
-              type="button"
-              onClick={() => handleNavigate('dashboard')}
-              className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
-                currentActiveKey === 'dashboard'
-                  ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
-            >
-              <NavIcon
-                type="dashboard"
-                className={`size-5 transition-colors ${currentActiveKey === 'dashboard' ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
-              />
-              <span className="text-[10px] mt-0.5 truncate leading-tight">Dasbor</span>
-            </button>
-
-            {/* 2. Calon Klien / Klien */}
-            {allowedResources.some((r) => ['klien', 'calonKlien'].includes(r.key)) && (
-              <button
-                type="button"
-                onClick={() => handleNavigate(allowedResources.some((r) => r.key === 'klien') ? 'klien' : 'calonKlien')}
-                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
-                  ['klien', 'calonKlien'].includes(currentActiveKey)
-                    ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                <NavIcon
-                  type="klien"
-                  className={`size-5 transition-colors ${['klien', 'calonKlien'].includes(currentActiveKey) ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
-                />
-                <span className="text-[10px] mt-0.5 truncate leading-tight">Klien</span>
-              </button>
-            )}
-
-            {/* 3. Pekerjaan */}
-            {allowedResources.some((r) => r.key === 'pekerjaan') && (
-              <button
-                type="button"
-                onClick={() => handleNavigate('pekerjaan')}
-                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
-                  currentActiveKey === 'pekerjaan'
-                    ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                <NavIcon
-                  type="pekerjaan"
-                  className={`size-5 transition-colors ${currentActiveKey === 'pekerjaan' ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
-                />
-                <span className="text-[10px] mt-0.5 truncate leading-tight">Tugas</span>
-              </button>
-            )}
-
-            {/* 4. Reporting / Kinerja */}
-            {allowedResources.some((r) => ['reporting', 'kinerjaKaryawan'].includes(r.key)) && (
-              <button
-                type="button"
-                onClick={() => handleNavigate(allowedResources.some((r) => r.key === 'reporting') ? 'reporting' : 'kinerjaKaryawan')}
-                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all select-none cursor-pointer ${
-                  ['reporting', 'kinerjaKaryawan'].includes(currentActiveKey)
-                    ? 'text-brand-600 dark:text-brand-400 font-bold scale-105'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                <NavIcon
-                  type="reporting"
-                  className={`size-5 transition-colors ${['reporting', 'kinerjaKaryawan'].includes(currentActiveKey) ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`}
-                />
-                <span className="text-[10px] mt-0.5 truncate leading-tight">Laporan</span>
-              </button>
-            )}
-
-            {/* 5. Menu Lainnya (Buka Sidebar Drawer Mobile) */}
-            <button
-              type="button"
-              onClick={() => setIsMobileOpen(true)}
-              className="flex flex-col items-center justify-center py-1 px-1.5 rounded-xl text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all select-none cursor-pointer"
-            >
-              <div className="size-5 flex items-center justify-center">
-                <svg className="size-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                </svg>
-              </div>
-              <span className="text-[10px] mt-0.5 truncate leading-tight">Lainnya</span>
-            </button>
-          </div>
-        </nav>
       </div>
 
       {/* Logout Confirmation Modal */}

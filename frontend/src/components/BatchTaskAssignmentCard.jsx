@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { batchCreatePekerjaan, listResource } from '../api/resources'
+import ConfirmModal from './ConfirmModal'
 import LoadingSpinner from './common/LoadingSpinner'
 import MonthInputField from './common/MonthInputField'
+import { isAcceptedFile } from './ResourceForm'
 
 export default function BatchTaskAssignmentCard({
   initialTarget,
@@ -53,6 +55,8 @@ export default function BatchTaskAssignmentCard({
   const [jobItems, setJobItems] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false)
+  const [pendingBatchData, setPendingBatchData] = useState(null)
   const [expandedSop, setExpandedSop] = useState({})
 
   // Bulan periode default (Format YYYY-MM, contoh: 2026-10)
@@ -273,10 +277,13 @@ export default function BatchTaskAssignmentCard({
   const handleFilesAdd = (index, newFiles) => {
     if (!newFiles || newFiles.length === 0) return
     const fileArray = Array.from(newFiles)
+    const allowed = '.pdf,image/*,.jpg,.jpeg,.png,.webp,.zip,.rar,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    const validFiles = fileArray.filter((f) => isAcceptedFile(f, allowed))
+    if (!validFiles.length) return
     setJobItems((prev) => {
       const next = [...prev]
       const currentFiles = Array.isArray(next[index].files) ? next[index].files : []
-      next[index] = { ...next[index], files: [...currentFiles, ...fileArray] }
+      next[index] = { ...next[index], files: [...currentFiles, ...validFiles] }
       return next
     })
   }
@@ -342,40 +349,50 @@ export default function BatchTaskAssignmentCard({
       }
     }
 
+    const formData = new FormData()
+    formData.append('id_klien', selectedKlienId)
+    if (selectedLayananId) {
+      formData.append('id_layanan', selectedLayananId)
+    }
+
+    activeItems.forEach((item, index) => {
+      if (item.id_master_pekerjaan) {
+        formData.append(`items[${index}][id_master_pekerjaan]`, item.id_master_pekerjaan)
+      }
+      formData.append(`items[${index}][judul]`, item.judul)
+      formData.append(`items[${index}][id_pic]`, item.id_pic)
+      formData.append(`items[${index}][deadline]`, item.deadline)
+      if (item.template_instruksi) {
+        formData.append(`items[${index}][deskripsi]`, item.template_instruksi)
+      }
+      if (item.periode_bulan) {
+        formData.append(`items[${index}][periode_bulan]`, item.periode_bulan)
+      }
+      formData.append(`items[${index}][prioritas]`, 'sedang')
+
+      if (Array.isArray(item.files)) {
+        item.files.forEach((file) => {
+          formData.append(`items[${index}][lampiran_instruksi][]`, file)
+        })
+      }
+    })
+
+    setPendingBatchData({ formData, count: activeItems.length })
+    setShowBatchConfirm(true)
+  }
+
+  const executeBatchSubmit = async () => {
+    if (!pendingBatchData) return
+    const { formData, count } = pendingBatchData
+    setShowBatchConfirm(false)
+    setPendingBatchData(null)
     setSubmitting(true)
+    setErrorMessage('')
 
     try {
-      const formData = new FormData()
-      formData.append('id_klien', selectedKlienId)
-      if (selectedLayananId) {
-        formData.append('id_layanan', selectedLayananId)
-      }
-
-      activeItems.forEach((item, index) => {
-        if (item.id_master_pekerjaan) {
-          formData.append(`items[${index}][id_master_pekerjaan]`, item.id_master_pekerjaan)
-        }
-        formData.append(`items[${index}][judul]`, item.judul)
-        formData.append(`items[${index}][id_pic]`, item.id_pic)
-        formData.append(`items[${index}][deadline]`, item.deadline)
-        if (item.template_instruksi) {
-          formData.append(`items[${index}][deskripsi]`, item.template_instruksi)
-        }
-        if (item.periode_bulan) {
-          formData.append(`items[${index}][periode_bulan]`, item.periode_bulan)
-        }
-        formData.append(`items[${index}][prioritas]`, 'sedang')
-
-        if (Array.isArray(item.files)) {
-          item.files.forEach((file) => {
-            formData.append(`items[${index}][lampiran_instruksi][]`, file)
-          })
-        }
-      })
-
       await batchCreatePekerjaan(formData)
       if (typeof onSuccess === 'function') {
-        onSuccess(`${activeItems.length} pekerjaan berhasil ditugaskan sekaligus kepada karyawan!`)
+        onSuccess(`${count} pekerjaan berhasil ditugaskan sekaligus kepada karyawan!`)
       }
     } catch (err) {
       setErrorMessage(err.message || 'Gagal menugaskan pekerjaan secara batch.')
@@ -699,7 +716,7 @@ export default function BatchTaskAssignmentCard({
                             {/* Upload Berkas Acuan / TOR (Multiple Files) - Menggantikan Prioritas */}
                             <div className={item.sifat_periode === 'bulanan' ? 'sm:col-span-1' : 'sm:col-span-2'}>
                               <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">
-                                Berkas Acuan / TOR (Bisa Banyak)
+                                Berkas Acuan / TOR
                               </label>
                               <label
                                 onDragOver={(e) => {
@@ -724,7 +741,7 @@ export default function BatchTaskAssignmentCard({
                                 <input
                                   type="file"
                                   multiple
-                                  accept=".pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx"
+                                  accept=".pdf,image/*,.jpg,.jpeg,.png,.webp,.zip,.rar,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                   disabled={submitting}
                                   onChange={(e) => {
                                     handleFilesAdd(idx, e.target.files)
@@ -740,14 +757,20 @@ export default function BatchTaskAssignmentCard({
                                   {item.files.map((file, fIdx) => (
                                     <span
                                       key={fIdx}
-                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-brand-50 dark:bg-brand-500/15 border border-brand-200 dark:border-brand-800 text-[11px] text-brand-800 dark:text-brand-300 max-w-[200px]"
+                                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xl bg-brand-50 dark:bg-brand-500/15 border border-brand-200 dark:border-brand-800 text-[11px] font-medium text-brand-800 dark:text-brand-300 max-w-[220px] shadow-2xs"
                                     >
+                                      <svg className="size-3 text-brand-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
                                       <span className="truncate">{file.name}</span>
+                                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-normal shrink-0">
+                                        ({(file.size / 1024).toFixed(0)} KB)
+                                      </span>
                                       <button
                                         type="button"
                                         onClick={() => handleFileRemove(idx, fIdx)}
                                         disabled={submitting}
-                                        className="text-gray-400 hover:text-error-500 font-bold ml-0.5 cursor-pointer"
+                                        className="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 font-bold ml-0.5 cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-full size-3.5 inline-flex items-center justify-center transition-colors shrink-0"
                                         title="Hapus berkas"
                                       >
                                         &times;
@@ -810,6 +833,23 @@ export default function BatchTaskAssignmentCard({
           </div>
         </div>
       </form>
+
+      {/* Konfirmasi Penugasan Batch */}
+      {showBatchConfirm && (
+        <ConfirmModal
+          open={showBatchConfirm}
+          title="Tugaskan Pekerjaan Batch?"
+          message={`Apakah Anda yakin ingin menugaskan ${pendingBatchData?.count || selectedCount} pekerjaan terpilih ini sekaligus kepada masing-masing staf PIC karyawan?`}
+          confirmText={`Ya, Tugaskan (${pendingBatchData?.count || selectedCount})`}
+          type="info"
+          loading={submitting}
+          onConfirm={executeBatchSubmit}
+          onClose={() => {
+            setShowBatchConfirm(false)
+            setPendingBatchData(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -25,7 +25,7 @@ export const resourceConfigs = [
       { name: 'alamat_perusahaan', label: '3. Alamat Perusahaan', type: 'textarea', rows: 2, required: false, section: 'Informasi Profil Klien & Perusahaan' },
       { name: 'nama_direktur', label: '4. Nama Direktur', type: 'text', required: false, section: 'Informasi Profil Klien & Perusahaan' },
       { name: 'kontak_person', label: '5. Kontak Person (No. HP / WhatsApp / Telepon)', type: 'text', required: true, placeholder: 'No. HP / WhatsApp / Telepon (maks. 16 digit angka)', numericOnly: true, maxLength: 16, section: 'Informasi Profil Klien & Perusahaan' },
-      { name: 'email', label: '6. Email Klien / Perusahaan', type: 'email', required: false, placeholder: 'contoh: kontak@perusahaan.com', section: 'Informasi Profil Klien & Perusahaan' },
+      { name: 'email', label: '6. Email Klien / Perusahaan', type: 'email', required: false, placeholder: 'nama_perusahaan@gmail.com', section: 'Informasi Profil Klien & Perusahaan' },
       {
         name: 'id_user',
         label: 'Operator PIC',
@@ -66,21 +66,21 @@ export const resourceConfigs = [
 
       // 2. Legalitas Perusahaan (Nomor & Dokumen Pendukung)
       { name: 'nomor_nib', label: '1. NIB (Nomor Induk Berusaha)', type: 'text', placeholder: 'Masukkan nomor NIB', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
-      { name: 'file_nib', label: 'Upload Dokumen NIB', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_nib', label: 'Upload Dokumen NIB', type: 'file', accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,application/pdf', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
 
       { name: 'nomor_npwp', label: '2. NPWP Perusahaan', type: 'text', placeholder: 'Masukkan nomor NPWP', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
-      { name: 'file_npwp', label: 'Upload Dokumen NPWP', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_npwp', label: 'Upload Dokumen NPWP', type: 'file', accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,application/pdf', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
 
       { name: 'nomor_akta_pendirian', label: '3. Akta Pendirian', type: 'text', placeholder: 'Masukkan nomor Akta Pendirian', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
-      { name: 'file_akta_pendirian', label: 'Upload Dokumen Akta Pendirian', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_akta_pendirian', label: 'Upload Dokumen Akta Pendirian', type: 'file', accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,application/pdf', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
 
       { name: 'nomor_sk_kemenkumham', label: '4. SK Kemenkumham', type: 'text', placeholder: 'Masukkan nomor SK Kemenkumham', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
-      { name: 'file_sk_kemenkumham', label: 'Upload Dokumen SK Kemenkumham', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_sk_kemenkumham', label: 'Upload Dokumen SK Kemenkumham', type: 'file', accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,application/pdf', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
 
       { name: 'nomor_izin_usaha', label: '5. Izin Usaha', type: 'text', placeholder: 'Masukkan nomor Izin Usaha', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
-      { name: 'file_izin_usaha', label: 'Upload Dokumen Izin Usaha', type: 'file', accept: '.pdf,image/*', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_izin_usaha', label: 'Upload Dokumen Izin Usaha', type: 'file', accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,application/pdf', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
 
-      { name: 'file_dokumen_pendukung', label: 'Upload Dokumen Pendukung Lainnya', type: 'file', multiple: true, accept: '.pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
+      { name: 'file_dokumen_pendukung', label: 'Upload Dokumen Pendukung Lainnya', type: 'file', multiple: true, accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,.zip,.rar,.doc,.docx,.xls,.xlsx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv', section: 'Legalitas Perusahaan & Dokumen Pendukung' },
     ],
   },
   {
@@ -271,7 +271,7 @@ export const resourceConfigs = [
         label: 'Berkas Acuan / Dokumen Panduan (TOR / Brief)',
         type: 'file',
         multiple: true,
-        accept: '.pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx,.ppt,.pptx',
+        accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,.zip,.rar,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation',
         required: false,
         fullWidth: true,
       },
@@ -322,7 +322,7 @@ export const resourceConfigs = [
         label: 'Upload Dokumen Bukti (PDF, Gambar, Zip, Dokumen)',
         type: 'file',
         multiple: true,
-        accept: '.pdf,image/*,.zip,.rar,.doc,.docx,.xls,.xlsx',
+        accept: '.pdf,image/*,.jpg,.jpeg,.png,.webp,.zip,.rar,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation',
         required: false,
         fullWidth: true,
       },
@@ -401,8 +401,8 @@ export const resourceConfigs = [
       { key: 'role', label: 'Role / Peran' },
     ],
     fields: [
-      { name: 'nama', label: 'Nama Lengkap', type: 'text', required: true, placeholder: 'Nama Pengguna (contoh: Budi Santoso)' },
-      { name: 'email', label: 'Username', type: 'text', required: true, placeholder: 'Masukkan username login (contoh: budi_santoso)' },
+      { name: 'nama', label: 'Nama Lengkap', type: 'text', required: true, placeholder: 'Nama Pengguna' },
+      { name: 'email', label: 'Username', type: 'text', required: true, placeholder: 'Masukkan username' },
       { name: 'password', label: 'Password Login', type: 'password', required: true, placeholder: 'Minimal 6 karakter' },
       {
         name: 'role',

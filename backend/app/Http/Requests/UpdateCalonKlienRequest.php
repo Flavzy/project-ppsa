@@ -56,7 +56,7 @@ class UpdateCalonKlienRequest extends FormRequest
                 'nullable',
                 function ($attribute, $value, $fail) {
                     $files = is_array($value) ? $value : [$value];
-                    $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar', 'doc', 'docx', 'xls', 'xlsx'];
+                    $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'zip', 'rar', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
                     foreach ($files as $file) {
                         if ($file instanceof \Illuminate\Http\UploadedFile) {
                             if ($file->getSize() > 20480 * 1024) {

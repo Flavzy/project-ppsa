@@ -105,6 +105,11 @@ class KontrakController extends Controller
     {
         Gate::authorize('delete', $kontrak);
 
+        $hasPekerjaan = $kontrak->klien && $kontrak->klien->pekerjaan()->exists();
+        if ($kontrak->status !== 'draft' || $hasPekerjaan) {
+            abort(422, "Kontrak berstatus aktif atau yang telah memiliki penugasan pekerjaan tidak dapat dihapus. Silakan ubah status kontrak menjadi 'Dibatalkan' atau 'Selesai' jika kerja sama berakhir.");
+        }
+
         $kontrak->delete();
 
         return response()->noContent();

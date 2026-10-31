@@ -108,15 +108,6 @@ export default function DetailLegalitasModal({ record, onClose }) {
             </div>
           </div>
 
-          {/* Mobile Swipe Hint */}
-          <div className="flex sm:hidden items-center justify-between px-1 text-[11px] text-gray-400 dark:text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <svg className="size-3.5 text-brand-500 shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-              <span>Geser tabel ke samping untuk melihat berkas →</span>
-            </span>
-          </div>
 
           {/* Legalitas Table with Horizontal Scroll Support */}
           <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xs">

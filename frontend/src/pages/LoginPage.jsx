@@ -108,7 +108,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 dark:bg-gray-950 font-outfit">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 dark:bg-gray-950 font-inter">
       {/* Mobile Top Hero Banner (Illustration & Branding for Phone screens - Never Hidden) */}
       <div className="lg:hidden relative bg-gradient-to-br from-slate-900 via-gray-900 to-slate-950 text-white px-5 py-7 text-center overflow-hidden border-b border-slate-800">
         <GridShape className="opacity-20 text-slate-500" />

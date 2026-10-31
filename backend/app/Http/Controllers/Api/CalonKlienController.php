@@ -201,6 +201,10 @@ class CalonKlienController extends Controller
     {
         Gate::authorize('delete', $calonKlien);
 
+        if ($calonKlien->kontrak()->exists() || $calonKlien->status_prospek === 'deal') {
+            abort(422, 'Calon klien ini telah resmi memiliki kontrak kerja sama dan tidak dapat dihapus. Silakan kelola status kontrak melalui menu Kontrak.');
+        }
+
         // Delete uploaded files from storage
         foreach (self::FILE_FIELDS as $field) {
             if ($calonKlien->$field) {
