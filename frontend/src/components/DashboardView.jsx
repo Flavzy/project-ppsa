@@ -45,18 +45,18 @@ const ROLE_BADGE_CONFIG = {
   karyawan: { label: 'Karyawan', color: 'info' },
 }
 
-// Subcomponent: TailAdmin Metric Stat Card - Crisp and proportional
+// Subcomponent: TailAdmin Metric Stat Card - Crisp and proportional (Bentuk Balok Tipis Sudut Diagonal Bawah + Kanan)
 function MetricCard({ title, value, subtitle, icon, iconBg = 'bg-brand-50 text-brand-600 dark:bg-brand-500/15', alert = false, badgeText, badgeColor = 'primary' }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border p-3.5 sm:p-5 transition-all shadow-xs hover:shadow-md ${
+      className={`group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-r-[3.5px] border-b-[3.5px] p-3.5 sm:p-5 transition-all duration-200 ease-out transform-gpu hover:-translate-y-0.5 hover:scale-[1.025] hover:shadow-md hover:z-10 cursor-default select-none ${
         alert
-          ? 'border-error-200 bg-error-25/40 dark:border-error-800 dark:bg-error-500/5'
-          : 'border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900'
+          ? 'border-error-200 border-r-error-300 border-b-error-400/90 bg-error-25/40 dark:border-error-800 dark:border-r-error-700 dark:border-b-error-600 dark:bg-error-500/5 shadow-[2px_2px_0_0_rgba(248,113,113,0.15)] hover:border-r-error-400 hover:border-b-error-500'
+          : 'border-gray-200 border-r-gray-300/80 border-b-gray-300/95 bg-white dark:border-gray-800 dark:border-r-gray-700/80 dark:border-b-gray-700 dark:bg-gray-900 shadow-[2px_2px_0_0_rgba(203,213,225,0.35)] hover:border-r-brand-300 hover:border-b-brand-400 dark:hover:border-r-brand-500 dark:hover:border-b-brand-500'
       }`}
     >
       <div className="flex items-center justify-between gap-1">
-        <div className={`flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-xl ${alert ? 'bg-error-50 text-error-600 dark:bg-error-500/15' : iconBg}`}>
+        <div className={`flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 ${alert ? 'bg-error-50 text-error-600 dark:bg-error-500/15' : iconBg}`}>
           {icon}
         </div>
         {badgeText && (

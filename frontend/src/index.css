@@ -343,6 +343,33 @@ html.dark input[type="month"]::-webkit-calendar-picker-indicator:hover {
   will-change: transform, opacity;
 }
 
+/* Animasi Ayunan Berdering Lonceng Notifikasi Saat Kursor Mendekat (Bell Swing on Hover) */
+@keyframes bellRing {
+  0% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-12deg);
+  }
+  60% {
+    transform: rotate(8deg);
+  }
+  80% {
+    transform: rotate(-4deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+.group:hover .group-hover\:animate-bell-ring {
+  animation: bellRing 0.5s ease-in-out both;
+  transform-origin: top center;
+}
+
 /* Print styles for official contract documents */
 @media print {
   @page {

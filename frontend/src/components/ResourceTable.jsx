@@ -1176,6 +1176,21 @@ function ResourceTable({
     return []
   }, [records, config.key])
 
+  const datePresetOptions = useMemo(() => [
+    { id: 'all', label: 'Semua Waktu' },
+    { id: 'today', label: 'Hari Ini' },
+    { id: 'this_week', label: 'Minggu Ini' },
+    { id: 'this_month', label: 'Bulan Ini' },
+  ], [])
+
+  const currentStatusOption = useMemo(() => {
+    return statusFilterOptions.find((opt) => opt.key === statusFilter) || statusFilterOptions[0]
+  }, [statusFilterOptions, statusFilter])
+
+  const currentDatePresetOption = useMemo(() => {
+    return datePresetOptions.find((d) => d.id === datePreset) || datePresetOptions[0]
+  }, [datePresetOptions, datePreset])
+
   // Filter Data Berdasarkan Pencarian, Status / Kategori Dropdown & Preset Tanggal
   const filteredRecords = useMemo(() => {
     let result = records || []
@@ -1417,6 +1432,23 @@ function ResourceTable({
   const [isPageSizeOpen, setIsPageSizeOpen] = useState(false)
   const pageSizeMenuRef = useRef(null)
 
+  // Menu Dropdown Animasi Meluncur Turun & Tarik Kembali untuk Filter Status/Kategori & Rentang Waktu
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false)
+  const statusFilterMenuRef = useRef(null)
+  const [isDateFilterOpen, setIsDateFilterOpen] = useState(false)
+  const dateFilterMenuRef = useRef(null)
+
+  // Fungsi Reset Menyeluruh: Bersihkan pencarian, filter status/role, dan preset rentang waktu
+  const handleResetFiltersAndSearch = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setDatePreset('all')
+    setCurrentPage(1)
+    setIsStatusFilterOpen(false)
+    setIsDateFilterOpen(false)
+    setIsMobileFilterDrawerOpen(false)
+  }
+
   // Pintasan Keyboard Laptop/Desktop: '/' untuk fokus kotak cari, 'Escape' untuk tutup menu/filter/batal cari
   useEffect(() => {
     function handleKeyDown(e) {
@@ -1440,6 +1472,14 @@ function ResourceTable({
           setActiveDropdownId(null)
           return
         }
+        if (isStatusFilterOpen) {
+          setIsStatusFilterOpen(false)
+          return
+        }
+        if (isDateFilterOpen) {
+          setIsDateFilterOpen(false)
+          return
+        }
         if (isPageSizeOpen) {
           setIsPageSizeOpen(false)
           return
@@ -1457,7 +1497,7 @@ function ResourceTable({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeDropdownId, isMobileFilterDrawerOpen, isPageSizeOpen])
+  }, [activeDropdownId, isMobileFilterDrawerOpen, isPageSizeOpen, isStatusFilterOpen, isDateFilterOpen])
 
   useEffect(() => {
     function handlePointerDown(e) {
@@ -1467,17 +1507,25 @@ function ResourceTable({
       if (pageSizeMenuRef.current && !pageSizeMenuRef.current.contains(e.target)) {
         setIsPageSizeOpen(false)
       }
+      if (statusFilterMenuRef.current && !statusFilterMenuRef.current.contains(e.target)) {
+        setIsStatusFilterOpen(false)
+      }
+      if (dateFilterMenuRef.current && !dateFilterMenuRef.current.contains(e.target)) {
+        setIsDateFilterOpen(false)
+      }
     }
-    if (activeDropdownId !== null || isPageSizeOpen) {
+    if (activeDropdownId !== null || isPageSizeOpen || isStatusFilterOpen || isDateFilterOpen) {
       document.addEventListener('pointerdown', handlePointerDown)
       return () => document.removeEventListener('pointerdown', handlePointerDown)
     }
-  }, [activeDropdownId, isPageSizeOpen])
+  }, [activeDropdownId, isPageSizeOpen, isStatusFilterOpen, isDateFilterOpen])
 
   useEffect(() => {
     setActiveDropdownId(null)
     setIsPageSizeOpen(false)
-  }, [currentPage, pageSize, statusFilter, searchQuery])
+    setIsStatusFilterOpen(false)
+    setIsDateFilterOpen(false)
+  }, [currentPage, pageSize, statusFilter, datePreset, searchQuery])
 
   if (loading && (!records || records.length === 0)) {
     return (
@@ -1671,6 +1719,16 @@ function ResourceTable({
           {(statusFilter !== 'all' || datePreset !== 'all') && (
             <span className="size-2 rounded-full bg-white dark:bg-brand-200 animate-pulse" />
           )}
+          <svg
+            className={`size-3.5 text-gray-400 dark:text-gray-300 transition-transform duration-250 ease-in-out ${
+              isMobileFilterDrawerOpen ? 'rotate-180' : 'rotate-0'
+            }`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </button>
 
         {/* Tombol Ekspor Excel Cepat (Mobile) */}
@@ -1725,30 +1783,82 @@ function ResourceTable({
           </div>
 
           {/* Dropdown Filter Rentang Waktu (Desktop / Laptop) */}
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <select
-              value={datePreset}
-              onChange={(e) => {
-                setDatePreset(e.target.value)
-                setCurrentPage(1)
+          <div className="relative" ref={dateFilterMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDateFilterOpen((prev) => !prev)
+                setIsStatusFilterOpen(false)
               }}
-              className="pl-9 pr-8 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-hidden focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all shadow-2xs cursor-pointer appearance-none"
+              aria-expanded={isDateFilterOpen}
+              aria-haspopup="listbox"
+              className={`inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all duration-150 cursor-pointer shadow-2xs select-none active:scale-95 ${
+                datePreset !== 'all'
+                  ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/15 text-brand-600 dark:text-brand-300 ring-1 ring-brand-500/25'
+                  : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750'
+              }`}
               title="Filter Berdasarkan Rentang Waktu"
             >
-              <option value="all" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Semua Waktu</option>
-              <option value="today" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Hari Ini</option>
-              <option value="this_week" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Minggu Ini</option>
-              <option value="this_month" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">Bulan Ini</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400">
-              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`size-4 shrink-0 ${datePreset !== 'all' ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="truncate max-w-[120px]">
+                {currentDatePresetOption.label}
+              </span>
+              <svg
+                className={`size-4 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-250 ease-in-out ${
+                  isDateFilterOpen ? 'rotate-180 text-brand-500 dark:text-brand-400' : 'rotate-0'
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
+            </button>
+
+            {/* Dropdown Menu Rentang Waktu dengan Animasi Meluncur Turun & Ditarik ke Atas */}
+            <div
+              role="listbox"
+              className={`absolute top-full mt-1.5 left-0 z-50 w-48 rounded-2xl border border-gray-200 dark:border-gray-700/80 bg-white/95 dark:bg-gray-850/95 backdrop-blur-md p-1.5 shadow-xl origin-top transition-all duration-200 ${
+                isDateFilterOpen
+                  ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+                  : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'
+              }`}
+            >
+              <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800 mb-1">
+                Rentang Waktu
+              </div>
+              <div className="space-y-0.5">
+                {datePresetOptions.map((item) => {
+                  const isSelected = datePreset === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => {
+                        setDatePreset(item.id)
+                        setCurrentPage(1)
+                        setIsDateFilterOpen(false)
+                      }}
+                      className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer text-left ${
+                        isSelected
+                          ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-bold ring-1 ring-brand-500/20'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/80 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      {isSelected && (
+                        <svg className="size-3.5 text-brand-600 dark:text-brand-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -1756,30 +1866,110 @@ function ResourceTable({
         {/* Dropdown Filter Kategori / Status & Pengatur Kepadatan Baris Tabel */}
         <div className="flex flex-wrap items-center gap-2">
           {statusFilterOptions.length > 0 && (
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="relative" ref={statusFilterMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStatusFilterOpen((prev) => !prev)
+                  setIsDateFilterOpen(false)
+                }}
+                aria-expanded={isStatusFilterOpen}
+                aria-haspopup="listbox"
+                className={`inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all duration-150 cursor-pointer shadow-2xs select-none active:scale-95 ${
+                  statusFilter !== 'all'
+                    ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/15 text-brand-600 dark:text-brand-300 ring-1 ring-brand-500/25'
+                    : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750'
+                }`}
+                title="Filter Berdasarkan Status & Kategori"
+              >
+                {/* Funnel Icon */}
+                <svg className={`size-4 shrink-0 ${statusFilter !== 'all' ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
-              </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value)
-                  setCurrentPage(1)
-                }}
-                className="pl-9 pr-8 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-hidden focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all shadow-2xs cursor-pointer appearance-none"
-              >
-                {statusFilterOptions.map((opt) => (
-                  <option key={opt.key} value={opt.key} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
-                    {opt.label} ({opt.count})
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400">
-                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+                {/* Current Active Label */}
+                <span className="truncate max-w-[150px] sm:max-w-[200px]">
+                  {currentStatusOption?.label || 'Semua Status'} ({currentStatusOption?.count ?? records.length})
+                </span>
+
+                {/* Rotating Chevron Icon */}
+                <svg
+                  className={`size-4 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-250 ease-in-out ${
+                    isStatusFilterOpen ? 'rotate-180 text-brand-500 dark:text-brand-400' : 'rotate-0'
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
+              </button>
+
+              {/* Dropdown Menu Daftar Filter yang Meluncur Turun & Ditarik Kembali ke Atas */}
+              <div
+                role="listbox"
+                className={`absolute top-full mt-1.5 right-0 z-50 w-60 sm:w-64 max-h-72 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700/80 bg-white/95 dark:bg-gray-850/95 backdrop-blur-md p-1.5 shadow-xl origin-top transition-all duration-200 ${
+                  isStatusFilterOpen
+                    ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+                    : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'
+                }`}
+              >
+                <div className="px-2.5 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800 mb-1 flex items-center justify-between">
+                  <span>Pilih Filter</span>
+                  {statusFilter !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter('all')
+                        setCurrentPage(1)
+                        setIsStatusFilterOpen(false)
+                      }}
+                      className="text-brand-600 dark:text-brand-400 hover:underline cursor-pointer lowercase text-[10px] font-semibold"
+                    >
+                      reset
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-0.5">
+                  {statusFilterOptions.map((opt) => {
+                    const isSelected = statusFilter === opt.key
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          setStatusFilter(opt.key)
+                          setCurrentPage(1)
+                          setIsStatusFilterOpen(false)
+                        }}
+                        className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer text-left ${
+                          isSelected
+                            ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-bold ring-1 ring-brand-500/20'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/80 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{opt.label}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            isSelected
+                              ? 'bg-brand-100 dark:bg-brand-500/30 text-brand-700 dark:text-brand-200'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                          }`}>
+                            {opt.count}
+                          </span>
+                          {isSelected && (
+                            <svg className="size-3.5 text-brand-600 dark:text-brand-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -1999,12 +2189,8 @@ function ResourceTable({
             </p>
             <button
               type="button"
-              onClick={() => {
-                setSearchQuery('')
-                setStatusFilter('all')
-                setCurrentPage(1)
-              }}
-              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all cursor-pointer shadow-2xs"
+              onClick={handleResetFiltersAndSearch}
+              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               Reset Filter & Pencarian
             </button>
