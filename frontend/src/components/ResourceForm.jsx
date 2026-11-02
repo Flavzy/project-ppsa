@@ -42,6 +42,10 @@ function getInitialValue(field, record, currentUser, config) {
       const num = Number(record[field.name])
       return isNaN(num) ? '' : num
     }
+    if (field.name === 'is_active') {
+      const raw = record[field.name]
+      return (raw === true || raw === 1 || raw === '1' || raw === 'true') ? 1 : 0
+    }
     return record[field.name]
   }
 
@@ -744,7 +748,10 @@ function ResourceForm({
   const tglPenugasanVal = values.tgl_penugasan || record?.tgl_penugasan || todayStr
 
   // Tangani perubahan nilai input dan otomatis simpan ke draf jika mode tambah baru
-  function handleFieldChange(fieldName, val) {
+  function handleFieldChange(fieldName, rawVal) {
+    const val = fieldName === 'is_active' && rawVal !== '' && rawVal !== undefined && rawVal !== null
+      ? (rawVal === 1 || rawVal === '1' || rawVal === true || rawVal === 'true' ? 1 : 0)
+      : rawVal
     setDismissedErrors((prev) => (prev[fieldName] ? prev : { ...prev, [fieldName]: true }))
     setClientErrors((prev) => {
       if (!prev[fieldName]) return prev
@@ -957,6 +964,12 @@ function ResourceForm({
         const numOrig = origRaw !== undefined && origRaw !== null && origRaw !== '' ? Number(origRaw) : null
         const numCurrent = currentRaw !== undefined && currentRaw !== null && currentRaw !== '' ? Number(currentRaw) : null
         return numOrig !== numCurrent
+      }
+
+      if (field.name === 'is_active') {
+        const boolOrig = origRaw === true || origRaw === 1 || origRaw === '1' || origRaw === 'true'
+        const boolCurrent = currentRaw === true || currentRaw === 1 || currentRaw === '1' || currentRaw === 'true'
+        return boolOrig !== boolCurrent
       }
 
       const origVal = String(origRaw !== undefined && origRaw !== null ? origRaw : '').trim()
@@ -1233,7 +1246,11 @@ function ResourceForm({
           })
         } else {
           const val = values[field.name] !== undefined ? values[field.name] : ''
-          formData.append(field.name, val)
+          if (field.name === 'is_active') {
+            formData.append(field.name, (val === 1 || val === '1' || val === true || val === 'true') ? 1 : 0)
+          } else {
+            formData.append(field.name, val)
+          }
         }
       })
 
@@ -1264,6 +1281,10 @@ function ResourceForm({
 
         const val = values[field.name] !== undefined ? values[field.name] : ''
         if (record && (field.name === 'password' || field.type === 'password') && (!val || String(val).trim() === '')) {
+          return
+        }
+        if (field.name === 'is_active') {
+          payload['is_active'] = (val === 1 || val === '1' || val === true || val === 'true') ? 1 : 0
           return
         }
         payload[field.name] = val === '' ? null : val
@@ -1571,7 +1592,13 @@ function ResourceForm({
 
                       const hasCurrent = selectOptions.some((opt) => {
                         const v = typeof opt === 'object' ? opt[valKey] : opt
-                        return String(v) === String(initialVal)
+                        if (String(v) === String(initialVal)) return true
+                        if (field.name === 'is_active') {
+                          const optBool = v === 1 || v === '1' || v === true || v === 'true'
+                          const initBool = initialVal === 1 || initialVal === '1' || initialVal === true || initialVal === 'true'
+                          return optBool === initBool
+                        }
+                        return false
                       })
 
                       // Temukan nama yang ramah manusia, jangan pernah menampilkan angka ID mentah
@@ -1615,7 +1642,11 @@ function ResourceForm({
                           <select
                             id={field.name}
                             name={field.name}
-                            value={values[field.name] ?? ''}
+                            value={
+                              field.name === 'is_active' && values[field.name] !== undefined && values[field.name] !== null
+                                ? (values[field.name] === true || values[field.name] === 1 || values[field.name] === '1' || values[field.name] === 'true' ? 1 : 0)
+                                : (values[field.name] ?? '')
+                            }
                             onChange={(e) => handleFieldChange(field.name, e.target.value)}
                             required={field.required && !isFieldDisabled}
                             disabled={isFieldDisabled}
@@ -1625,7 +1656,7 @@ function ResourceForm({
                                 : 'border-gray-300 dark:border-gray-700 focus:border-brand-500 focus:ring-brand-500/10'
                             } bg-transparent dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-800 dark:text-gray-100 focus:outline-hidden focus:ring-4 transition-colors disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60`}
                           >
-                            <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
+                            <option value="" disabled hidden className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                               {selectOptions.length === 0 && config.key === 'kinerjaKaryawan' && field.name === 'id_pekerjaan'
                                 ? '-- Tidak ada tugas selesai & disetujui yang menunggu penilaian --'
                                 : selectOptions.length === 0 && config.key === 'pekerjaan' && field.name === 'id_klien'

@@ -444,7 +444,7 @@ export const resourceConfigs = [
         required: true,
         defaultValue: 1,
         options: [
-          { value: 1, label: 'Aktif (Dapat Dipilih)' },
+          { value: 1, label: 'Aktif' },
           { value: 0, label: 'Nonaktif' },
         ],
       },

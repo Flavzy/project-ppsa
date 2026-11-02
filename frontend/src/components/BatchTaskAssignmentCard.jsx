@@ -489,7 +489,7 @@ export default function BatchTaskAssignmentCard({
               disabled={submitting}
               className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3.5 py-2.5 text-xs sm:text-sm text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-4 focus:ring-brand-500/10 transition-colors"
             >
-              <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
+              <option value="" disabled hidden className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                 {activeClients.length === 0 ? '-- Tidak ada klien dengan kontrak aktif --' : '-- Pilih Perusahaan Klien --'}
               </option>
               {activeClients.map((k) => (
@@ -671,7 +671,7 @@ export default function BatchTaskAssignmentCard({
                                 disabled={submitting}
                                 className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-xs text-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20"
                               >
-                                <option value="" className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">-- Pilih Karyawan --</option>
+                                <option value="" disabled hidden className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">-- Pilih Karyawan --</option>
                                 {employees.map((emp) => (
                                   <option key={emp.id_user} value={String(emp.id_user)} className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100">
                                     {emp.nama}
